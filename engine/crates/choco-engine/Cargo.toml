@@ -28,6 +28,7 @@ ureq.workspace = true
 whisper-rs = { workspace = true, optional = true }
 png = "0.18"
 sha2 = "0.11"
+cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
 
 [dev-dependencies]
 tempfile.workspace = true

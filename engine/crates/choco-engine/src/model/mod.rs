@@ -145,6 +145,11 @@ pub struct CropPlan {
 pub struct CaptionStyle {
     pub name: String,
     pub font_family: String,
+    #[serde(default = "default_weight")]
+    pub font_weight: u16,
+    /// "word": only the spoken word is highlighted. "progressive": every word spoken so far.
+    #[serde(default = "default_highlight")]
+    pub highlight: String,
     /// Percent of frame height.
     pub size_pct: f32,
     /// Percent of frame height from the bottom edge.
@@ -157,6 +162,13 @@ pub struct CaptionStyle {
     pub active_pill: Option<String>,
     pub max_lines: u8,
     pub uppercase: bool,
+}
+
+fn default_weight() -> u16 {
+    800
+}
+fn default_highlight() -> String {
+    "word".into()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
