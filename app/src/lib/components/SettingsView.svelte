@@ -23,9 +23,10 @@
     const d = await open({ directory: true, defaultPath: settings.defaults.output_dir });
     if (typeof d === "string") settings.defaults.output_dir = d;
   }
+  let keyRemoved = $state(false);
   async function removeKey() {
     await api.setApiKey("");
-    status.has_key = false;
+    keyRemoved = true;
   }
   const appleSpeech = $derived(status.speech_engines.some((e) => e.kind === "apple_speech"));
 </script>
@@ -35,7 +36,8 @@
 
   <h2>Clip picker</h2>
   <ProviderSetup {status} bind:settings />
-  {#if status.has_key}<button class="ghost small" onclick={removeKey}>Remove saved key</button>{/if}
+  {#if status.has_key && !keyRemoved}<button class="ghost small" onclick={removeKey}>Remove saved key</button>{/if}
+  {#if keyRemoved}<p class="small muted">Key removed from the Keychain.</p>{/if}
 
   <h2 class="sp">Defaults</h2>
   <div class="card grid">

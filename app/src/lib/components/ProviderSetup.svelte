@@ -1,10 +1,13 @@
 <script lang="ts">
   import { api, OPENCODE_URL, OPENCODE_SIGNUP, type Status, type Settings, type ProviderKind } from "$lib/api";
   import { openUrl } from "@tauri-apps/plugin-opener";
+  import { untrack } from "svelte";
 
-  let { status, settings = $bindable() }: { status: Status; settings: Settings } = $props();
+  let { status, settings = $bindable(), onKeySaved }: { status: Status; settings: Settings; onKeySaved?: () => void } = $props();
 
   let key = $state("");
+  // Local copy: a child must not mutate its parent's props.
+  let hasKey = $state<boolean>(untrack(() => status.has_key));
   let models = $state<string[]>([]);
   let busy = $state(false);
   let message = $state("");
@@ -31,15 +34,17 @@
     message = "";
     ok = null;
     try {
-      if (key.trim()) await api.setApiKey(key.trim());
+      // Prove the key against the endpoint first; only a working key is saved to the Keychain.
       models = await api.providerModels(settings.provider.base_url, key.trim() || undefined);
+      if (key.trim()) await api.setApiKey(key.trim());
       if (!settings.provider.score_model || !models.includes(settings.provider.score_model)) {
         settings.provider.score_model = ordered[0] ?? "";
       }
       if (!settings.provider.summary_model || !models.includes(settings.provider.summary_model)) {
         settings.provider.summary_model = settings.provider.score_model;
       }
-      status.has_key = true;
+      hasKey = true;
+      onKeySaved?.();
       key = "";
       message = `Connected. ${models.length} models available.`;
       ok = true;
@@ -96,10 +101,10 @@
       <label for="base">Base URL</label>
       <input id="base" type="text" placeholder="https://api.example.com/v1" bind:value={settings.provider.base_url} />
     {/if}
-    <label for="key">API key {#if status.has_key}<span class="ok">· saved in your Keychain</span>{/if}</label>
+    <label for="key">API key {#if hasKey}<span class="ok">· saved in your Keychain</span>{/if}</label>
     <div class="row">
-      <input id="key" class="grow" type="password" placeholder={status.has_key ? "Paste a new key to replace it" : "Paste your key"} bind:value={key} />
-      <button class="primary" disabled={busy || (!key.trim() && !status.has_key)} onclick={connect}>{status.has_key && !key ? "Refresh models" : "Connect"}</button>
+      <input id="key" class="grow" type="password" placeholder={hasKey ? "Paste a new key to replace it" : "Paste your key"} bind:value={key} />
+      <button class="primary" disabled={busy || (!key.trim() && !hasKey)} onclick={connect}>{hasKey && !key ? "Refresh models" : "Connect"}</button>
     </div>
     {#if settings.provider.kind === "opencode"}
       <p class="small">No key yet? <a href={OPENCODE_SIGNUP} onclick={(e) => { e.preventDefault(); openUrl(OPENCODE_SIGNUP); }}>Create one on OpenCode Zen</a>, add a little credit, paste it here. It never leaves this Mac except to call OpenCode.</p>
