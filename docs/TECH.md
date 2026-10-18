@@ -127,13 +127,14 @@ Windows specifics: whisper on Vulkan (NVIDIA, AMD, Intel) or CPU. D3D11VA decode
 `trait Transcriber { fn transcribe(&self, audio: &AudioFile, opts: &TranscribeOptions, progress) -> Result<Transcript> }` with two implementations. The backend picks one; the user can override in Settings.
 
 ### 5.1 `apple.rs` (feature `apple-speech`, macOS 26+)
-- Swift shim in `engine/crates/apple/` exposing a C function: audio file path in, JSON transcript with word timings out. Uses `SpeechAnalyzer` + `SpeechTranscriber` with `.audioTimeRange` attributes for word-level times. Language auto-detect via the locale list.
+- Swift helper executable `choco-apple-speech` built from `engine/crates/apple/SpeechHelper.swift` by `build.rs`, run as a child process: `status` and `transcribe <wav> <locale>`. Progress and errors are JSON lines on stderr; the transcript is JSON on stdout. A child process keeps the engine pure Rust and means a crash in the OS speech stack cannot take the app down. Apple speech has no language auto-detect, so a locale is required (default en-US); whisper covers auto-detect. Uses `SpeechAnalyzer` + `SpeechTranscriber` with `.audioTimeRange` attributes for word-level times. Language auto-detect via the locale list.
 - The OS downloads its own speech assets on demand (`AssetInventory`); surface that progress in the UI the first time.
 - Zero app size cost beyond the shim.
 
 ### 5.2 `whisper.rs` (feature `whisper`, default on Windows and macOS < 26)
 - `whisper-rs` with device from the backend. Enable `token_timestamps` and DTW word alignment.
-- Run on 30 s windows with 2 s overlap, merge.
+- Feed the whole file. whisper.cpp windows long audio internally (30 s with context carry-over); `no_context` is on to stop runaway repeats crossing windows. Words are rebuilt from sub-word tokens (a leading space starts a word); times come from token `t0`/`t1` in centiseconds. DTW alignment is a later accuracy experiment, not v1.
+- whisper-rs leaks the boxed progress closure, so progress is a shared atomic polled until the worker thread finishes. Never put a channel sender in that closure.
 - Default model `ggml-large-v3-turbo-q5_0` (~550 MB); `ggml-base-q5` (~60 MB) for preview. No CoreML encoder variant by default; it is an optional speed-up download on older Macs.
 
 ### 5.3 Shared cleanup (`cleanup.rs`)
@@ -142,7 +143,7 @@ Windows specifics: whisper on Vulkan (NVIDIA, AMD, Intel) or CPU. D3D11VA decode
 - Applies to both engines so downstream sees one behaviour.
 
 ### 5.4 Model manager (`models_registry/`)
-- Manifests with URL, size, blake3, minimum memory. Stored under `dirs::data_dir()/choco.video/models`. Download with resume and checksum verification. Only Whisper and the optional local picker model live here; nothing ships in the installer.
+- Manifests with URL pinned to an immutable upstream revision, size, sha256 (what Hugging Face publishes, so it can be checked against the source), license, minimum memory. Stored under `dirs::data_dir()/choco.video/models`. Download with resume and checksum verification. Only Whisper and the optional local picker model live here; nothing ships in the installer.
 
 ## 6. Highlights (`highlights/`)
 
