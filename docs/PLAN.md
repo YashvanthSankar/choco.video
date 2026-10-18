@@ -1,10 +1,12 @@
 # choco.video — Plan
 
-> Drop a long video on your Mac or PC. Get ranked, captioned, speaker-centered vertical shorts a minute later. Nothing leaves the machine.
+> Drop a long video on your Mac or PC. Get ranked, captioned, speaker-centered vertical shorts a minute later. Your video never leaves the machine, and the app is a 20 MB download.
 
 ## 1. Aim
 
-**One sentence:** choco.video is a desktop app, built on an open-source engine, that turns long-form video into short vertical clips entirely on-device, sold for a one-time price instead of a credit-metered subscription. macOS ships first, Windows follows on the same engine.
+**One sentence:** choco.video is a small desktop app, built on an open-source engine, that turns long-form video into short vertical clips with the video processed on-device and the heavy AI judgment run where it is cheapest, sold for a one-time price instead of a credit-metered subscription. macOS ships first, Windows follows on the same engine.
+
+**Size principle:** the installer is about 20 MB and nothing heavy ships inside it. Video decoding, face tracking, captions and rendering are local and small. Speech recognition uses the OS engine where one exists and a one-time download where it does not. The highlight picker, the only step that needs a large model, runs on a hosted frontier model by default, with offline fallbacks. We never trade output quality for size; we trade *where* the model runs.
 
 **Why it exists:** Opus Clip and Vizard charge $15–29/month, meter by credits, watermark free exports, expire clips after 3 days, and upload every file to their cloud. Every review of both products complains about the same three things: credits, watermarks, expiry. Modern laptop GPUs and Apple Silicon can run the whole pipeline for free, which makes "unlimited, local, one-time price" a structural advantage rather than a feature.
 
@@ -20,7 +22,7 @@
 - Month 6: a few hundred paying users, clip quality that people post without re-editing, engine repo past 1k stars.
 - Month 12: a real living from it, or a clear signal to move to the next product on the same engine.
 
-**Non-goals (explicit, for v1):** B-roll, auto-posting, scheduling, team workspaces, Linux app (CLI only), translation, dubbing, AI voice, thumbnails. Anything cloud-dependent by design.
+**Non-goals (explicit, for v1):** B-roll, auto-posting, scheduling, team workspaces, Linux app (CLI only), translation, dubbing, AI voice, thumbnails, bundling any model inside the installer. Uploading video or audio anywhere, ever.
 
 ## 2. Full functionality
 
@@ -31,10 +33,10 @@
 - Batch queue: several files, processed sequentially, each a separate project.
 
 ### 2.2 Transcription
-- Local Whisper via whisper.cpp. Word-level timestamps. Metal and CoreML encoder on Mac, CUDA or Vulkan on Windows, CPU fallback everywhere.
-- Model choice: `base` for quick preview, `large-v3-turbo` default on capable hardware, downloaded on first use with progress and checksum.
-- Language auto-detect. Transcript is editable in the review screen; edits propagate to captions.
-- Output: `Transcript` with segments, words, timestamps, confidence, language.
+- **Mac, macOS 26+:** Apple's on-device SpeechAnalyzer / SpeechTranscriber. Word timestamps, language auto-detect, runs on the Neural Engine, zero download. Default on current Macs.
+- **Windows, and Macs before macOS 26:** Whisper via whisper.cpp, `large-v3-turbo` quantized (~550 MB), downloaded on first run with progress and checksum. `base` (~60 MB) offered for a fast preview on weak machines.
+- Both engines produce the same `Transcript` type, so everything downstream is identical. The golden set measures both; where Apple's engine falls short on a language, the app offers the Whisper download for that language.
+- Transcript is editable in the review screen; edits propagate to captions.
 
 ### 2.3 Highlight selection ("the picker")
 - Splits transcript into candidate windows (15 to 90 seconds) at sentence boundaries and silence gaps.
@@ -42,7 +44,7 @@
 - Generates a hook title and a one-line description per clip.
 - Prompt mode: "find every moment about pricing" filters candidates by semantic match before scoring.
 - De-duplicates overlapping candidates. Returns top N (default 10) ranked.
-- Model ladder, user-selectable: local GGUF model via llama.cpp (default), Apple on-device model on macOS 26+ (zero download, Mac only), bring-your-own-key cloud (off by default). See §5.
+- Model ladder, user-selectable: hosted choco picker (default, frontier model, transcript text only), Apple on-device model on macOS 26+ (zero download, offline), bring-your-own-key, and an optional ~2.5 GB local model download for fully offline use. See §5.
 
 ### 2.4 Reframe 16:9 → 9:16
 - Face detection and tracking on sampled frames using a small ONNX face model (same model on both OSes, so output is identical). Apple Vision is an optional Mac backend if it proves measurably better.
@@ -75,7 +77,7 @@
 
 ### 2.9 App shell
 - Tauri 2 window app with a tray/menubar item showing queue progress. One UI codebase for both OSes.
-- First-run: pick a Whisper model and a picker model, download, done. No account.
+- First-run on a current Mac: nothing to download. Drop a video. On Windows or older Macs: one speech-model download (~550 MB) with progress. No account; the license key is the only credential.
 - Settings: models, hardware backend, default style, export folder, BYOK key (OS keychain), telemetry opt-in (off).
 - Auto-update via Tauri's updater. Crash reports opt-in, local only.
 - License: free trial with a watermark on export. Paid key removes it. Validation works offline after first activation.
@@ -106,13 +108,13 @@ Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping th
   file/URL ──▶ Ingest ──▶ MediaAsset                                            │
                  │            │                                                 │
                  │            ▼                                                 │
-                 │       Transcribe (whisper.cpp) ──▶ Transcript                │
+                 │       Transcribe (OS speech | whisper.cpp) ──▶ Transcript    │
                  │            │                          │                      │
                  │            │                          ▼                      │
-                 │            │                   Highlights (LLM ladder) ──▶ [Candidate]
+                 │            │                   Highlights (hosted|apple|byok|local) ──▶ [Candidate]
                  │            │                          │                      │
                  │            ▼                          ▼                      │
-                 │       Reframe (ONNX faces) ◀── per candidate time range      │
+                 │       Reframe (tract + YuNet) ◀── per candidate time range   │
                  │            │                                                 │
                  │            ▼                                                 │
                  │        CropPlan          Captions (Transcript + Style) ──▶ CaptionTrack
@@ -124,8 +126,8 @@ Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping th
                  │                       ▼                                      │
                  │                    Export (presets, naming)                   │
                  │                                                              │
-                 │   platform backends: {Metal+CoreML | CUDA/Vulkan | CPU}      │
-                 │                      {VideoToolbox | NVENC/AMF/QSV | software}│
+                 │   platform backends: {AppleSpeech | Whisper Metal/Vulkan/CPU} │
+                 │                      {VideoToolbox | NVENC/AMF/QSV/MF}        │
                  └──────────────────────────────────────────────────────────────┘
                                          ▲                 ▲
                                          │                 │
@@ -149,33 +151,34 @@ Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping th
 
 ## 4. Tech stack
 
-Moved to `STACK.md`. Summary: Rust engine (whisper.cpp, llama.cpp, ONNX, FFmpeg LGPL, wgpu, cosmic-text), Tauri 2 app, Lemon Squeezy, CI on macOS and Windows from week 1. Swift was dropped when Windows became a requirement.
+Moved to `STACK.md`. Summary: Rust engine (OS speech or whisper.cpp, tract + YuNet, minimal FFmpeg LGPL, wgpu, cosmic-text), a tiny hosted picker service, Tauri 2 app, Lemon Squeezy, CI on macOS and Windows from week 1 with a size budget. Swift was dropped when Windows became a requirement.
 
 ## 5. How we use AI
 
 AI is used in three places in the product and one place in building it.
 
 ### 5.1 Perception (always local, no choice given to the user)
-- **Speech to text:** Whisper via whisper.cpp. Everything downstream depends on word timestamps being accurate to ~50 ms.
-- **Faces:** ONNX face detection, landmarks, and tracking. Used for reframing and the mouth-movement active-speaker heuristic.
+- **Speech to text:** Apple's on-device SpeechAnalyzer on macOS 26+, zero download. Whisper via whisper.cpp elsewhere, quantized turbo downloaded once. Both yield the same `Transcript`. Everything downstream depends on word timestamps being accurate to ~50 ms.
+- **Faces:** YuNet, a 300 KB face model, run with the pure-Rust `tract` runtime. Used for reframing and the mouth-movement active-speaker heuristic.
 - **Scene cuts:** histogram difference, no ML. Feeds the reframe smoothing.
 
 ### 5.2 Judgment (the picker, user-selectable ladder)
-The picker is the only generative step, and it is the product. The model ladder:
+The picker is the only generative step, and it is the product. It needs a large model, so by default it does not run on the user's machine. The ladder:
 
 | Tier | What | Download | OS | Quality | Default |
 |---|---|---|---|---|---|
-| 1 | Local GGUF 7B–8B instruct at 4-bit via llama.cpp | ~4.5 GB once | both | good | yes |
-| 0 | Apple on-device model via Foundation Models | none | macOS 26+ only | adequate for scoring, weak at titles | offered as the zero-download option |
-| 2 | BYOK cloud via Anthropic Messages API, default `claude-opus-5-5`, `claude-haiku-5-5` as the economy option | none | both | best | off, opt-in, clearly labeled |
+| hosted | choco cloud picker: our stateless service calls the Anthropic Messages API (`claude-opus-5-5`, `claude-haiku-5-5` on the economy path) with transcript text only. Authenticated by license key, fair-use capped. | none | both | best | yes |
+| apple | Apple on-device Foundation Models | none | macOS 26+ | adequate scoring, weaker titles | offline fallback on Mac, selectable |
+| byok | user's own Anthropic key, same prompts, called directly from the app | none | both | best | selectable |
+| local | 4B instruct GGUF at 4-bit via llama.cpp | ~2.5 GB once | both | good | opt-in, for fully offline on Windows |
 
 Rules that hold across tiers:
-- The engine sends **transcript text only**, never audio or video, to any model. Hard rule, stated in the UI next to the BYOK toggle.
-- Scoring uses **structured output** (a JSON schema for `{score, reasons, title, hook}`) so results parse reliably on every tier: GBNF grammar on llama.cpp, `output_config.format` on the Anthropic API, strict parse plus one retry on the Apple tier.
+- The engine sends **transcript text only**, never audio or video, to any model or server. Hard rule, stated in the UI next to the picker setting.
+- Scoring uses **structured output** (a JSON schema for `{score, reasons, title, hook}`) so results parse reliably on every tier: `output_config.format` on the Anthropic API, GBNF grammar on llama.cpp, strict parse plus one retry on the Apple tier.
 - Candidates are scored in **batches with the full transcript as context**, not one at a time blind, so the model knows what the rest of the episode covers.
-- Prompt mode uses local embeddings to shortlist, then the LLM ranks.
+- Prompt mode uses keyword search (BM25) over transcript sentences to shortlist, then the picker ranks. No embedding model to download in v1.
 - Every pick records which tier and model produced it, so quality is comparable on the golden set.
-- The picker and the renderer never run concurrently. The LLM is unloaded before render so an 18 GB machine does not swap.
+- The local tier never runs concurrently with the renderer; the model is unloaded before render. The default tiers have no in-process model at all.
 
 ### 5.3 Language helpers (local)
 - Sentence embeddings for prompt-mode search and duplicate detection.
@@ -191,6 +194,7 @@ Rules that hold across tiers:
 
 | Component | License | Visibility | Why |
 |---|---|---|---|
+| `choco-cloud` service | Proprietary | Private | The hosted picker: a tiny stateless service that scores transcript text with a frontier model. Never sees media. |
 | `choco-engine` crate | MIT | Public repo `choco-video/engine` | Permissive so anyone can embed it. Attracts contributors for caption styles, languages, model backends, Linux support. Stars are marketing. |
 | `choco` CLI | MIT | Same repo | Developers and power users script it on Mac, Windows, and Linux. The CLI is the demo that proves the engine works without the app. |
 | `choco-ffi` | MIT | Same repo | Lets anyone build a shell in any language. |
@@ -227,6 +231,7 @@ choco.video/
 ├── app/              Tauri 2 project → private
 │   ├── src-tauri/                 Rust shell, depends on choco-engine
 │   └── src/                       TypeScript UI
+├── cloud/            hosted picker service (Rust, axum) → private, depends on choco-engine for prompts and schema
 └── scripts/          dev helpers, FFmpeg build recipes, signing
 ```
 
@@ -234,7 +239,8 @@ choco.video/
 
 - **Trial:** full features, watermark on export. The watermark is the exact thing people are leaving Opus Clip to escape, so it converts.
 - **Price:** $79 one-time including one year of updates, then $39/year optional for continued updates. Alternative $8/month for people who prefer it. Decide by week 10 based on landing-page signups. One license covers Mac and Windows.
-- **No account, no telemetry by default.** Opt-in anonymous usage stats only, and only after v1.
+- **Hosted picker included.** The one-time license includes the hosted picker with a fair-use cap of 50 source hours per month, which no solo creator reaches. Beyond the cap: bring your own key, or a $4/month top-up. No credit meter in the normal path. Scoring one source hour costs us cents, so the cap bounds our worst case well under the license price.
+- **No account, no telemetry by default.** The license key is the only credential, and it is what authenticates picker calls. Opt-in anonymous usage stats only, and only after v1.
 - **Later:** hosted version on the same engine for people without a capable machine. Not before v1 has paying users.
 
 ## 8. Risks and the honest answer to each
@@ -245,7 +251,10 @@ choco.video/
 | Face tracking jitter makes clips look amateur | Dead-zone + eased keyframes + scene-cut handling. Compare frame by frame against Opus Clip output on the same source. |
 | FFmpeg build and linking across two OSes eats weeks | Use prebuilt LGPL FFmpeg binaries from a known recipe (Cap's build scripts are a reference, MIT-licensed helpers). Pin versions. Do it in week 1, not week 8. |
 | Windows hardware variance breaks encode or inference | CPU fallback for every stage. Compatibility matrix documented. Windows beta before Windows launch. |
-| 18 GB RAM machines swap when a 7B model and a 4K decode run together | Run picker and render sequentially, never concurrently. Unload the LLM before render. |
+| Apple SpeechAnalyzer is worse than Whisper on some languages | Golden set compares both in M1. Per-language fallback to the Whisper download, offered in the UI. |
+| The hosted picker is a server we must run | Stateless, no media, a few hundred lines, rate-limited by license key. On outage the app falls back to the Apple tier on Mac or BYOK and says so, instead of failing silently. |
+| Hosted inference cost per user | ~100k tokens per source hour, cents on Claude. The 50 h/month cap bounds the worst case at a few dollars per user per month, far under the one-time price. |
+| 18 GB RAM machines swap when the optional local picker model and a 4K decode run together | Local tier only: run picker and render sequentially, unload the model before render. Default tiers use no in-process LLM. |
 | Tauri webview feels less native than SwiftUI on Mac | Accept the trade for Windows. Match system appearance, use native menus and tray, keep the UI small. Cap and Handy are the proof it is good enough. |
 | Someone ships a polished cross-platform clipper first | Ship Mac v1 in 10 weeks. Engine repo public early for mindshare. |
 | Apple or Adobe adds this to a built-in app | Possible. If it happens, the engine and the audience carry to the next product. |

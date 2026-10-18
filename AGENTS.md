@@ -4,29 +4,31 @@ You are the development agent for choco.video. This file is your long-term memor
 
 ## What this project is
 
-A desktop app, Mac first then Windows, that turns long videos into ranked, captioned, speaker-centered 9:16 shorts entirely on-device. Open-source Rust engine (MIT) plus a paid Tauri app. Competes with Opus Clip and Vizard on "unlimited, local, one-time price". Full context: `docs/PLAN.md`. Competitors and why we win: `docs/COMPETITORS.md`.
+A small desktop app (~20 MB installer), Mac first then Windows, that turns long videos into ranked, captioned, speaker-centered 9:16 shorts. Video is processed on-device; the highlight picker runs on a hosted frontier model by default with offline fallbacks. Open-source Rust engine (MIT), a paid Tauri app, and a tiny private cloud service for the picker. Competes with Opus Clip and Vizard on "unlimited, local, one-time price". Full context: `docs/PLAN.md`. Competitors and why we win: `docs/COMPETITORS.md`.
 
 ## Non-negotiables
 
 1. **Mac ships first, but every engine change must build and test on Windows CI.** Never merge engine code that breaks the Windows job. Platform-specific code lives only in `engine/crates/choco-engine/src/backend/`.
 2. **No GPL anywhere in the engine or app.** FFmpeg is LGPL-only (`--disable-gpl`), dynamically linked. No libx264, no libx265. `cargo deny` enforces the allowlist; do not edit `deny.toml` to make a failure go away. Never copy code from SupoClip, ViralCutter, HotClip, or any GPL/AGPL project.
 3. **No Python, no Node at runtime.** The shipped app is Rust + a webview. Dev scripts may use anything.
-4. **Media never leaves the machine.** Only transcript text may be sent to a cloud model, only on the BYOK tier, only when the user opted in. Never add telemetry, analytics, or network calls without an explicit opt-in setting and a line in this file.
+4. **Video and audio never leave the machine.** Only transcript text may be sent anywhere, and only to the picker (our `cloud/` service or the user's own Anthropic key). The cloud service never logs transcripts. Never add telemetry, analytics, or other network calls without an explicit opt-in setting and a line in this file.
+4b. **Small by default.** Installer ≤ 25 MB, installed app ≤ 50 MB without models, enforced in CI. Nothing heavy ships in the installer; models are runtime downloads and the default path on a current Mac downloads nothing. Prefer pure-Rust crates (`tract`, `cosmic-text`) over C runtimes when output is identical. A dependency over 2 MB compiled needs a Decisions entry. Never trade output quality for size; trade where the model runs.
 5. **Stages are pure functions over serde types.** No globals, no stage reading another stage's cache. `pipeline/` owns caching and orchestration.
-6. **Picker and renderer never run concurrently.** Unload the LLM before rendering. Target machine has 16–18 GB.
+6. **The optional local picker and the renderer never run concurrently.** Unload the model before rendering. The default tiers have no in-process LLM. Target machine has 16–18 GB.
 7. **Measure before claiming.** A picker change is not an improvement until `choco eval` says precision@5 did not drop. A render change is not done until snapshot tests pass on both OSes. Record numbers in Benchmarks below.
 8. **Do not expand scope.** If a task is not in `docs/TODO.md` for the current milestone, ask or add it to a later milestone. v1 non-goals are listed in `docs/PLAN.md §1`. Parity features and their target version are in `docs/PLAN.md §2.10`.
 
 ## Stack at a glance
 
-Rust 2024 workspace in `engine/`. `whisper-rs` for transcription, `llama-cpp-2` for the local picker, `ort` + YuNet for faces, `ffmpeg-next` for decode/encode/mux, `wgpu` for compositing, `cosmic-text` + `swash` for captions, `clap` CLI, `cbindgen` FFI. App in `app/` is Tauri 2 with a small TypeScript UI. Payments via Lemon Squeezy. Details and rationale: `docs/STACK.md`, `docs/TECH.md`.
+Rust 2024 workspace in `engine/`. Apple SpeechAnalyzer (macOS 26+) or `whisper-rs` for transcription, `tract` + YuNet for faces, minimal LGPL `ffmpeg-next` for decode/encode/mux, `wgpu` (Metal + DX12 only) for compositing, `cosmic-text` + `swash` for captions, BM25 for prompt search, `clap` CLI, `cbindgen` FFI, optional `llama-cpp-2` behind `local-llm`. App in `app/` is Tauri 2 with a small TypeScript UI. `cloud/` is an `axum` service for the hosted picker. Payments and license keys via Lemon Squeezy. Details and rationale: `docs/STACK.md`, `docs/TECH.md`.
 
-Picker ladder: local GGUF (default, both OSes), Apple Foundation Models (macOS 26+, optional), Anthropic Messages API BYOK (`claude-opus-5-5` default, `claude-haiku-5-5` economy, off by default). Structured JSON output on every tier.
+Picker ladder: hosted (default, our service calling `claude-opus-5-5`, `claude-haiku-5-5` economy, license-key auth, 50 source hours/month fair use), Apple Foundation Models (macOS 26+, offline), BYOK (user's own key), local 4B GGUF (opt-in ~2.5 GB download). Structured JSON output on every tier. Transcript text only, always.
 
 ## Dev machine
 
 - Apple M3 Pro, 18 GB unified memory, macOS 27.0.1, Xcode 27.1, Swift 6.4, Homebrew ffmpeg at `/opt/homebrew/bin/ffmpeg` (dev scripts only, never shipped). No `yt-dlp`.
-- Memory is the constraint. A 7B Q4 model (~4.5 GB) plus whisper large-v3-turbo (~1.5 GB) plus a decoder fits; two LLMs or a 14B model does not.
+- macOS 27 means Apple SpeechAnalyzer and Foundation Models are available here; the zero-download path can be tested on this machine. Whisper and the local picker must still be tested here for Windows parity.
+- Memory matters only on the opt-in local tier: a 4B Q4 model (~2.5 GB) plus whisper turbo-q5 (~550 MB) plus a decoder fits comfortably; never load more than one model.
 - There is no Windows machine. Windows is verified by CI until M6, when real hardware is needed.
 
 ## Commands
@@ -54,7 +56,7 @@ cd ../app && npm install && npm run tauri dev
 - Timestamps are `u64` milliseconds everywhere. Never floats for time.
 - Options structs derive `Hash` so the pipeline cache can key on them.
 - Tests next to code in `#[cfg(test)]`; fixtures-based tests under `tests/`. Snapshot references under `tests/snapshots/`, updated only with a commit message that says why.
-- Prompts are markdown files under `highlights/llm/prompts/`, versioned by filename. Never inline prompt text in Rust.
+- Prompts are markdown files under `highlights/picker/prompts/`, versioned by filename, shared with `cloud/`. Never inline prompt text in Rust.
 - Commit messages: `stage: what changed` (`transcribe: filter repeated 4-grams`). Small commits.
 - Do not add dependencies without checking the license and noting it in the PR or commit body.
 
@@ -74,6 +76,11 @@ cd ../app && npm install && npm run tauri dev
 | 2026-10-18 | Trial = full features with watermark | The watermark is the exact pain users leave Opus Clip for; it converts. |
 | 2026-10-18 | Adopt parity features from chopify, Klipzy, AutoClip, OpenClip Studio (complete-thought clips, multi-aspect, SRT/VTT, poster+meta, loudnorm, audio-energy prior); skip SFX, AI chat, B-roll | Cheap, expected, removes objections. See `docs/COMPETITORS.md §5–6`. |
 | 2026-10-18 | Never read SupoClip, ViralCutter, HotClip source for implementation | Copyleft. Feature lists only. |
+| 2026-10-18 | Small-app principle: ~20 MB installer, no bundled models, zero download on current Macs | User requirement. "All local" would mean multi-GB downloads for worse picks. |
+| 2026-10-18 | Picker default is hosted (our `cloud/` service on Claude), included in the one-time price with a 50 h/month fair-use cap; Apple on-device, BYOK and an opt-in local 4B model are the fallbacks | Best quality with zero download; cents per source hour; keeps the "no credits" promise; offline paths still exist. |
+| 2026-10-18 | Transcription via Apple SpeechAnalyzer on macOS 26+, whisper.cpp quantized turbo elsewhere | Zero download on Mac; same `Transcript` type either way; golden set decides per-language fallbacks. |
+| 2026-10-18 | `tract` instead of ONNX Runtime for YuNet; minimal FFmpeg allowlist build; `wgpu` Metal+DX12 only; no CUDA; arm64-only Mac; OS software encoders as fallback, no openh264 | Each is a size cut with identical output. openh264 also carries patent exposure. |
+| 2026-10-18 | BM25 keyword search for prompt mode in v1, no embedding model | Avoids a model download; semantic search becomes an opt-in later. |
 
 ## Benchmarks
 
@@ -81,14 +88,19 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 
 | Date | What | Result | Notes |
 |---|---|---|---|
-| — | Transcribe 60 min podcast, large-v3-turbo, Metal + CoreML | not measured | M1 target |
-| — | Picker on 300 candidates, local 8B Q4 | not measured | M2 target |
+| — | Transcribe 60 min podcast, Apple SpeechAnalyzer | not measured | M1 target |
+| — | Transcribe 60 min podcast, whisper turbo-q5, Metal | not measured | M1 target |
+| — | Minimal FFmpeg dylibs total size, Mac | not measured | M1 target |
+| — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
+| — | Picker on 300 candidates, hosted tier, wall time and tokens | not measured | M2 target |
+| — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
 | — | Render 60 s clip 1080x1920, VideoToolbox | not measured | M3 target |
 | — | Golden set precision@5, local picker | not measured | M2 baseline |
 
 ## Known traps
 
-- CoreML whisper encoder compiles on first load and can take several minutes. Surface this in the UI; do not treat it as a hang.
+- Apple SpeechAnalyzer downloads its own language assets on first use via the OS. Surface that progress; do not treat it as a hang.
+- If the CoreML whisper encoder is ever enabled as an optional speed-up, it compiles on first load and can take minutes. Same rule.
 - `ffmpeg-next` build needs `pkg-config` and the FFmpeg dev libs on the link path. On Windows this is the usual source of CI failures; the pinned prebuilt in `scripts/ffmpeg/` is the fix, not ad-hoc downloads.
 - whisper.cpp word timestamps drift on long silences. The sentence re-split and clamp pass in `transcribe/` exists for this; do not remove it.
 - Phone footage carries a rotation tag. Probe must apply it or faces will be detected sideways.
@@ -103,7 +115,10 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 - Do not inline prompts, bump `deny.toml`, or skip the eval to make progress look faster.
 - Do not start the Windows UI before the Mac app has shipped.
 - Do not install Ollama, Python, or system ffmpeg as a runtime dependency to "get it working". Competitors did; that is why they have no users.
+- Do not bundle a model in the installer, add ONNX Runtime, CUDA, a universal binary, or a general FFmpeg build. Each one blows the size budget for no output gain.
+- Do not log, store, or forward transcript text in `cloud/` beyond the single scoring request. Usage counters only.
+- Do not let the hosted picker become a dependency for anything but scoring. Transcription, reframe, captions and render must keep working offline.
 
 ## Status
 
-- 2026-10-18: Planning complete. `docs/PLAN.md`, `docs/STACK.md`, `docs/TECH.md`, `docs/TODO.md`, `docs/COMPETITORS.md` written. Repo initialized, nothing committed. No code yet. Next: M1, first item in `docs/TODO.md`.
+- 2026-10-18: Planning complete. `docs/PLAN.md`, `docs/STACK.md`, `docs/TECH.md`, `docs/TODO.md`, `docs/COMPETITORS.md` written, then revised for the small-app principle (hosted picker default, Apple speech on Mac, tract, minimal FFmpeg, size budget). Repo initialized, nothing committed. No code yet. Next: M1, first item in `docs/TODO.md`.
