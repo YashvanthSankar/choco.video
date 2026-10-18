@@ -5,7 +5,7 @@ engine/fixtures/media/
 .DS_Store
 app/src-tauri/target/
 vendor/
-models/
+/models/
 *.gguf
 *.bin
 

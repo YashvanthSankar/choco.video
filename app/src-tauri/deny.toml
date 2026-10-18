@@ -30,6 +30,12 @@ deny = [
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+  # ttf-parser is unmaintained (no known vulnerability). It reaches us only through
+  # cosmic-text -> fontdb, parsing the four OFL fonts we bundle ourselves, never user input.
+  # Revisit when cosmic-text moves to skrifa/read-fonts.
+  { id = "RUSTSEC-2026-0192", reason = "unmaintained, parses only our bundled fonts" },
+]
 
 [sources]
 unknown-registry = "deny"
