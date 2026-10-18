@@ -1,0 +1,53 @@
+{
+  "label": "minimax-m3",
+  "score": {
+    "fixtures": [
+      {
+        "id": "danaylov",
+        "mean_iou": 0.667366623878479,
+        "picks": 10,
+        "precision_at_5": 0.4000000059604645,
+        "recall_at_10": 0.25
+      },
+      {
+        "id": "olave",
+        "mean_iou": 0.4741673171520233,
+        "picks": 10,
+        "precision_at_5": 0.6000000238418579,
+        "recall_at_10": 0.5
+      },
+      {
+        "id": "graham",
+        "mean_iou": 0.3593077063560486,
+        "picks": 10,
+        "precision_at_5": 0.4000000059604645,
+        "recall_at_10": 0.25
+      },
+      {
+        "id": "fox",
+        "mean_iou": 0.41371792554855347,
+        "picks": 10,
+        "precision_at_5": 0.6000000238418579,
+        "recall_at_10": 0.625
+      },
+      {
+        "id": "nolan",
+        "mean_iou": 0.0,
+        "picks": 10,
+        "precision_at_5": 0.0,
+        "recall_at_10": 0.0
+      }
+    ],
+    "human_reviewed": false,
+    "mean_iou": 0.38291192054748535,
+    "precision_at_5": 0.4000000059604645,
+    "recall_at_10": 0.32499998807907104
+  },
+  "source_ms": 18848877,
+  "usage": {
+    "score_input": 88430,
+    "score_output": 26020,
+    "summarize_input": 90884,
+    "summarize_output": 5356
+  }
+}

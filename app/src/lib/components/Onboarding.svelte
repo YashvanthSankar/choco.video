@@ -8,7 +8,8 @@
   let step = $state(0);
   // Onboarding edits a local copy of the settings, saved at the end.
   const initial = untrack(() => status);
-  let settings = $state<Settings>(structuredClone(initial.settings));
+  // $state.snapshot: a reactive proxy cannot be structuredClone'd (DataCloneError).
+  let settings = $state<Settings>($state.snapshot(initial.settings));
   let downloading = $state(false);
   let dl = $state({ fraction: 0, message: "" });
   let dlError = $state("");

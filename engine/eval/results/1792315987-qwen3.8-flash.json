@@ -1,0 +1,53 @@
+{
+  "label": "qwen3.8-flash",
+  "score": {
+    "fixtures": [
+      {
+        "id": "danaylov",
+        "mean_iou": 0.3477623462677002,
+        "picks": 10,
+        "precision_at_5": 0.4000000059604645,
+        "recall_at_10": 0.25
+      },
+      {
+        "id": "olave",
+        "mean_iou": 0.4741673171520233,
+        "picks": 10,
+        "precision_at_5": 0.4000000059604645,
+        "recall_at_10": 0.5
+      },
+      {
+        "id": "graham",
+        "mean_iou": 0.5361489057540894,
+        "picks": 10,
+        "precision_at_5": 0.0,
+        "recall_at_10": 0.125
+      },
+      {
+        "id": "fox",
+        "mean_iou": 0.49180278182029724,
+        "picks": 10,
+        "precision_at_5": 0.6000000238418579,
+        "recall_at_10": 0.5
+      },
+      {
+        "id": "nolan",
+        "mean_iou": 0.6143960356712341,
+        "picks": 10,
+        "precision_at_5": 0.0,
+        "recall_at_10": 0.25
+      }
+    ],
+    "human_reviewed": false,
+    "mean_iou": 0.4928554892539978,
+    "precision_at_5": 0.2800000309944153,
+    "recall_at_10": 0.32499998807907104
+  },
+  "source_ms": 18848877,
+  "usage": {
+    "score_input": 89035,
+    "score_output": 165278,
+    "summarize_input": 105812,
+    "summarize_output": 20288
+  }
+}

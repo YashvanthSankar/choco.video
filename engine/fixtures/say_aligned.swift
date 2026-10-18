@@ -5,13 +5,13 @@ import AVFoundation
 import Foundation
 
 let args = CommandLine.arguments
-guard args.count == 4 else { print("usage: say_aligned <text> <out.caf> <out.json>"); exit(2) }
+guard args.count >= 4 else { print("usage: say_aligned <text> <out.caf> <out.json> [voice-language, default en-US]"); exit(2) }
 let text = try! String(contentsOfFile: args[1], encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
 let outURL = URL(fileURLWithPath: args[2])
 
 let synth = AVSpeechSynthesizer()
 let utt = AVSpeechUtterance(string: text)
-utt.voice = AVSpeechSynthesisVoice(language: "en-US")
+utt.voice = AVSpeechSynthesisVoice(language: args.count >= 5 ? args[4] : "en-US")
 
 var file: AVAudioFile?
 var sampleRate = 0.0

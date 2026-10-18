@@ -42,6 +42,9 @@
     refresh()
       .then(() => (view = status!.settings.onboarded ? "home" : "onboarding"))
       .catch((e) => (fatal = String(e)));
+    // A component that throws while mounting would otherwise leave the previous view on screen.
+    window.addEventListener("error", (e) => (fatal = fatal || `UI error: ${e.message}`));
+    window.addEventListener("unhandledrejection", (e) => (fatal = fatal || `UI error: ${e.reason}`));
     return () => offs.forEach((p) => p.then((off) => off()));
   });
 

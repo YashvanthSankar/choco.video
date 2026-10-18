@@ -5,7 +5,7 @@
   import { untrack } from "svelte";
 
   let { status, onClose }: { status: Status; onClose: (s: Settings) => void } = $props();
-  let settings = $state<Settings>(structuredClone(untrack(() => status.settings)));
+  let settings = $state<Settings>($state.snapshot(untrack(() => status.settings)));
   let saved = $state(false);
   let error = $state("");
 

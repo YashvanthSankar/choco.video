@@ -1,0 +1,53 @@
+{
+  "label": "deepseek-v4.1-flash",
+  "score": {
+    "fixtures": [
+      {
+        "id": "danaylov",
+        "mean_iou": 0.538928210735321,
+        "picks": 10,
+        "precision_at_5": 0.4000000059604645,
+        "recall_at_10": 0.375
+      },
+      {
+        "id": "olave",
+        "mean_iou": 0.4687671959400177,
+        "picks": 10,
+        "precision_at_5": 0.20000000298023224,
+        "recall_at_10": 0.25
+      },
+      {
+        "id": "graham",
+        "mean_iou": 0.43271374702453613,
+        "picks": 10,
+        "precision_at_5": 0.0,
+        "recall_at_10": 0.125
+      },
+      {
+        "id": "fox",
+        "mean_iou": 0.6146459579467773,
+        "picks": 10,
+        "precision_at_5": 0.6000000238418579,
+        "recall_at_10": 0.5
+      },
+      {
+        "id": "nolan",
+        "mean_iou": 0.6143960356712341,
+        "picks": 9,
+        "precision_at_5": 0.4000000059604645,
+        "recall_at_10": 0.25
+      }
+    ],
+    "human_reviewed": false,
+    "mean_iou": 0.5338902473449707,
+    "precision_at_5": 0.3199999928474426,
+    "recall_at_10": 0.30000001192092896
+  },
+  "source_ms": 18848877,
+  "usage": {
+    "score_input": 84903,
+    "score_output": 184104,
+    "summarize_input": 93074,
+    "summarize_output": 16568
+  }
+}
