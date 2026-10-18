@@ -90,15 +90,15 @@
 </script>
 
 <div class="options">
-  <button class="option" class:selected={settings.provider.kind === "opencode"} onclick={() => choose("opencode")}>
+  <button class="option" aria-pressed={settings.provider.kind === "opencode"} class:selected={settings.provider.kind === "opencode"} onclick={() => choose("opencode")}>
     <strong>OpenCode Zen</strong> <span class="pill">recommended</span>
     <span class="small muted">One key, many models. Pay a few cents per hour of video, directly to OpenCode.</span>
   </button>
-  <button class="option" class:selected={settings.provider.kind === "custom"} onclick={() => choose("custom")}>
+  <button class="option" aria-pressed={settings.provider.kind === "custom"} class:selected={settings.provider.kind === "custom"} onclick={() => choose("custom")}>
     <strong>Another provider</strong>
     <span class="small muted">Any OpenAI-compatible endpoint: OpenRouter, Groq, DeepSeek, LM Studio, Ollama…</span>
   </button>
-  <button class="option" class:selected={settings.provider.kind === "apple"} disabled={!appleReady} onclick={() => choose("apple")}>
+  <button class="option" aria-pressed={settings.provider.kind === "apple"} class:selected={settings.provider.kind === "apple"} disabled={!appleReady} onclick={() => choose("apple")}>
     <strong>Apple on-device</strong> <span class="pill">no key</span>
     <span class="small muted">
       {appleReady ? "Free and offline. Slower, and picks are weaker than a hosted model." : appleHint.text}
@@ -161,10 +161,15 @@
 <style>
   .hint { margin: 10px 2px 0; }
   .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
-  .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
-  .option { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 14px; border-radius: var(--radius); background: var(--panel); }
-  .option.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-  .setup { margin-top: 4px; }
+  .options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 18px 0; }
+  .option { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-height: 132px; text-align: left; padding: 15px; border-radius: 10px; background: var(--panel); box-shadow: none; }
+  .option strong { font-size: 13px; }
+  .option .pill { margin-top: -2px; }
+  .option.selected { border-color: var(--caramel); box-shadow: 0 0 0 1px var(--caramel) inset; background: var(--panel-2); }
+  .option:disabled { opacity: .65; }
+  .setup { margin-top: 4px; box-shadow: none; }
+  .setup p { margin-top: 10px; }
   .models { align-items: flex-end; margin-bottom: 12px; }
   .msg { margin-top: 10px; }
+  @media (max-width: 680px) { .options { grid-template-columns: 1fr; } .option { min-height: 0; } .models { flex-direction: column; align-items: stretch; } }
 </style>

@@ -45,14 +45,14 @@
       <!-- svelte-ignore a11y_media_has_caption -->
       <video src={src(clip.mp4)} controls autoplay></video>
     {:else}
-      <button class="poster" onclick={() => (playing = true)} aria-label="Play">
+      <button class="poster" onmouseenter={() => (playing = true)} onclick={() => (playing = true)} aria-label={`Play clip ${clip.rank}: ${c.title}`}>
         <img src={src(clip.poster)} alt={c.title} loading="lazy" />
-        <span class="play">▶</span>
+        <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.8c0-.8.9-1.3 1.6-.9l9.1 6.2a1.1 1.1 0 0 1 0 1.8l-9.1 6.2c-.7.4-1.6-.1-1.6-.9V5.8Z"/></svg></span>
       </button>
     {/if}
   </div>
-  <div class="meta">
-    <div class="row top"><span class="pill score">{c.score}</span><span class="small muted">#{clip.rank} · {fmtTime(c.start_ms)}–{fmtTime(c.end_ms)} · {Math.round((c.end_ms - c.start_ms) / 1000)}s</span></div>
+  <div class="meta"><span class="rank">CLIP {String(clip.rank).padStart(2, "0")}</span>
+    <div class="row top"><span class="pill score">{c.score} score</span><span class="small muted tnum">{fmtTime(c.start_ms)}–{fmtTime(c.end_ms)} · {Math.round((c.end_ms - c.start_ms) / 1000)}s</span></div>
     <h3>{c.title}</h3>
     <p class="small">{c.description}</p>
     {#if c.reasons.length}<p class="small reasons">{c.reasons.join(" · ")}</p>{/if}
@@ -74,19 +74,24 @@
 </div>
 
 <style>
-  .clip { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-  .media { aspect-ratio: 9 / 16; background: #000; max-height: 420px; display: flex; justify-content: center; }
+  .clip { padding: 0; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+  .media { position: relative; aspect-ratio: 9 / 16; background: var(--ink); display: flex; justify-content: center; overflow: hidden; }
   video, img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .poster { position: relative; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: #000; }
-  .play { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; color: #fff; opacity: 0; transition: opacity .15s; background: rgba(0,0,0,.25); }
-  .poster:hover .play { opacity: 1; }
-  .meta { padding: 12px 14px 14px; }
-  .top { gap: 8px; margin-bottom: 6px; }
-  .score { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
-  h3 { font-size: 15px; margin-bottom: 4px; }
-  .reasons { color: var(--muted); font-style: italic; }
-  .actions { flex-wrap: wrap; gap: 6px; }
-  .actions button { padding: 6px 10px; font-size: 12px; }
-  .edit { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; margin-top: 8px; }
+  .poster { position: relative; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: var(--ink); }
+  .play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--play-ink); background: var(--play-scrim); transition: background .16s; }
+  .play svg { width: 42px; height: 42px; padding: 11px; background: var(--play-control); border-radius: 50%; }
+  .poster:hover .play { background: var(--play-scrim-hover); }
+  .meta { padding: 15px; display: flex; flex-direction: column; flex: 1; }
+  .rank { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .12em; margin-bottom: 8px; }
+  .top { gap: 8px; justify-content: space-between; margin-bottom: 9px; }
+  .top .small { white-space: nowrap; }
+  .score { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+  h3 { font-size: 14px; line-height: 1.3; margin-bottom: 5px; }
+  p { margin-bottom: 9px; }
+  .reasons { display: none; }
+  .actions { flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+  .actions button { padding: 5px 7px; min-height: 29px; font-size: 11px; }
+  .edit { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 11px; }
   .edit select { padding: 6px; font-size: 12px; }
+  .edit button { grid-column: 1 / -1; }
 </style>

@@ -14,6 +14,8 @@
   let preset = $state(d.preset);
   let layout = $state(d.layout);
   let maxClips = $state(d.max_clips);
+  // Keep a saved value that is not one of the presets selectable instead of showing a blank select.
+  const clipCounts = [...new Set([3, 5, 8, 10, 15, 20, d.max_clips])].sort((x, y) => x - y);
   let outputDir = $state(d.output_dir);
   let hovering = $state(false);
   const VIDEO = ["mp4", "mov", "m4v", "mkv", "webm", "avi", "m4a", "mp3", "wav"];
@@ -45,66 +47,54 @@
 </script>
 
 <div class="wrap">
-  <button class="drop" class:hovering class:has={!!file} onclick={pick}>
+  <div class="intro"><span class="eyebrow">NEW PROJECT</span><h1>Find the moments worth sharing.</h1><p>Turn one long recording into polished, ready-to-post clips.</p></div>
+  <button class="drop" class:hovering class:has={!!file} onclick={pick} aria-label={file ? `Change source file, currently ${name}` : 'Choose a video or audio file'}>
+    <span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></span>
     {#if file}
-      <strong>{name}</strong>
-      <span class="small muted">Click to choose a different file</span>
+      <strong title={name}>{name}</strong><span class="small muted">Source selected · Click to choose another</span>
     {:else}
-      <strong>Drop a long video here</strong>
-      <span class="small muted">or click to choose · MP4, MOV, MKV, WebM, and more</span>
+      <strong>Drop a video or audio file here</strong><span class="small muted">or click to browse · MP4, MOV, MKV, WebM, MP3 and more</span>
     {/if}
   </button>
-
   <div class="card opts">
-    <label for="prompt">Only clips about… (optional)</label>
+    <div class="section-head"><div><h2>Clip settings</h2><p class="small">A few choices before we find your highlights.</p></div></div>
+    <label for="prompt">Focus on a topic <span class="muted optional">Optional</span></label>
     <input id="prompt" type="text" placeholder="e.g. pricing, the founding story, AI" bind:value={prompt} />
     <div class="grid">
-      <div>
-        <label for="n">Up to</label>
-        <select id="n" bind:value={maxClips}>
-          {#each [3, 5, 8, 10, 15, 20] as n}<option value={n}>{n} clips</option>{/each}
-        </select>
-      </div>
-      <div>
-        <label for="style">Captions</label>
-        <select id="style" bind:value={style}>
-          {#each styles as s}<option value={s}>{s}</option>{/each}
-          <option value="none">none (subtitle files only)</option>
-        </select>
-      </div>
-      <div>
-        <label for="preset">Size</label>
-        <select id="preset" bind:value={preset}>
-          {#each presets as p}<option value={p}>{p === "shorts" ? "9:16 vertical" : p === "square" ? "1:1 square" : p === "portrait" ? "4:5 portrait" : "16:9 landscape"}</option>{/each}
-        </select>
-      </div>
-      <div>
-        <label for="layout">Framing</label>
-        <select id="layout" bind:value={layout}>
-          <option value="auto">Follow the speaker</option>
-          <option value="static">Centre crop</option>
-          <option value="fit">Whole frame, blurred fill</option>
-        </select>
-      </div>
+      <div><label for="n">Number of clips</label><select id="n" bind:value={maxClips}>{#each clipCounts as n}<option value={n}>Up to {n}</option>{/each}</select></div>
+      <div><span class="field-label">Captions</span><div class="segments" role="group" aria-label="Caption style">{#each [...styles, 'none'] as s}<button class:active={style === s} aria-pressed={style === s} onclick={() => (style = s)}>{s === 'none' ? 'Off' : s}</button>{/each}</div></div>
+      <div><span class="field-label">Output size</span><div class="segments" role="group" aria-label="Output size">{#each presets as p}<button class:active={preset === p} aria-pressed={preset === p} title={p} onclick={() => (preset = p)}>{p === 'shorts' ? '9:16' : p === 'square' ? '1:1' : p === 'portrait' ? '4:5' : '16:9'}</button>{/each}</div></div>
+      <div><span class="field-label">Framing</span><div class="segments" role="group" aria-label="Framing">{#each [{value:'auto',label:'Follow'}, {value:'static',label:'Centre'}, {value:'fit',label:'Fit'}] as choice}<button class:active={layout === choice.value} aria-pressed={layout === choice.value} title={choice.value === 'auto' ? 'Follow the speaker' : choice.value === 'static' ? 'Centre crop' : 'Whole frame, blurred fill'} onclick={() => (layout = choice.value)}>{choice.label}</button>{/each}</div></div>
     </div>
-    <label for="out">Save clips to</label>
-    <div class="row">
-      <input id="out" class="grow" type="text" readonly value={outputDir} />
-      <button onclick={pickDir}>Choose…</button>
-    </div>
+    <label for="out">Save clips to</label><div class="row destination"><input id="out" class="grow" type="text" readonly value={outputDir} /><button onclick={pickDir}>Choose…</button></div>
   </div>
-
-  {#if error}<p class="err">{error}</p>{/if}
-  <div class="row end"><button class="primary big" disabled={!file} onclick={start}>Find clips</button></div>
+  {#if error}<p class="err" role="alert">{error}</p>{/if}
+  <div class="row end"><span class="small muted">Your video stays on this Mac.</span><button class="primary big" disabled={!file} title={!file ? 'Choose a source file to find clips' : 'Find clips'} onclick={start}>Find clips <span aria-hidden="true">→</span></button></div>
 </div>
-
 <style>
-  .wrap { max-width: 820px; margin: 0 auto; padding: 56px 28px 28px; }
-  .drop { width: 100%; height: 190px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; border: 2px dashed var(--line); border-radius: 16px; background: var(--panel); font-size: 16px; }
-  .drop.hovering, .drop:hover { border-color: var(--accent); }
+  .wrap { max-width: 850px; margin: 0 auto; padding: 42px 28px 40px; }
+  .intro { margin-bottom: 22px; }
+  .eyebrow { display: block; font-size: 10px; font-weight: 750; letter-spacing: .13em; color: var(--accent); margin-bottom: 8px; }
+  .intro p { margin-bottom: 0; }
+  .drop { width: 100%; min-height: 166px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; border: 1.5px dashed var(--line); border-radius: 12px; background: var(--panel); text-align: center; padding: 22px; box-shadow: none; }
+  .drop:hover, .drop.hovering { border-color: var(--caramel); background: var(--panel-2); }
+  .drop.hovering { box-shadow: 0 0 0 4px rgb(208 138 87 / 15%); }
   .drop.has { border-style: solid; }
+  .drop strong { font-size: 15px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drop-icon { width: 40px; height: 40px; display: grid; place-items: center; color: var(--accent); background: var(--panel-2); border-radius: 10px; margin-bottom: 6px; }
+  .drop-icon svg { width: 22px; height: 22px; }
   .opts { margin-top: 16px; }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .end { justify-content: flex-end; margin-top: 18px; }
-  .big { padding: 11px 26px; font-size: 15px; }
+  .section-head { border-bottom: 1px solid var(--line); padding-bottom: 13px; }
+  .section-head h2, .section-head p { margin-bottom: 0; }
+  .optional { font-weight: 400; margin-left: 4px; }
+  .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2px 18px; }
+  .field-label { display: block; font-size: 12px; font-weight: 600; margin: 14px 0 6px; }
+  .segments { display: flex; width: 100%; padding: 3px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); min-height: 34px; }
+  .segments button { flex: 1; min-width: 0; min-height: 26px; padding: 3px 7px; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .segments button:hover:not(:disabled) { background: var(--hover); border: 0; }
+  .segments button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+  .destination { flex-wrap: nowrap; }
+  .end { justify-content: space-between; margin-top: 18px; }
+  .big { min-width: 132px; min-height: 36px; }
+  @media (max-width: 650px) { .wrap { padding: 28px 18px; } .grid { grid-template-columns: 1fr; } .end { flex-wrap: wrap; } }
 </style>

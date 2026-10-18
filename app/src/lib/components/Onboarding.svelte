@@ -54,10 +54,10 @@
   }
 </script>
 
-<div class="wrap">
-  <div class="steps small muted">
+<div class="wrap"><div class="shell card">
+  <div class="steps small muted" aria-label="Setup progress">
     {#each ["Welcome", "Clip picker", "Speech", "Ready"] as s, i}
-      <span class:current={i === step}>{i + 1}. {s}</span>
+      <span class:current={i === step} aria-current={i === step ? "step" : undefined}><b>{i + 1}</b>{s}</span>
     {/each}
   </div>
 
@@ -104,15 +104,21 @@
     <p>Clips are saved to <code>{settings.defaults.output_dir}</code>. You can change the picker, models and defaults any time in Settings.</p>
     <div class="nav"><button class="primary" onclick={finish}>Start clipping</button></div>
   {/if}
-</div>
+</div></div>
 
 <style>
-  .wrap { max-width: 820px; margin: 0 auto; padding: 56px 28px 28px; }
-  .steps { display: flex; gap: 18px; margin-bottom: 28px; }
-  .steps .current { color: var(--accent); font-weight: 600; }
-  .privacy { margin: 18px 0; }
-  .nav { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-  .bar { height: 6px; background: var(--panel-2); border-radius: 9px; overflow: hidden; margin: 10px 0; }
-  .bar div { height: 100%; background: var(--accent); transition: width .3s; }
-  code { color: var(--text); }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 42px 24px; }
+  .shell { padding: 30px 34px; }
+  .steps { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 24px; margin-bottom: 27px; border-bottom: 1px solid var(--line); }
+  .steps span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .steps b { display: inline-grid; place-items: center; width: 21px; height: 21px; border: 1px solid var(--line); border-radius: 50%; font-size: 11px; }
+  .steps .current { color: var(--accent); font-weight: 650; }
+  .steps .current b { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+  .privacy { margin: 23px 0; background: var(--panel-2); box-shadow: none; }
+  .privacy p { margin: 5px 0 0; }
+  .nav { display: flex; justify-content: flex-end; gap: 8px; margin-top: 28px; }
+  .bar { height: 7px; background: var(--panel-2); border-radius: 9px; overflow: hidden; margin: 12px 0; }
+  .bar div { height: 100%; background: var(--caramel); transition: width .3s; }
+  code { overflow-wrap: anywhere; }
+  @media (max-width: 660px) { .wrap { padding: 20px 14px; } .shell { padding: 20px; } .steps { flex-wrap: wrap; justify-content: flex-start; } }
 </style>

@@ -71,8 +71,8 @@
   }
 </script>
 
-<header class="bar drag">
-  <span class="brand">choco<span class="dot">.</span>video</span>
+<header class="bar drag" data-tauri-drag-region>
+  <span class="brand" data-tauri-drag-region><span class="mark" aria-hidden="true">c</span><span class="word">choco<span class="dot">.</span>video</span></span>
   {#if status && view !== "onboarding" && view !== "loading"}
     <nav class="nodrag">
       {#if view === "results"}<button class="ghost" onclick={() => (view = "home")}>New video</button>{/if}
@@ -100,11 +100,12 @@
 </main>
 
 <style>
-  .bar { position: fixed; top: 0; left: 0; right: 0; height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 86px; background: rgba(21,17,14,.85); backdrop-filter: blur(10px); z-index: 10; border-bottom: 1px solid var(--line); }
-  .brand { font-weight: 700; letter-spacing: -0.02em; }
-  .dot { color: var(--accent); }
-  nav { display: flex; gap: 6px; }
-  nav button { padding: 4px 10px; font-size: 12px; }
-  main { padding-top: 38px; min-height: 100vh; }
+  .bar { position: sticky; top: 0; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px 0 84px; background: var(--panel); z-index: 10; border-bottom: 1px solid var(--line); }
+  .brand { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 13px; letter-spacing: -.025em; user-select: none; }
+  .mark { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 3px; border-radius: 6px; background: var(--chocolate); color: var(--cream); font-size: 15px; font-weight: 750; line-height: 1; }
+  .dot { color: var(--caramel); }
+  nav { display: flex; gap: 4px; }
+  nav button { font-size: 12px; }
+  main { min-height: calc(100vh - 52px); }
   .center { display: grid; place-items: center; height: 60vh; }
 </style>

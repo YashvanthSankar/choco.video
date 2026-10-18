@@ -32,7 +32,7 @@
 </script>
 
 <div class="wrap">
-  <div class="row"><h1 class="grow">Settings</h1><button onclick={() => onClose(settings)}>Done</button></div>
+  <div class="row head"><div class="grow"><h1>Settings</h1><p class="small">Make choco.video work the way you do.</p></div><button onclick={() => onClose(settings)}>Done</button></div>
 
   <h2>Clip picker</h2>
   <ProviderSetup {status} bind:settings />
@@ -69,7 +69,7 @@
   </div>
 
   <h2 class="sp">About</h2>
-  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · macOS {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, Inter and Montserrat (OFL).</p>
+  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · macOS {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, system fonts.</p>
 
   <div class="row end">
     {#if error}<span class="err small">{error}</span>{/if}
@@ -79,9 +79,13 @@
 </div>
 
 <style>
-  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 28px 28px; }
-  .sp { margin-top: 26px; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; }
+  .wrap { max-width: 870px; margin: 0 auto; padding: 38px 28px 48px; }
+  .head { margin-bottom: 28px; }
+  .head p { margin: 0; }
+  h2 { border-top: 1px solid var(--line); padding-top: 23px; margin-bottom: 13px; }
+  .sp { margin-top: 28px; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 14px; }
   .wide { grid-column: 1 / -1; }
-  .end { justify-content: flex-end; margin-top: 20px; gap: 12px; }
+  .end { justify-content: flex-end; margin-top: 24px; gap: 12px; }
+  @media (max-width: 680px) { .wrap { padding: 25px 18px; } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
 </style>
