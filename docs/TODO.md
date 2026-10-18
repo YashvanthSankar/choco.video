@@ -50,14 +50,16 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 ## M3 Captions + render (weeks 5–6)
 
 - [~] Word timing accuracy → per-engine bias correction shipped (Apple +100 ms, whisper +260 ms, from medians on two synthesized voices; bias on a held-out third voice now −16 to +40 ms). Remaining per-word scatter: median 52–95 ms, 53–67% within 100 ms; **≤ 50 ms target not met**. Tried snapping to energy onsets: mixed (helped 2 clips, hurt 1), not shipped. Next: whisper DTW timestamps; measure caption readability, not just onsets
-- [ ] `captions/` chunker with font-measured line breaks
-- [ ] `CaptionStyle` JSON + four built-in styles + bundled OFL fonts
-- [ ] Atlas rasterization with `cosmic-text` + `swash`, active-word variants
+- [x] `captions/` chunker: ≤ 4 words, breaks on clause punctuation, pauses ≥ 350 ms and measured frame width; exact hand-over between chunks, 400 ms hold after pauses → 4 tests
+- [x] `CaptionStyle` JSON + four built-in styles (clean, bold, karaoke, minimal) + bundled OFL fonts (Inter 600/800, Montserrat 800/900, Latin subset, 233 KB) → preview PNGs checked by eye
+- [x] Rasterization with `cosmic-text` 0.19 + `swash`, bundled fonts only: shadow, outline, active-word colour and scale, progressive highlight, pill/box → deterministic pixels test passes
+- [x] SRT + WebVTT sidecars with clip-relative times (in `captions/subtitles.rs`)
+- [ ] Compositor decision: CPU (swscale crop/scale in YUV + caption sprites blended in YUV) instead of `wgpu`, for size and simplicity; revisit only if the render benchmark is too slow
 - [ ] `render/decode.rs` with hwaccel + bounded channel
-- [ ] `render/compose.rs` `wgpu` shader: crop, scale, blur background, caption blit, watermark
+- [ ] `render/compose.rs`: crop rect per frame (interpolated `CropPlan`), scale to preset size, blurred-background `Fit`, caption sprite blend
 - [ ] `render/encode.rs` VideoToolbox on Mac; software fallback is the OS encoder, never libx264 or openh264
 - [ ] `render/mux.rs` MP4 faststart, audio copy/re-encode
-- [ ] `export/` presets (9:16, 1:1, 4:5, 16:9), naming, sidecar JSON, PNG poster, SRT + VTT per clip, watermark flag
+- [ ] `export/` presets (9:16, 1:1, 4:5, 16:9), naming, sidecar JSON, PNG poster, SRT + VTT per clip (no watermark: open source, no trial)
 - [ ] Loudness normalization to -14 LUFS on the clip audio (`loudnorm` two-pass or single-pass)
 - [ ] `choco render` and `choco run` end to end with `Static` layout
 - [ ] Snapshot tests on synthetic fixtures, green on Mac CI (Windows parity checked in M6)
