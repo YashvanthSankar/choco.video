@@ -17,9 +17,9 @@ fn main() {
 /// Compile the Swift helper that wraps SpeechAnalyzer. Runs as a child process so the
 /// engine stays pure Rust and a crash in the OS speech stack cannot take the app down.
 fn build_apple_helper() {
-    let src = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../apple/SpeechHelper.swift");
+    let src = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../apple/AppleHelper.swift");
     println!("cargo::rerun-if-changed={}", src.display());
-    let out = PathBuf::from(env::var("OUT_DIR").unwrap()).join("choco-apple-speech");
+    let out = PathBuf::from(env::var("OUT_DIR").unwrap()).join("choco-apple");
     let status = Command::new("xcrun")
         .args(["swiftc", "-O", "-parse-as-library", "-target", "arm64-apple-macos14.0", "-o"])
         .arg(&out)
@@ -30,7 +30,7 @@ fn build_apple_helper() {
             println!("cargo::rustc-env=CHOCO_APPLE_HELPER_BUILT={}", out.display());
         }
         other => {
-            println!("cargo::warning=Apple speech helper not built ({other:?}); whisper will be used");
+            println!("cargo::warning=Apple helper not built ({other:?}); whisper will be used");
             println!("cargo::rustc-env=CHOCO_APPLE_HELPER_BUILT=");
         }
     }

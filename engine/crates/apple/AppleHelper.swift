@@ -1,18 +1,21 @@
-// choco-apple-speech: a tiny helper that runs Apple's SpeechAnalyzer on a WAV file.
+// choco-apple: a tiny helper exposing Apple's on-device frameworks to choco-engine.
 // Usage:
-//   choco-apple-speech status
-//   choco-apple-speech transcribe <file.wav> <locale>
-// Progress and errors go to stderr as JSON lines. The transcript goes to stdout as JSON
-// matching choco-engine's `Transcript` type. Built by choco-engine's build.rs.
+//   choco-apple status
+//   choco-apple transcribe <file.wav> <locale>        SpeechAnalyzer, word-timed transcript
+//   choco-apple generate < request.json                Foundation Models (Apple Intelligence)
+// Progress and errors go to stderr as JSON lines; results go to stdout as JSON.
+// Built by choco-engine's build.rs. Runs as a child process so a crash here cannot take the app down.
 
 import AVFoundation
 import Foundation
+import FoundationModels
 import Speech
 
 struct WordOut: Encodable { let start_ms: UInt64; let end_ms: UInt64; let text: String; let confidence: Float }
 struct SegmentOut: Encodable { let start_ms: UInt64; let end_ms: UInt64; let text: String; let words: [WordOut] }
 struct TranscriptOut: Encodable { let language: String; let engine: String; let segments: [SegmentOut] }
-struct StatusOut: Encodable { let available: Bool; let os: String; let locales: [String]; let installed_locales: [String] }
+struct StatusOut: Encodable { let available: Bool; let os: String; let locales: [String]; let installed_locales: [String]; let llm_available: Bool; let llm_status: String }
+struct GenerateRequest: Decodable { let mode: String; let instructions: String; let prompt: String }
 
 let stderr = FileHandle.standardError
 
@@ -41,7 +44,10 @@ func osVersion() -> String {
 func status() async -> StatusOut {
     let supported = await SpeechTranscriber.supportedLocales.map { $0.identifier(.bcp47) }
     let installed = await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) }
-    return StatusOut(available: SpeechTranscriber.isAvailable, os: osVersion(), locales: supported.sorted(), installed_locales: installed.sorted())
+    let llm = SystemLanguageModel.default.availability
+    var llmOk = false
+    if case .available = llm { llmOk = true }
+    return StatusOut(available: SpeechTranscriber.isAvailable, os: osVersion(), locales: supported.sorted(), installed_locales: installed.sorted(), llm_available: llmOk, llm_status: "\(llm)")
 }
 
 @available(macOS 26.0, *)
@@ -135,29 +141,93 @@ func transcribe(path: String, localeId: String) async throws -> TranscriptOut {
     return TranscriptOut(language: locale.identifier(.bcp47), engine: "apple-speech", segments: segments)
 }
 
+// MARK: Foundation Models
+
+@available(macOS 26.0, *)
+@Generable
+struct GenScore: Encodable {
+    @Guide(description: "The candidate id exactly as given, for example c12")
+    var id: String
+    @Guide(description: "How likely the clip is to hold a viewer, 0 to 100", .range(0...100))
+    var score: Int
+    @Guide(description: "One to three short phrases explaining the score")
+    var reasons: [String]
+    @Guide(description: "Hook title for the clip, at most 60 characters, no emojis")
+    var title: String
+    @Guide(description: "One sentence for the post caption")
+    var description: String
+    @Guide(description: "Three to five hashtags, each starting with #")
+    var hashtags: [String]
+}
+
+@available(macOS 26.0, *)
+@Generable
+struct GenScores: Encodable {
+    @Guide(description: "Exactly one entry per candidate")
+    var scores: [GenScore]
+}
+
+@available(macOS 26.0, *)
+func generate() async throws {
+    let input = FileHandle.standardInput.readDataToEndOfFile()
+    let req = try JSONDecoder().decode(GenerateRequest.self, from: input)
+    guard case .available = SystemLanguageModel.default.availability else {
+        fail("unavailable: Apple Intelligence model is \(SystemLanguageModel.default.availability)")
+    }
+    let options = GenerationOptions(temperature: 0.2)
+    do {
+        if req.mode == "scores" {
+            // Guided generation: output always matches the schema, default guardrails.
+            let session = LanguageModelSession(model: SystemLanguageModel.default, instructions: req.instructions)
+            let r = try await session.respond(to: req.prompt, generating: GenScores.self, options: options)
+            FileHandle.standardOutput.write(try JSONEncoder().encode(r.content))
+        } else {
+            // Plain text, with guardrails meant for transforming user-supplied text (summaries,
+            // or JSON-as-text scores). Podcasts discussing war, ethics or health trip the default
+            // guardrails as false positives; the caller parses and validates the text strictly.
+            let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+            let session = LanguageModelSession(model: model, instructions: req.instructions)
+            let r = try await session.respond(to: req.prompt, options: options)
+            FileHandle.standardOutput.write(try JSONEncoder().encode(["text": r.content]))
+        }
+    } catch let e as LanguageModelSession.GenerationError {
+        switch e {
+        case .guardrailViolation: fail("declined: guardrail")
+        case .exceededContextWindowSize: fail("context: exceeded the on-device context window")
+        case .refusal: fail("declined: refusal")
+        default: fail("generation: \(e)")
+        }
+    } catch {
+        let msg = "\(error)"
+        fail(msg.localizedCaseInsensitiveContains("sensitive") ? "declined: \(msg)" : "generation: \(msg)")
+    }
+}
+
 @main
 struct Main {
     static func main() async {
         let args = CommandLine.arguments
-        guard args.count >= 2 else { fail("usage: choco-apple-speech status | transcribe <wav> <locale>") }
+        guard args.count >= 2 else { fail("usage: choco-apple status | transcribe <wav> <locale> | generate < request.json") }
         guard #available(macOS 26.0, *) else {
             if args[1] == "status" {
-                let out = StatusOut(available: false, os: osVersion(), locales: [], installed_locales: [])
+                let out = StatusOut(available: false, os: osVersion(), locales: [], installed_locales: [], llm_available: false, llm_status: "needs macOS 26")
                 FileHandle.standardOutput.write(try! JSONEncoder().encode(out))
                 exit(0)
             }
-            fail("Apple speech needs macOS 26 or later; this Mac runs \(osVersion())")
+            fail("unavailable: needs macOS 26 or later; this Mac runs \(osVersion())")
         }
         do {
             let encoder = JSONEncoder()
             switch args[1] {
             case "status":
                 FileHandle.standardOutput.write(try encoder.encode(await status()))
+            case "generate":
+                try await generate()
             case "transcribe" where args.count >= 4:
                 let out = try await transcribe(path: args[2], localeId: args[3])
                 FileHandle.standardOutput.write(try encoder.encode(out))
             default:
-                fail("usage: choco-apple-speech status | transcribe <wav> <locale>")
+                fail("usage: choco-apple status | transcribe <wav> <locale> | generate < request.json")
             }
         } catch {
             fail("\(error)")

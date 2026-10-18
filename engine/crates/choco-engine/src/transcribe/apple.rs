@@ -1,4 +1,4 @@
-//! Apple SpeechAnalyzer (macOS 26+) through the `choco-apple-speech` helper process.
+//! Apple SpeechAnalyzer (macOS 26+) through the `choco-apple` helper process.
 //! Protocol: progress and errors as JSON lines on stderr, the transcript as JSON on stdout.
 
 use super::{Result, TranscribeError, TranscribeOptions, STAGE};
@@ -8,14 +8,14 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const HELPER: &str = "choco-apple-speech";
+const HELPER: &str = "choco-apple";
 
 /// Locate the helper: explicit override, next to the executable, inside an app bundle, or the build output.
 pub fn helper_path() -> Option<PathBuf> {
     if !cfg!(target_os = "macos") {
         return None;
     }
-    if let Some(p) = std::env::var_os("CHOCO_APPLE_SPEECH_HELPER").map(PathBuf::from) {
+    if let Some(p) = std::env::var_os("CHOCO_APPLE_HELPER").map(PathBuf::from) {
         return p.is_file().then_some(p);
     }
     if let Ok(exe) = std::env::current_exe()
@@ -37,6 +37,10 @@ pub struct AppleStatus {
     pub os: String,
     pub locales: Vec<String>,
     pub installed_locales: Vec<String>,
+    #[serde(default)]
+    pub llm_available: bool,
+    #[serde(default)]
+    pub llm_status: String,
 }
 
 /// Ask the helper whether SpeechAnalyzer is usable and which locales it supports.

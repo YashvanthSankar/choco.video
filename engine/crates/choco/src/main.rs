@@ -3,7 +3,8 @@
 use anyhow::{Context, Result, bail};
 use choco_engine::backend::{self, SpeechEngine};
 use choco_engine::transcribe::{TranscribeOptions, apple};
-use choco_engine::{Progress, ingest, models_registry, transcribe};
+use choco_engine::highlights::{self, HighlightOptions, audio, picker};
+use choco_engine::{Progress, Transcript, ingest, models_registry, transcribe};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::io::Write;
 use std::path::PathBuf;
@@ -39,6 +40,27 @@ enum Cmd {
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
+    /// Pick the best clips. Reuses a transcript JSON when given, otherwise transcribes first.
+    Highlights {
+        file: PathBuf,
+        /// Transcript from `choco transcribe -o`; skips transcription.
+        #[arg(long)]
+        transcript: Option<PathBuf>,
+        /// Maximum clips; content decides the count.
+        #[arg(long, default_value_t = 10)]
+        n: usize,
+        /// Only clips about this, e.g. "pricing".
+        #[arg(long)]
+        prompt: Option<String>,
+        #[arg(long, value_enum, default_value_t = PickerArg::Auto)]
+        picker: PickerArg,
+        /// Minimum score to keep a clip.
+        #[arg(long, default_value_t = 55)]
+        min_score: u8,
+        /// Write candidates JSON here.
+        #[arg(long, short)]
+        out: Option<PathBuf>,
+    },
     /// Write a PNG frame from the video.
     Thumbnail {
         file: PathBuf,
@@ -63,6 +85,39 @@ enum ModelsCmd {
     List,
     Pull { id: String },
     Rm { id: String },
+}
+
+#[derive(Clone, Copy, ValueEnum, PartialEq)]
+enum PickerArg {
+    /// BYOK if CHOCO_LLM_API_KEY is set, else Apple on-device.
+    Auto,
+    /// Our hosted service (needs a license key; lands with cloud/).
+    Hosted,
+    /// Apple Intelligence on-device model, macOS 26+.
+    Apple,
+    /// Any OpenAI-compatible endpoint: CHOCO_LLM_BASE_URL (default OpenCode Zen), CHOCO_LLM_API_KEY, CHOCO_LLM_MODEL.
+    Byok,
+}
+
+fn make_picker(p: PickerArg) -> Result<Box<dyn picker::Llm>> {
+    use picker::openai_compat::{OpenAiCompat, OpenAiCompatConfig};
+    Ok(match p {
+        PickerArg::Byok => Box::new(OpenAiCompat::new(OpenAiCompatConfig::from_env("byok")?)),
+        PickerArg::Apple => {
+            if !picker::apple::available() {
+                bail!("Apple Intelligence model is not available on this Mac (needs macOS 26+ with Apple Intelligence enabled)");
+            }
+            Box::new(picker::apple::AppleLlm)
+        }
+        PickerArg::Hosted => bail!("the hosted picker arrives with the cloud service; use --picker byok or --picker apple"),
+        PickerArg::Auto => {
+            if std::env::var("CHOCO_LLM_API_KEY").is_ok_and(|k| !k.is_empty()) {
+                make_picker(PickerArg::Byok)?
+            } else {
+                make_picker(PickerArg::Apple)?
+            }
+        }
+    })
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -156,6 +211,53 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Cmd::Highlights { file, transcript, n, prompt, picker: pk, min_score, out } => {
+            let started = Instant::now();
+            let llm = make_picker(pk)?;
+            let pr = progress_printer(false);
+            let asset = ingest::probe(&file).with_context(|| format!("probing {}", file.display()))?;
+            let tmp = tempfile::tempdir()?;
+            let wav = tmp.path().join("audio.wav");
+            ingest::extract_audio(&asset, &wav, &pr)?;
+            let feats = audio::analyze(&wav)?;
+            let t: Transcript = match transcript {
+                Some(p) => serde_json::from_str(&std::fs::read_to_string(&p)?).with_context(|| format!("reading {}", p.display()))?,
+                None => {
+                    let b = backend::detect();
+                    let opts = TranscribeOptions {
+                        language: None,
+                        whisper_model: b.recommended_models().whisper_model.unwrap_or_else(|| models_registry::WHISPER_DEFAULT.into()),
+                        models_dir: models_registry::default_dir(),
+                    };
+                    transcribe::transcribe(&wav, b.speech_engines()[0], &opts, &pr)?
+                }
+            };
+            let mut opts = HighlightOptions { prompt, ..Default::default() };
+            opts.rank.max_clips = n;
+            opts.rank.min_score = min_score;
+            let (cands, report) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &opts, &pr)?;
+            eprintln!(
+                "{} via {} · {} windows → {} shortlisted → {} scored ({} declined, {} failed batches) · {} model calls · {:.1}s",
+                llm.tier(), llm.model(picker::Role::Score), report.windows, report.shortlisted, report.scored,
+                report.declined_batches, report.failed_batches, report.model_calls, started.elapsed().as_secs_f64()
+            );
+            let json = serde_json::to_string_pretty(&serde_json::json!({"candidates": cands, "report": report}))?;
+            if let Some(out) = out {
+                std::fs::write(&out, &json)?;
+                eprintln!("wrote {}", out.display());
+            }
+            if cli.json {
+                println!("{json}");
+            } else {
+                for (i, c) in cands.iter().enumerate() {
+                    let ts = |ms: u64| format!("{}:{:02}", ms / 60_000, (ms / 1000) % 60);
+                    println!("{:>2}. [{:>3}] {}–{} ({:>2}s)  {}", i + 1, c.score, ts(c.start_ms), ts(c.end_ms), (c.end_ms - c.start_ms) / 1000, c.title);
+                    if !c.reasons.is_empty() {
+                        println!("               {}", c.reasons.join(" · "));
+                    }
+                }
+            }
+        }
         Cmd::Thumbnail { file, at_ms, width, out } => {
             let a = ingest::probe(&file)?;
             ingest::thumbnail(&a, at_ms, width, &out)?;
@@ -221,7 +323,7 @@ fn doctor(json: bool) -> Result<()> {
     }
     if info.os == "macos" && !engines.contains(&SpeechEngine::AppleSpeech) {
         if backend_major(&info.os_version) >= 26 {
-            hints.push("Apple speech helper not found. Rebuild with the apple-speech feature, or set CHOCO_APPLE_SPEECH_HELPER.".into());
+            hints.push("Apple speech helper not found. Rebuild with the apple-speech feature, or set CHOCO_APPLE_HELPER.".into());
         } else {
             hints.push(format!("macOS {} has no SpeechAnalyzer; whisper will be used. macOS 26+ transcribes with zero download.", info.os_version));
         }

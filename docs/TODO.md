@@ -6,7 +6,7 @@ Legend: `[x]` done and verified on the dev Mac · `[~]` in progress or partly ve
 
 Rules: one milestone in progress at a time. A box is checked only when it works and is measured on the dev Mac. **No Windows work until M6** (user decision, 2026-10-18). Move finished milestones to the bottom. Keep this file short; details go in `TECH.md`.
 
-## Now: M1 Engine skeleton (weeks 1–2)
+## Done: M1 Engine skeleton (weeks 1–2) — Mac complete; CI runs on first push
 
 - [x] `git init`, `.gitignore` (target/, fixtures media, models, vendor/, *.chocoproj), `LICENSE` (MIT) in `engine/`
 - [x] Cargo workspace: `choco-engine`, `choco`, `choco-ffi`; shared lints; `deny.toml` with license allowlist and bans (x264, x265, openh264, ort) → builds clean, clippy clean; `cargo deny check` passes
@@ -25,19 +25,20 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [x] Size budget check script (`scripts/size-check.sh`), 25 MB installer / 50 MB installed → engine part measures 11.3 MB installed, 4.9 MB compressed; wired into `app.yml` at M5
 - [x] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5 → 72-min CC BY podcast: Apple 112 s (42x), ~30 MB; whisper 267 s (17x), 1.7 GB, loses ~11% of words to hallucination loops. Ground-truth timing: Apple 103 ms median error, whisper 256 ms (captions fix in M3)
 
-## Next: M2 Picker (weeks 3–4)
+## Now: M2 Picker (weeks 3–4)
 
-- [ ] `highlights/windows.rs` candidate generation with pre-filters
-- [ ] Complete-thought boundaries: grow/trim to terminal punctuation + silence gap; test that no candidate starts or ends mid-sentence
-- [ ] Audio energy + pause features (RMS spikes, laughter-like bursts, long pauses) computed from the 16 kHz wav, fed into the shortlist prior
-- [ ] `highlights/search.rs` shortlist: quality prior, BM25 prompt mode, Jaccard dedupe. No embedding model.
-- [ ] `highlights/picker/openai_compat.rs`: one `/chat/completions` client (ureq) with `json_schema` → `json_object` fallback, strict parse + one retry, configured by `CHOCO_LLM_BASE_URL` / `CHOCO_LLM_API_KEY` / `CHOCO_LLM_MODEL`; works against OpenCode Zen
-- [ ] `highlights/picker/` `Picker` trait; `Hosted`, `Byok` (both on the shared client), `AppleFoundation` shim; batch of 8 with episode context
+- [x] `highlights/windows.rs` candidate generation with pre-filters (min words, dead-air ratio, filler-only openings) → 2,925 windows from the 72-min podcast; 3 tests
+- [x] Complete-thought boundaries: every window starts after and ends on a sentence end (punctuation or ≥ 700 ms pause) → tested, including unpunctuated segments
+- [x] Audio energy + pause features (loudness z-score, spikes per minute, pause ratio, longest pause) from the 16 kHz wav → fixed a silence-threshold bug that counted speech as silence when silence is rare
+- [x] `highlights/search.rs` shortlist: quality prior (pace, hook words, questions, numbers, length, weak openers, audio), BM25 prompt mode with synonym and inflection expansion, near-duplicate removal. No embedding model
+- [~] `highlights/picker/openai_compat.rs`: one `/chat/completions` client (ureq), `json_schema` → `json_object` fallback remembered per client, 429/5xx backoff, refusal handling, `<think>` and code-fence stripping → 3 tests against a local mock server; **not yet run against OpenCode Zen (needs a key)**
+- [~] `highlights/picker/` `Llm` trait with shared batching, map-reduce summary for small contexts, strict parse + one retry, re-ask for skipped ids → end-to-end test with a fake model passes. Apple tier works on the real 72-min podcast; `Byok` wired; `Hosted` waits for `cloud/`
 - [ ] Pick the scoring and titling models on OpenCode Zen by golden-set precision@5 and measured cost per source hour (budget ≤ $0.03); record both in `AGENTS.md`
-- [ ] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hashing
+- [x] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hash (blake3, 16 hex) on every candidate
 - [ ] `cloud/`: axum service with `/v1/score`, `/v1/summarize`, `/v1/title`, `/v1/quota`; license-key auth against Lemon Squeezy; per-key usage counter; OpenAI-compatible provider (OpenCode Zen) via config; no transcript logging; Dockerfile; deployed to one small host; `cloud.yml`
-- [ ] `rank.rs` NMS + diversity penalty + score floor; `--n` is a max, content decides the count
-- [ ] `choco highlights` with `--n`, `--prompt`, `--picker hosted|apple|byok|local`
+- [x] `rank.rs` overlap suppression (> 40% of the shorter clip), same-content suppression, score floor 55, `--n` is a max
+- [x] `choco highlights` with `--n`, `--prompt`, `--picker auto|apple|byok|hosted`, `--min-score`, `--transcript` reuse, `-o` JSON with a diagnostic report
+- [~] Apple on-device tier on the real podcast → 10 sensible clips in ~5 min, but Apple's default guardrails declined 5–7 of 15 batches as "sensitive content" (false positives on ethics/war talk). Fix in progress: retry declined batches under the permissive content-transformation guardrails. Calibration is loose (a clip with "weak hook, low energy" reasons scored 68); revisit with the eval
 - [ ] Golden set: 10 fixtures, 5–8 human-picked ranges each, in `eval/golden.json`
 - [ ] `choco eval` runner, baseline numbers per tier recorded in `AGENTS.md` Benchmarks
 - [ ] Compare Apple speech vs whisper on the golden set per language; decide per-language fallback list

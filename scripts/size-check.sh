@@ -20,8 +20,8 @@ add() { # label path
 }
 add "choco CLI" "$REL/choco"
 add "choco CLI" "$REL/choco.exe"
-helper="$(ls "$REL"/build/choco-engine-*/out/choco-apple-speech 2>/dev/null | head -1 || true)"
-[[ -n "$helper" ]] && add "Apple speech helper" "$helper"
+helper="$(ls "$REL"/build/choco-engine-*/out/choco-apple 2>/dev/null | head -1 || true)"
+[[ -n "$helper" ]] && add "Apple helper" "$helper"
 if [[ -d "$FF" ]]; then
   for f in "$FF"/lib*.[0-9]*.[0-9]*.[0-9]*.dylib; do add "$(basename "$f")" "$f"; done
 fi

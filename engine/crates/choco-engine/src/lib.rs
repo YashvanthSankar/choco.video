@@ -4,6 +4,7 @@
 //! live only in [`backend`]. See `docs/TECH.md` in the main repository.
 
 pub mod backend;
+pub mod highlights;
 pub mod ingest;
 pub mod model;
 pub mod models_registry;
