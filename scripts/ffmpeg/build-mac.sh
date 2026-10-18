@@ -11,6 +11,10 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="${FFMPEG_WORK:-$ROOT/vendor/ffmpeg/build}"
 PREFIX="$ROOT/vendor/ffmpeg/${VERSION}-macos-arm64"
 JOBS="$(sysctl -n hw.ncpu)"
+MESON="${MESON:-meson}"
+# dav1d: BSD-2-Clause AV1 decoder, built static and linked into libavcodec (no extra dylib).
+DAV1D_VERSION="1.5.4"
+DAV1D_SHA256="686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5"  # published by VideoLAN
 
 if [[ -z "$SHA256" && -f "$ROOT/scripts/ffmpeg/VERSIONS" ]]; then
   SHA256="$(awk -v v="$VERSION" '$1==v {print $2}' "$ROOT/scripts/ffmpeg/VERSIONS")"
@@ -27,6 +31,21 @@ if [[ -n "$SHA256" && "$ACTUAL" != "$SHA256" ]]; then
 fi
 echo "ffmpeg-$VERSION sha256 $ACTUAL"
 
+# --- dav1d (software AV1; VideoToolbox covers AV1 in hardware on M3 and later)
+DAV1D_TAR="$WORK/dav1d-$DAV1D_VERSION.tar.xz"
+DAV1D_PREFIX="$WORK/dav1d-$DAV1D_VERSION-prefix"
+if [[ ! -f "$DAV1D_PREFIX/lib/libdav1d.a" ]]; then
+  [[ -f "$DAV1D_TAR" ]] || curl -fL --retry 3 -o "$DAV1D_TAR" "https://downloads.videolan.org/pub/videolan/dav1d/$DAV1D_VERSION/dav1d-$DAV1D_VERSION.tar.xz"
+  echo "$DAV1D_SHA256  $DAV1D_TAR" | shasum -a 256 -c -
+  rm -rf "$WORK/dav1d-$DAV1D_VERSION" && tar -xf "$DAV1D_TAR" -C "$WORK"
+  ( cd "$WORK/dav1d-$DAV1D_VERSION" && \
+    "$MESON" setup build --prefix="$DAV1D_PREFIX" --libdir=lib --buildtype=release --default-library=static \
+      -Denable_tools=false -Denable_tests=false -Denable_examples=false \
+      -Dc_args="-mmacosx-version-min=14.0" -Dc_link_args="-mmacosx-version-min=14.0" && \
+    ninja -C build install )
+fi
+export PKG_CONFIG_PATH="$DAV1D_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
 SRC="$WORK/ffmpeg-$VERSION"
 rm -rf "$SRC" && tar -xf "$TARBALL" -C "$WORK"
 cd "$SRC"
@@ -34,16 +53,16 @@ cd "$SRC"
 join() { local IFS=,; echo "$*"; }
 
 DEMUXERS=(mov matroska mp3 wav aac flac ogg)
-DECODERS=(h264 hevc vp8 vp9 prores mpeg4 mjpeg png
+DECODERS=(h264 hevc vp8 vp9 av1 libdav1d prores mpeg4 mjpeg png
           aac aac_fixed mp3 mp3float opus vorbis flac alac ac3 eac3
           pcm_s16le pcm_s24le pcm_s32le pcm_f32le)
-PARSERS=(h264 hevc vp8 vp9 aac mpegaudio opus vorbis flac ac3 mjpeg png)
+PARSERS=(h264 hevc vp8 vp9 av1 aac mpegaudio opus vorbis flac ac3 mjpeg png)
 BSFS=(h264_mp4toannexb hevc_mp4toannexb aac_adtstoasc vp9_superframe_split extract_extradata)
 ENCODERS=(h264_videotoolbox hevc_videotoolbox aac aac_at png pcm_s16le pcm_f32le)
 MUXERS=(mp4 mov ipod wav image2)
 FILTERS=(abuffer abuffersink buffer buffersink aresample aformat anull null format scale
          loudnorm ebur128 volume atrim trim asetpts setpts transpose hflip vflip)
-HWACCELS=(h264_videotoolbox hevc_videotoolbox vp9_videotoolbox prores_videotoolbox)
+HWACCELS=(h264_videotoolbox hevc_videotoolbox vp9_videotoolbox av1_videotoolbox prores_videotoolbox)
 
 ./configure \
   --prefix="$PREFIX" \
@@ -51,7 +70,7 @@ HWACCELS=(h264_videotoolbox hevc_videotoolbox vp9_videotoolbox prores_videotoolb
   --arch=arm64 --target-os=darwin --cc=clang \
   --enable-shared --disable-static \
   --disable-gpl --disable-nonfree \
-  --disable-autodetect --enable-videotoolbox --enable-audiotoolbox \
+  --disable-autodetect --enable-videotoolbox --enable-audiotoolbox --enable-libdav1d --pkg-config-flags=--static \
   --disable-programs --disable-doc --disable-debug \
   --disable-network --disable-avdevice \
   --disable-everything \

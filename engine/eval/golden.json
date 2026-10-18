@@ -51,6 +51,108 @@
           "why": "Technology is the how, not the what or the why."
         }
       ]
+    },
+    {
+      "id": "olave",
+      "media": "fixtures/media/olave.webm",
+      "transcript": "fixtures/media/olave.transcript.json",
+      "license": "CC BY 3.0",
+      "attribution": "Olave Talks (Wikimedia Commons)",
+      "drafted_by": "editor agent (Claude), 2026-10-18",
+      "reviewed_by_human": false,
+      "clips": [
+        {
+          "start_ms": 3560040,
+          "end_ms": 3643980,
+          "why": "German teammate's racist line, then she wins the moot court as best orator."
+        },
+        {
+          "start_ms": 2172780,
+          "end_ms": 2251320,
+          "why": "Classroom slavery lesson with dialogue and a deadpan punchline."
+        },
+        {
+          "start_ms": 2574960,
+          "end_ms": 2658180,
+          "why": "TV host in 2002 refuses to appear next to Black Pete on her own show, and wins."
+        },
+        {
+          "start_ms": 3352740,
+          "end_ms": 3421620,
+          "why": "Rant on mediocre men being as confident as excellent ones, strong punchline."
+        },
+        {
+          "start_ms": 1029900,
+          "end_ms": 1105980,
+          "why": "Host admits a guest changed her mind; home cooking vs restaurants comparison."
+        },
+        {
+          "start_ms": 1731300,
+          "end_ms": 1801140,
+          "why": "Silent protest ends with eight hours locked in a mobile prison."
+        },
+        {
+          "start_ms": 424980,
+          "end_ms": 496140,
+          "why": "Thesis hook: not a talk about racism, a talk about whiteness."
+        },
+        {
+          "start_ms": 2831940,
+          "end_ms": 2900940,
+          "why": "Corporate lawyer burns out trying to fit in, rescued by activists."
+        }
+      ]
+    },
+    {
+      "id": "graham",
+      "media": "fixtures/media/graham.webm",
+      "transcript": "fixtures/media/graham.transcript.json",
+      "license": "CC BY 3.0",
+      "attribution": "Ashley Graham (Wikimedia Commons)",
+      "drafted_by": "editor agent (Claude), 2026-10-18",
+      "reviewed_by_human": false,
+      "clips": [
+        {
+          "start_ms": 2432760,
+          "end_ms": 2475480,
+          "why": "Men fear robots that might kill them; women: that's every guy they've dated."
+        },
+        {
+          "start_ms": 1524840,
+          "end_ms": 1590180,
+          "why": "Rehab protein-bar story: 'people pleasing is a form of assholery'."
+        },
+        {
+          "start_ms": 988200,
+          "end_ms": 1056180,
+          "why": "Born addicted to cortisol: drama is like a drug."
+        },
+        {
+          "start_ms": 1390920,
+          "end_ms": 1449720,
+          "why": "Codependency defined as the inability to tolerate others' discomfort, plus a checklist."
+        },
+        {
+          "start_ms": 2636940,
+          "end_ms": 2688660,
+          "why": "Three failed pilots were practice, like workout days."
+        },
+        {
+          "start_ms": 298380,
+          "end_ms": 365220,
+          "why": "Writers' room: art imitates life, but you have to have a life."
+        },
+        {
+          "start_ms": 2119800,
+          "end_ms": 2170860,
+          "why": "Feed yourself the way you'd feed a five-year-old."
+        },
+        {
+          "start_ms": 761940,
+          "end_ms": 783780,
+          "why": "Freezing her eggs raised her standards for a guy."
+        }
+      ]
     }
   ]
 }

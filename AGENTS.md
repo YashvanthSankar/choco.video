@@ -95,7 +95,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 |---|---|---|---|
 | 2026-10-18 | Transcribe 72 min real podcast (danaylov, VP9/Opus), Apple SpeechAnalyzer, release | 112 s total (audio 9 s, speech 103 s, 42x realtime), ~30 MB peak in-process, 11,415 words, steady ~160 wpm | M3 Pro 18 GB; speech model runs in the OS service, not counted |
 | 2026-10-18 | Transcribe 72 min real podcast, whisper turbo-q5 on Metal, release | 267 s total (speech 257 s, 17x realtime), 1.7 GB peak; 10,156 words after loop cleanup vs Apple's 11,415; 85% of words agree in order; word starts differ by median 320 ms | Whisper loses ~11% of speech under loops; fine as the fallback for macOS < 26, needs loop recovery before M6 |
-| 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 7.5 MB | LGPL 2.1; avcodec 4.5 MB is most of it |
+| 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 8.3 MB (7.5 MB before AV1) | LGPL 2.1; dav1d 1.5.4 (BSD-2) static inside avcodec (5.6 MB) |
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
 | 2026-10-18 | Word-start error vs synthesized ground truth (62 words, `fixtures/timing.py`) | Apple: median 103 ms, bias −100 ms, 49% within 100 ms. Whisper turbo-q5 token times: median 256 ms, bias −232 ms, 11% within 100 ms | Both early. Captions need ≤ 50 ms; fix in M3 (DTW, offset calibration) |
@@ -118,6 +118,8 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 - AVSpeechSynthesizer word-marker offsets restart at each internal synthesis chunk (an empty buffer marks it). `fixtures/say_aligned.swift` rebases them; keep that if you touch it.
 - OpenCode Zen is behind Cloudflare and returns HTTP 403 "error code: 1010" to some default client user agents (Python urllib, measured). The client always sends `User-Agent: choco-video/<version>`; keep it.
 - Apple's default guardrails decline podcast batches about war, ethics or health as "sensitive content" (5–7 of 15 batches on the 72-min podcast). The helper retries declined batches as plain text under `.permissiveContentTransformations`, which fixed all declines in that run.
+- Real downloads are often AV1 (2 of our 5 CC BY fixtures). The minimal FFmpeg must keep `av1`, `libdav1d` and `av1_videotoolbox`; `tests/media.rs` fails if a format regresses. Probe reads codec parameters directly so it never needs a decoder.
+- GitHub's package registry (ghcr.io) was unreachable from the dev network, so Homebrew bottles failed; meson came from PyPI in a scratch venv (`MESON=` env for `build-mac.sh`).
 - Phone footage carries a rotation tag. Probe must apply it or faces will be detected sideways.
 - `wgpu` readback is the slow path. Prefer handing textures to the encoder when the backend supports it.
 

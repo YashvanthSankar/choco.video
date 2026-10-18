@@ -46,6 +46,10 @@ say -v Daniel   -o "$T/s4.aiff" "The day someone offered to pay me for it."
 "$FF" -y -hide_banner -loglevel error -i media/speech.mp4 -t 8 -c:v libvpx-vp9 -b:v 500k -deadline realtime -c:a libopus media/vp9-opus.mkv 2>/dev/null \
   || echo "skipped vp9-opus.mkv (ffmpeg lacks libvpx or libopus)"
 
+# 6b. AV1 + Opus WebM, the codec most modern web video and many YouTube downloads use.
+"$FF" -y -hide_banner -loglevel error -i media/speech.mp4 -t 8 -vf scale=1280:720 -c:v libsvtav1 -preset 12 -c:a libopus media/av1-opus.webm 2>/dev/null \
+  || echo "skipped av1-opus.webm (ffmpeg lacks libsvtav1 or libopus)"
+
 # 7. Same script with exact word onsets from AVSpeechSynthesizer, for timing accuracy (timing.py).
 xcrun swiftc -O say_aligned.swift -o "$T/say_aligned"
 "$T/say_aligned" media/speech.txt "$T/aligned.caf" media/aligned.words.json

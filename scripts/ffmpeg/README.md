@@ -11,13 +11,14 @@ export PKG_CONFIG_PATH="$PWD/vendor/ffmpeg/8.1.3-macos-arm64/lib/pkgconfig"
 
 Output lands in `vendor/ffmpeg/<version>-macos-arm64/` (gitignored). The script verifies the tarball against `VERSIONS`, refuses to finish if `config.h` reports GPL or nonfree, and installs dylibs with `@rpath` install names so the app bundle can carry them in `Contents/Frameworks`.
 
-`--disable-everything` plus an allowlist. To add a codec, filter or format, add it to the arrays in `build-mac.sh`, rebuild, and record the new size below. `--disable-autodetect` means no zlib, so the PNG encoder is off; thumbnails and posters are encoded by the pure-Rust `png` crate instead.
+`--disable-everything` plus an allowlist. AV1 decodes in software with dav1d (built static from a VideoLAN-checksummed tarball; needs `meson` and `ninja`, override with `MESON=`) and in hardware through VideoToolbox on chips that have it. To add a codec, filter or format, add it to the arrays in `build-mac.sh`, rebuild, and record the new size below. `--disable-autodetect` means no zlib, so the PNG encoder is off; thumbnails and posters are encoded by the pure-Rust `png` crate instead.
 
 ## Measured
 
 | Date | Version | Target | Total dylib size | License |
 |---|---|---|---|---|
 | 2026-10-18 | 8.1.3 | macos-arm64 | 7.5 MB (avcodec 4.5, swscale 1.1, avformat 0.8, avutil 0.7, avfilter 0.3, swresample 0.1) | LGPL 2.1 or later |
+| 2026-10-18 | 8.1.3 + dav1d 1.5.4 | macos-arm64 | 8.3 MB (avcodec 5.6 with dav1d static) | LGPL 2.1 or later; dav1d BSD-2 |
 
 ## Windows (M6, not before)
 

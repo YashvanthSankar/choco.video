@@ -19,6 +19,8 @@ pub enum IngestError {
     NoStream { path: PathBuf, kind: &'static str },
     #[error("ingest: ffmpeg: {0}")]
     Ffmpeg(#[from] ff::Error),
+    #[error("ingest: this build cannot decode {codec} ({kind}); file a bug with the codec name")]
+    Unsupported { codec: String, kind: &'static str },
     #[error("ingest: io: {0}")]
     Io(#[from] std::io::Error),
     #[error("ingest: png: {0}")]
@@ -35,8 +37,14 @@ pub fn probe(path: &Path) -> Result<MediaAsset> {
 
     let video = match ictx.streams().best(ff::media::Type::Video) {
         Some(s) => {
-            let ctx = ff::codec::context::Context::from_parameters(s.parameters())?;
-            let dec = ctx.decoder().video()?;
+            // Read size from the container's codec parameters, not a decoder: probing must work
+            // even when this build cannot decode the codec, so the error surfaces at decode time
+            // with a clear message instead of "decoder not found" on open.
+            // SAFETY: codecpar is valid for the lifetime of the stream.
+            let (w, h) = unsafe {
+                let par = (*s.as_ptr()).codecpar;
+                ((*par).width.max(0) as u32, (*par).height.max(0) as u32)
+            };
             let rate = s.avg_frame_rate();
             let (num, den) = if rate.numerator() > 0 && rate.denominator() > 0 {
                 (rate.numerator() as u32, rate.denominator() as u32)
@@ -44,7 +52,6 @@ pub fn probe(path: &Path) -> Result<MediaAsset> {
                 (30, 1)
             };
             let rotation = rotation_deg(&s);
-            let (w, h) = (dec.width(), dec.height());
             let (dw, dh) = if rotation % 180 == 90 { (h, w) } else { (w, h) };
             Some(VideoStream {
                 index: s.index(),
@@ -63,14 +70,12 @@ pub fn probe(path: &Path) -> Result<MediaAsset> {
 
     let audio = match ictx.streams().best(ff::media::Type::Audio) {
         Some(s) => {
-            let ctx = ff::codec::context::Context::from_parameters(s.parameters())?;
-            let dec = ctx.decoder().audio()?;
-            Some(AudioStream {
-                index: s.index(),
-                codec: codec_name(s.parameters().id()),
-                sample_rate: dec.rate(),
-                channels: dec.channels(),
-            })
+            // SAFETY: codecpar is valid for the lifetime of the stream.
+            let (rate, channels) = unsafe {
+                let par = (*s.as_ptr()).codecpar;
+                ((*par).sample_rate.max(0) as u32, (*par).ch_layout.nb_channels.max(0) as u16)
+            };
+            Some(AudioStream { index: s.index(), codec: codec_name(s.parameters().id()), sample_rate: rate, channels })
         }
         None => None,
     };
@@ -154,7 +159,10 @@ pub fn extract_audio(asset: &MediaAsset, out: &Path, progress: ProgressFn) -> Re
     let index = stream.index();
     let time_base = stream.time_base();
     let ctx = ff::codec::context::Context::from_parameters(stream.parameters())?;
-    let mut decoder = ctx.decoder().audio()?;
+    let mut decoder = ctx
+        .decoder()
+        .audio()
+        .map_err(|_| IngestError::Unsupported { codec: codec_name(stream.parameters().id()), kind: "audio" })?;
     if decoder.channel_layout().is_empty() {
         decoder.set_channel_layout(ff::ChannelLayout::default(decoder.channels() as i32));
     }
@@ -302,7 +310,10 @@ pub fn thumbnail(asset: &MediaAsset, t_ms: u64, max_width: u32, out: &Path) -> R
     let stream = ictx.stream(vinfo.index).ok_or_else(|| IngestError::NoStream { path: asset.path.clone(), kind: "video" })?;
     let time_base = stream.time_base();
     let ctx = ff::codec::context::Context::from_parameters(stream.parameters())?;
-    let mut decoder = ctx.decoder().video()?;
+    let mut decoder = ctx
+        .decoder()
+        .video()
+        .map_err(|_| IngestError::Unsupported { codec: codec_name(stream.parameters().id()), kind: "video" })?;
 
     let target_ts = (t_ms as i64) * ff::ffi::AV_TIME_BASE as i64 / 1000;
     let _ = ictx.seek(target_ts, ..target_ts);
