@@ -154,6 +154,12 @@ fn overlap_frac(a: &Window, b: &Window) -> f32 {
 /// Overlapping windows are allowed here (different lengths from the same start are useful
 /// to the model); only near-identical ones are dropped.
 pub fn shortlist(windows: &[Window], score: &[f32], k: usize) -> Vec<usize> {
+    shortlist_with(windows, score, k, 0.85)
+}
+
+/// Like [`shortlist`], but a window is skipped when it overlaps a kept one by more than
+/// `max_overlap` of the shorter. Lower values spread the shortlist across the episode.
+pub fn shortlist_with(windows: &[Window], score: &[f32], k: usize, max_overlap: f32) -> Vec<usize> {
     let mut order: Vec<usize> = (0..windows.len()).collect();
     order.sort_by(|&a, &b| score[b].total_cmp(&score[a]));
     let mut kept: Vec<usize> = Vec::new();
@@ -163,7 +169,7 @@ pub fn shortlist(windows: &[Window], score: &[f32], k: usize) -> Vec<usize> {
         }
         let dup = kept.iter().any(|&j| {
             let o = overlap_frac(&windows[i], &windows[j]);
-            o > 0.85 || (o > 0.5 && jaccard(&windows[i].text, &windows[j].text) > 0.8)
+            o > max_overlap || (o > 0.5 && jaccard(&windows[i].text, &windows[j].text) > 0.8)
         });
         if !dup {
             kept.push(i);

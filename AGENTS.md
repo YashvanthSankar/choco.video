@@ -99,6 +99,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
 | 2026-10-18 | Word-start error vs synthesized ground truth (62 words, `fixtures/timing.py`) | Apple: median 103 ms, bias −100 ms, 49% within 100 ms. Whisper turbo-q5 token times: median 256 ms, bias −232 ms, 11% within 100 ms | Both early. Captions need ≤ 50 ms; fix in M3 (DTW, offset calibration) |
+| 2026-10-18 | Shortlist ceiling: golden clips reachable by the model | 60 @ 85% overlap: 0.47 · 60 @ 10%: 0.80 · 80 @ 20%: 0.93 (default) · 90 @ 10%: 1.00 | The heuristic prior was the bottleneck, not the model |
 | — | Picker on the 72-min podcast per OpenCode model: wall time, tokens, cost per source hour | in progress | M2 |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
 | 2026-10-18 | Render 62 s clip to 1080x1920 (VP9 640x360 source, bold captions, loudnorm), VideoToolbox H.264 | 10.8 s wall, 5.7x realtime; ~25 MB at 10 Mbps | CPU compositor, no GPU library |

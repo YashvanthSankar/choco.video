@@ -24,6 +24,9 @@ pub struct HighlightOptions {
     pub shortlist: usize,
     /// Words in the episode summary.
     pub summary_words: usize,
+    /// Shortlisted windows may overlap each other by at most this share of the shorter one,
+    /// in percent. Lower spreads the shortlist across the whole episode.
+    pub shortlist_max_overlap_pct: u8,
 }
 
 impl Default for HighlightOptions {
@@ -32,8 +35,11 @@ impl Default for HighlightOptions {
             windows: Default::default(),
             rank: Default::default(),
             prompt: None,
-            shortlist: 60,
+            // Measured on the golden set: 60 windows at 85% overlap left only 47% of golden clips
+            // reachable by the model; 80 at 20% reaches 93% for 1.33x the scoring tokens.
+            shortlist: 80,
             summary_words: 250,
+            shortlist_max_overlap_pct: 20,
         }
     }
 }
@@ -138,6 +144,16 @@ fn score_batch(llm: &dyn Llm, summary: &str, batch: &[&windows::Window], prompt:
     Ok(scores)
 }
 
+/// The windows the model would see, without calling it. For measuring the shortlist ceiling.
+pub fn shortlist_only(t: &Transcript, audio: Option<&audio::AudioFeatures>, opts: &HighlightOptions) -> Vec<windows::Window> {
+    let ws = windows::windows(t, &opts.windows);
+    let scores: Vec<f32> = match &opts.prompt {
+        Some(p) => search::bm25(&ws, p),
+        None => ws.iter().map(|w| search::prior(w, audio.map(|a| a.window(w.start_ms, w.end_ms)).as_ref())).collect(),
+    };
+    search::shortlist_with(&ws, &scores, opts.shortlist, opts.shortlist_max_overlap_pct as f32 / 100.0).into_iter().map(|i| ws[i].clone()).collect()
+}
+
 pub fn highlights(
     t: &Transcript,
     audio: Option<&audio::AudioFeatures>,
@@ -164,7 +180,7 @@ pub fn highlights(
         }
         None => ws.iter().map(|w| search::prior(w, audio.map(|a| a.window(w.start_ms, w.end_ms)).as_ref())).collect(),
     };
-    let short = search::shortlist(&ws, &scores, opts.shortlist);
+    let short = search::shortlist_with(&ws, &scores, opts.shortlist, opts.shortlist_max_overlap_pct as f32 / 100.0);
     report.shortlisted = short.len();
 
     progress(Progress::new(STAGE, 0.05, format!("summarizing episode with {}", llm.model(Role::Summarize))));

@@ -78,6 +78,15 @@ enum Cmd {
         /// Where to write per-run results.
         #[arg(long, default_value = "eval/results")]
         out_dir: PathBuf,
+        /// Only measure how many golden clips survive the shortlist (no model calls).
+        #[arg(long)]
+        shortlist_only: bool,
+        /// Shortlist size to test with --shortlist-only.
+        #[arg(long, default_value_t = 80)]
+        shortlist: usize,
+        /// Max overlap between shortlisted windows, percent (--shortlist-only).
+        #[arg(long, default_value_t = 20)]
+        overlap: u8,
     },
     /// Render one vertical clip with captions.
     Render {
@@ -334,10 +343,30 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Cmd::Eval { golden, results, picker: pk, label, out_dir } => {
+        Cmd::Eval { golden, results, picker: pk, label, out_dir, shortlist_only, shortlist, overlap } => {
             use choco_engine::eval;
             let set: eval::GoldenSet = serde_json::from_str(&std::fs::read_to_string(&golden).with_context(|| format!("reading {}", golden.display()))?)?;
             let base = golden.parent().and_then(|p| p.parent()).unwrap_or(std::path::Path::new("."));
+            if shortlist_only {
+                let pr = progress_printer(true);
+                let mut total = 0.0;
+                println!("{:<12} {:>8} {:>8}", "fixture", "golden", "in list");
+                for f in &set.fixtures {
+                    let t: Transcript = serde_json::from_str(&std::fs::read_to_string(base.join(&f.transcript))?)?;
+                    let asset = ingest::probe(&base.join(&f.media))?;
+                    let tmp = tempfile::tempdir()?;
+                    let wav = tmp.path().join("audio.wav");
+                    ingest::extract_audio(&asset, &wav, &pr)?;
+                    let feats = audio::analyze(&wav)?;
+                    let opts = HighlightOptions { shortlist, shortlist_max_overlap_pct: overlap, ..Default::default() };
+                    let ws = highlights::shortlist_only(&t, Some(&feats), &opts);
+                    let found = f.clips.iter().filter(|g| ws.iter().any(|w| eval::hits((w.start_ms, w.end_ms), (g.start_ms, g.end_ms)))).count();
+                    total += found as f32 / f.clips.len() as f32;
+                    println!("{:<12} {:>8} {:>8}", f.id, f.clips.len(), found);
+                }
+                println!("shortlist recall (golden clips reachable by the model): {:.2}", total / set.fixtures.len() as f32);
+                return Ok(());
+            }
             let llm = if results.is_none() { Some(make_picker(pk)?) } else { None };
             let pr = progress_printer(false);
             let mut scores = Vec::new();
