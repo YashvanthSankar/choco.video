@@ -93,6 +93,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | — | Transcribe 60 min podcast, Apple SpeechAnalyzer | not measured | M1 target |
 | — | Transcribe 60 min podcast, whisper turbo-q5, Metal | not measured | M1 target |
 | 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 7.5 MB | LGPL 2.1; avcodec 4.5 MB is most of it |
+| 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
 | — | Picker on 300 candidates, hosted tier, wall time and tokens | not measured | M2 target |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |

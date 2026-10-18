@@ -14,15 +14,15 @@ Rules: one milestone in progress at a time. A box is checked only when the thing
 - [~] `backend/`: trait, `detect()`, `mac.rs` (AppleSpeech on 26+, Metal, VideoToolbox), `windows.rs` (stub that reports Whisper on CPU), `cpu.rs`, `recommended_models()` by memory → detects M3 Pro, 18 GB, macOS 27.0.1, AppleSpeech → Whisper Metal
 - [~] Release profile in workspace `Cargo.toml` (fat LTO, 1 codegen unit, abort, strip, opt-level z with overrides); arm64-only Mac target; toolchain pinned to 1.99.1
 - [~] FFmpeg minimal LGPL: build recipe with `--disable-everything` plus an allowlist (mov/mp4/matroska/webm demux, h264/hevc/vp9/aac/opus/mp3 decode, hw encoders, aac encode, loudnorm/aresample/scale filters, VideoToolbox/D3D11VA/NVENC/AMF/QSV/MF hwaccel), `--disable-gpl --disable-nonfree`; pin version; record the dylib sizes in `AGENTS.md` Benchmarks; document in `scripts/ffmpeg/README.md`; Windows link path verified in CI → Mac done: 8.1.3, 7.5 MB of dylibs, LGPL 2.1 confirmed, `@rpath` install names; Windows link path pending (no CI yet)
-- [ ] `ingest/`: `probe`, `extract_audio` (16 kHz mono f32), `thumbnail`
+- [~] `ingest/`: `probe`, `extract_audio` (16 kHz mono f32), `thumbnail` → probes MP4, MOV, MKV/WebM (VP9, Opus), audio-only M4A; rotated phone clip thumbnail matches FFmpeg's reference pixel for pixel
 - [~] `transcribe/`: `Transcriber` trait + shared cleanup (sentence re-split, hallucination filter, clamp)
-- [~] `transcribe/apple.rs`: Swift shim in `engine/crates/apple/` for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+, availability-gated
-- [ ] `transcribe/whisper.rs`: `whisper-rs` with Metal/Vulkan/CPU, windowed decode with overlap, word timestamps, quantized turbo default
+- [~] `transcribe/apple.rs`: Swift helper (168 KB) for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+ → 45 locales; 0% WER on the synthetic script, 20x realtime, zero download
+- [~] `transcribe/whisper.rs`: `whisper-rs` with Metal/CPU, word timestamps from tokens, quantized turbo default → 0% WER on the synthetic script; fixed a progress deadlock caused by whisper-rs leaking its callback. whisper.cpp windows long audio itself, so no manual overlap windowing
 - [~] `models_registry/`: manifests pinned to a Hugging Face revision, resumable download, sha256 verify (upstream publishes sha256, so not blake3), `choco models list|pull|rm`
 - [~] CLI: `choco probe`, `choco transcribe`, `choco thumbnail`, `choco doctor` with fix hints, `choco models`, `--json` → doctor reports ready
 - [x] `fixtures/generate.sh` (synthetic, macOS `say` voices with known text: speech, rotated phone clip, silent, two voices, audio-only, VP9/Opus MKV) and `fixtures/fetch.sh` + `sources.tsv` (5 CC BY 3.0 long-form recordings from Wikimedia Commons, 48–72 min, sha1-verified)
-- [ ] CI `engine.yml` on `macos-14` + `windows-latest`: release build, test, clippy, deny, `cargo bloat` summary
-- [ ] Size budget check script (`scripts/size-check.sh`) that fails over 25 MB installer / 50 MB installed; wired into `app.yml` at M5, run by hand before then
+- [~] CI `engine.yml` on `macos-15` + `windows-latest` + cargo-deny: release build, test, clippy, size report → written; not run yet because nothing has been pushed. `cargo deny check` passes locally. Windows links a pinned BtbN LGPL 8.1.3 build until M6
+- [~] Size budget check script (`scripts/size-check.sh`) that fails over 25 MB installer / 50 MB installed; measures the engine part until the app exists at M5
 - [ ] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5; record wall time, peak memory and word-timing agreement in `AGENTS.md` Benchmarks
 
 ## Next: M2 Picker (weeks 3–4)
