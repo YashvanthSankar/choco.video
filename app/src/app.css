@@ -1,0 +1,51 @@
+:root {
+  --bg: #15110e;
+  --panel: #1f1915;
+  --panel-2: #2a221c;
+  --line: #3a3029;
+  --text: #f4ece4;
+  --muted: #b3a597;
+  --accent: #e8a35c;
+  --accent-ink: #1a120b;
+  --good: #7fd18b;
+  --bad: #f08a7a;
+  --radius: 12px;
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); }
+h1, h2, h3 { margin: 0 0 8px; letter-spacing: -0.01em; }
+h1 { font-size: 26px; }
+h2 { font-size: 18px; }
+p { margin: 0 0 10px; color: var(--muted); }
+a { color: var(--accent); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 14px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.ghost { background: transparent; }
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.grow { flex: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.ok { color: var(--good); }
+.err { color: var(--bad); }
+.pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+.drag { -webkit-app-region: drag; }
+.nodrag { -webkit-app-region: no-drag; }

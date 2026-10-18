@@ -1,156 +1,107 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from "svelte";
+  import { api, onJobDone, onJobError, onJobProgress, type JobRequest, type ProgressEvent, type RunResult, type Settings, type Status } from "$lib/api";
+  import Onboarding from "$lib/components/Onboarding.svelte";
+  import Home from "$lib/components/Home.svelte";
+  import JobView from "$lib/components/JobView.svelte";
+  import Results from "$lib/components/Results.svelte";
+  import SettingsView from "$lib/components/SettingsView.svelte";
 
-  let name = $state("");
-  let greetMsg = $state("");
+  type View = "loading" | "onboarding" | "home" | "job" | "results" | "settings";
+  let view = $state<View>("loading");
+  let status = $state<Status | null>(null);
+  let job = $state<number | null>(null);
+  let jobFile = $state("");
+  let events = $state<ProgressEvent[]>([]);
+  let run = $state<RunResult | null>(null);
+  let error = $state("");
+  let fatal = $state("");
 
-  async function greet(event: Event) {
-    event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
+  async function refresh() {
+    status = await api.status();
+  }
+
+  onMount(() => {
+    const offs = [
+      onJobProgress((e) => {
+        if (e.job === job) events = [...events.slice(-200), e];
+      }),
+      onJobDone((e) => {
+        if (e.job !== job) return;
+        run = e.result;
+        job = null;
+        view = "results";
+      }),
+      onJobError((e) => {
+        if (e.job !== job) return;
+        job = null;
+        error = e.error.includes("cancelled") ? "" : e.error;
+        view = "home";
+      }),
+    ];
+    refresh()
+      .then(() => (view = status!.settings.onboarded ? "home" : "onboarding"))
+      .catch((e) => (fatal = String(e)));
+    return () => offs.forEach((p) => p.then((off) => off()));
+  });
+
+  async function start(req: JobRequest) {
+    error = "";
+    events = [];
+    jobFile = req.file;
+    try {
+      job = await api.startJob(req);
+      view = "job";
+    } catch (e) {
+      error = String(e);
+    }
+  }
+
+  async function doneOnboarding(_: Settings) {
+    await refresh();
+    view = "home";
+  }
+
+  async function closeSettings(_: Settings) {
+    await refresh();
+    view = run ? "results" : "home";
   }
 </script>
 
-<main class="container">
-  <h1>Welcome to Tauri + Svelte</h1>
+<header class="bar drag">
+  <span class="brand">choco<span class="dot">.</span>video</span>
+  {#if status && view !== "onboarding" && view !== "loading"}
+    <nav class="nodrag">
+      {#if view === "results"}<button class="ghost" onclick={() => (view = "home")}>New video</button>{/if}
+      {#if view !== "job"}<button class="ghost" onclick={() => (view = "settings")}>Settings</button>{/if}
+    </nav>
+  {/if}
+</header>
 
-  <div class="row">
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo vite" alt="Vite Logo" />
-    </a>
-    <a href="https://tauri.app" target="_blank">
-      <img src="/tauri.svg" class="logo tauri" alt="Tauri Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank">
-      <img src="/svelte.svg" class="logo svelte-kit" alt="SvelteKit Logo" />
-    </a>
-  </div>
-  <p>Click on the Tauri, Vite, and SvelteKit logos to learn more.</p>
-
-  <form class="row" onsubmit={greet}>
-    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{greetMsg}</p>
+<main>
+  {#if fatal}
+    <div class="center"><p class="err">{fatal}</p></div>
+  {:else if view === "loading" || !status}
+    <div class="center"><p>Loading…</p></div>
+  {:else if view === "onboarding"}
+    <Onboarding {status} onDone={doneOnboarding} />
+  {:else if view === "home"}
+    <Home settings={status.settings} styles={status.styles} presets={status.presets} onStart={start} {error} />
+  {:else if view === "job"}
+    <JobView file={jobFile} {events} onCancel={() => job !== null && api.cancelJob(job)} />
+  {:else if view === "results" && run}
+    <Results bind:run styles={status.styles} presets={status.presets} onNew={() => (view = "home")} />
+  {:else if view === "settings"}
+    <SettingsView {status} onClose={closeSettings} />
+  {/if}
 </main>
 
 <style>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.svelte-kit:hover {
-  filter: drop-shadow(0 0 2em #ff3e00);
-}
-
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
+  .bar { position: fixed; top: 0; left: 0; right: 0; height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 86px; background: rgba(21,17,14,.85); backdrop-filter: blur(10px); z-index: 10; border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; letter-spacing: -0.02em; }
+  .dot { color: var(--accent); }
+  nav { display: flex; gap: 6px; }
+  nav button { padding: 4px 10px; font-size: 12px; }
+  main { padding-top: 38px; min-height: 100vh; }
+  .center { display: grid; place-items: center; height: 60vh; }
 </style>

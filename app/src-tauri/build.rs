@@ -4,8 +4,11 @@ fn main() {
         // Bundled: Contents/MacOS/choco-app next to Contents/Frameworks/*.dylib.
         println!("cargo::rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
     }
-    // Development (`tauri dev`): the vendored FFmpeg build.
-    if let Ok(dir) = std::env::var("CHOCO_FFMPEG_LIB_DIR") {
+    // Development only (`tauri dev`): the vendored FFmpeg build. Release binaries must not carry
+    // a path from the build machine; they load FFmpeg from Contents/Frameworks.
+    if std::env::var("PROFILE").as_deref() == Ok("debug")
+        && let Ok(dir) = std::env::var("CHOCO_FFMPEG_LIB_DIR")
+    {
         println!("cargo::rustc-link-arg=-Wl,-rpath,{dir}");
     }
     tauri_build::build()

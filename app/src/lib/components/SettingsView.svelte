@@ -1,0 +1,85 @@
+<script lang="ts">
+  import { api, type Status, type Settings } from "$lib/api";
+  import { open } from "@tauri-apps/plugin-dialog";
+  import ProviderSetup from "./ProviderSetup.svelte";
+  import { untrack } from "svelte";
+
+  let { status, onClose }: { status: Status; onClose: (s: Settings) => void } = $props();
+  let settings = $state<Settings>(structuredClone(untrack(() => status.settings)));
+  let saved = $state(false);
+  let error = $state("");
+
+  async function save() {
+    error = "";
+    try {
+      await api.saveSettings(settings);
+      saved = true;
+      setTimeout(() => (saved = false), 1500);
+    } catch (e) {
+      error = String(e);
+    }
+  }
+  async function pickDir() {
+    const d = await open({ directory: true, defaultPath: settings.defaults.output_dir });
+    if (typeof d === "string") settings.defaults.output_dir = d;
+  }
+  async function removeKey() {
+    await api.setApiKey("");
+    status.has_key = false;
+  }
+  const appleSpeech = $derived(status.speech_engines.some((e) => e.kind === "apple_speech"));
+</script>
+
+<div class="wrap">
+  <div class="row"><h1 class="grow">Settings</h1><button onclick={() => onClose(settings)}>Done</button></div>
+
+  <h2>Clip picker</h2>
+  <ProviderSetup {status} bind:settings />
+  {#if status.has_key}<button class="ghost small" onclick={removeKey}>Remove saved key</button>{/if}
+
+  <h2 class="sp">Defaults</h2>
+  <div class="card grid">
+    <div><label for="ds">Captions</label><select id="ds" bind:value={settings.defaults.style}>{#each status.styles as s}<option value={s}>{s}</option>{/each}<option value="none">none</option></select></div>
+    <div><label for="dp">Size</label><select id="dp" bind:value={settings.defaults.preset}>{#each status.presets as p}<option value={p}>{p}</option>{/each}</select></div>
+    <div><label for="dl">Framing</label><select id="dl" bind:value={settings.defaults.layout}><option value="auto">Follow the speaker</option><option value="static">Centre crop</option><option value="fit">Whole frame</option></select></div>
+    <div><label for="dn">Clips</label><input id="dn" type="number" min="1" max="30" bind:value={settings.defaults.max_clips} /></div>
+    <div><label for="dm">Minimum score</label><input id="dm" type="number" min="0" max="100" bind:value={settings.defaults.min_score} /></div>
+    <div class="wide"><label for="do">Save clips to</label><div class="row"><input id="do" class="grow" type="text" readonly value={settings.defaults.output_dir} /><button onclick={pickDir}>Choose…</button></div></div>
+  </div>
+
+  <h2 class="sp">Speech</h2>
+  <div class="card grid">
+    <div>
+      <label for="sp">Engine</label>
+      <select id="sp" bind:value={settings.speech}>
+        <option value="auto">Automatic</option>
+        {#if appleSpeech}<option value="apple">Apple speech (built in)</option>{/if}
+        <option value="whisper">Whisper (downloaded model)</option>
+      </select>
+    </div>
+    <div>
+      <label for="lang">Language</label>
+      <select id="lang" bind:value={settings.language}>
+        <option value="">Automatic (English for Apple speech)</option>
+        {#each status.apple?.locales ?? ["en-US"] as l}<option value={l}>{l}</option>{/each}
+      </select>
+    </div>
+  </div>
+
+  <h2 class="sp">About</h2>
+  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · macOS {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, Inter and Montserrat (OFL).</p>
+
+  <div class="row end">
+    {#if error}<span class="err small">{error}</span>{/if}
+    {#if saved}<span class="ok small">Saved</span>{/if}
+    <button class="primary" onclick={save}>Save</button>
+  </div>
+</div>
+
+<style>
+  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 28px 28px; }
+  .sp { margin-top: 26px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; }
+  .wide { grid-column: 1 / -1; }
+  .end { justify-content: flex-end; margin-top: 20px; gap: 12px; }
+</style>

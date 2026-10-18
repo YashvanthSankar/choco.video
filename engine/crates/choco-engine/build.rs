@@ -12,6 +12,27 @@ fn main() {
     if target_os == "macos" && env::var_os("CARGO_FEATURE_APPLE_SPEECH").is_some() {
         build_apple_helper();
     }
+    if target_os == "macos" {
+        link_clang_runtime();
+    }
+}
+
+/// whisper.cpp's Metal backend uses `@available` checks. When built for an older minimum macOS
+/// (the app targets 14.0) these compile to `__isPlatformVersionAtLeast`, which lives in clang's
+/// compiler runtime; rustc's link line does not include it. Linking it as a static library from
+/// here propagates to every binary that uses the engine.
+fn link_clang_runtime() {
+    let Ok(out) = Command::new("xcrun").args(["clang", "--print-resource-dir"]).output() else {
+        println!("cargo::warning=could not locate clang's resource dir; builds for older macOS targets may fail to link");
+        return;
+    };
+    let dir = PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()).join("lib/darwin");
+    if dir.join("libclang_rt.osx.a").is_file() {
+        println!("cargo::rustc-link-search=native={}", dir.display());
+        println!("cargo::rustc-link-lib=static=clang_rt.osx");
+    } else {
+        println!("cargo::warning=libclang_rt.osx.a not found in {}", dir.display());
+    }
 }
 
 /// Compile the Swift helper that wraps SpeechAnalyzer. Runs as a child process so the
