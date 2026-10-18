@@ -1,0 +1,155 @@
+name: release
+
+# Push a tag like v0.1.0 (matching app/src-tauri/tauri.conf.json) to build the Mac app and
+# publish a GitHub Release. The DMG is always uploaded under a fixed name, so
+#   https://github.com/<owner>/choco.video/releases/latest/download/choco.video-macos-arm64.dmg
+# is a permanent "download the latest" link (the website's hero button uses it).
+#
+# Signing and notarization are optional. Without the secrets below the app is ad-hoc signed and
+# users must right-click > Open on first launch; the release notes say so. With them:
+#   APPLE_CERTIFICATE           base64 of the Developer ID Application .p12
+#   APPLE_CERTIFICATE_PASSWORD  password of that .p12
+#   APPLE_SIGNING_IDENTITY      e.g. "Developer ID Application: Name (TEAMID)"
+#   APPLE_ID, APPLE_PASSWORD (app-specific password), APPLE_TEAM_ID   for notarization
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  ASSET: choco.video-macos-arm64.dmg
+
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve version
+        id: v
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          CONF=$(python3 -c "import json;print(json.load(open('app/src-tauri/tauri.conf.json'))['version'])")
+          [[ "$TAG" == "v$CONF" ]] || { echo "::error::tag $TAG does not match app version $CONF in tauri.conf.json"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$CONF" >> "$GITHUB_OUTPUT"
+
+      - name: Rust toolchain
+        working-directory: engine
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Build tools
+        run: brew install nasm pkg-config meson ninja
+
+      - name: Cache minimal FFmpeg
+        id: ffcache
+        uses: actions/cache@v4
+        with:
+          path: vendor/ffmpeg/8.1.3-macos-arm64
+          key: ffmpeg-macos-arm64-${{ hashFiles('scripts/ffmpeg/build-mac.sh', 'scripts/ffmpeg/VERSIONS') }}
+
+      - name: Build minimal LGPL FFmpeg
+        if: steps.ffcache.outputs.cache-hit != 'true'
+        run: ./scripts/ffmpeg/build-mac.sh
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            engine
+            app/src-tauri
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Engine tests
+        working-directory: engine
+        run: cargo test --all
+
+      - name: Import signing certificate
+        id: sign
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [[ -z "$APPLE_CERTIFICATE" ]]; then echo "signed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          KC="$RUNNER_TEMP/build.keychain-db"; KP="$(uuidgen)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KP" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build app and DMG
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ steps.sign.outputs.signed == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Tauri signs/notarizes when these exist; an empty value must mean "absent".
+          for v in APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do [[ -n "${!v}" ]] || unset "$v"; done
+          set -o pipefail
+          ./scripts/build-app.sh | tee "$RUNNER_TEMP/build.log"
+
+      - name: Stage assets
+        id: assets
+        run: |
+          DMG="$(ls app/src-tauri/target/release/bundle/dmg/*.dmg | head -1)"
+          mkdir -p dist
+          cp "$DMG" "dist/$ASSET"
+          (cd dist && shasum -a 256 "$ASSET" > "$ASSET.sha256")
+          echo "size=$(du -h "dist/$ASSET" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha=$(cut -d' ' -f1 "dist/$ASSET.sha256")" >> "$GITHUB_OUTPUT"
+          grep -E "^app:" "$RUNNER_TEMP/build.log" >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Release notes
+        run: |
+          {
+            echo "## Download"
+            echo
+            echo "**[$ASSET](https://github.com/${{ github.repository }}/releases/download/${{ steps.v.outputs.tag }}/$ASSET)** · ${{ steps.assets.outputs.size }} · Apple Silicon · macOS 14 or later"
+            echo
+            echo "SHA-256: \`${{ steps.assets.outputs.sha }}\`"
+            echo
+            if [[ "${{ steps.sign.outputs.signed }}" != "true" ]]; then
+              echo "> This build is not notarized yet. On first launch, right-click choco.video in Applications and choose **Open**, then confirm."
+              echo
+            fi
+            echo "Your video never leaves your Mac. The only network use is transcript text sent to the clip picker you choose."
+          } > "$RUNNER_TEMP/notes.md"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: choco.video ${{ steps.v.outputs.version }}
+          body_path: ${{ runner.temp }}/notes.md
+          generate_release_notes: true
+          files: |
+            dist/${{ env.ASSET }}
+            dist/${{ env.ASSET }}.sha256

@@ -8,3 +8,11 @@ vendor/
 models/
 *.gguf
 *.bin
+
+# HyperFrames working media
+videos/*/footage/
+videos/*/capture/
+videos/*/renders/
+videos/*/snapshots/
+videos/*/node_modules/
+videos/*/.media/
