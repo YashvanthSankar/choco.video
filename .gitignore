@@ -16,3 +16,5 @@ videos/*/renders/
 videos/*/snapshots/
 videos/*/node_modules/
 videos/*/.media/
+videos/*/assets/*.mp4
+videos/*/.hyperframes/artifacts/

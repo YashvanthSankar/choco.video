@@ -88,6 +88,9 @@ nav .end { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .btn.big { height: auto; padding: 0 20px; border-radius: 14px; min-height: 58px; }
 
 /* studio demo */
+.film { margin: 0 0 28px; display: grid; gap: 10px; }
+.film video { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 18px; background: var(--bg-2); box-shadow: var(--shadow), inset 0 0 0 1px var(--line); display: block; }
+.film figcaption { font-size: 12.5px; color: var(--ink-3); text-align: center; }
 .studio { border-radius: 18px; background: var(--surface); box-shadow: var(--shadow), inset 0 0 0 1px var(--line); padding: 14px; display: grid; gap: 14px; }
 .studio-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px 4px 0; font-size: 13px; }
 .studio-top .file { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -284,6 +287,11 @@ footer a:hover { color: var(--ink); }
       <span><a href="https://github.com/YashvanthSankar/choco.video/releases">Release notes</a></span>
     </div>
   </div>
+
+  <figure class="film">
+    <video src="media/choco-launch.mp4" poster="media/choco-launch-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="40-second demo: a 48-minute podcast becomes four vertical clips. Real, unedited choco.video output."></video>
+    <figcaption>Real, unedited output. Footage: <i>Pretty Big Deal with Ashley Graham</i> and a Nikola Danaylov interview, CC BY 3.0, Wikimedia Commons.</figcaption>
+  </figure>
 
   <div class="studio" role="img" aria-label="Live demo: a widescreen podcast shot with a vertical crop box that follows whoever is speaking, beside a phone showing the cropped clip with captions, above a timeline with four picked moments.">
     <div class="studio-top">

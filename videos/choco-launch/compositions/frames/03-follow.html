@@ -1,0 +1,66 @@
+<template><div id="root" data-composition-id="03-follow" data-width="1920" data-height="1080" data-duration="8">
+<style>
+@font-face{font-family:Geist;src:url("assets/fonts/Geist-400.woff2")}
+@font-face{font-family:GeistMono;src:url("assets/fonts/GeistMono-500.woff2")}
+#root{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;color:#1E1411;font-family:Geist}
+.clip{position:absolute}
+#f03-ground{inset:0;background:#FAF6F1}
+#f03-stage{inset:0}
+#f03-kicker{position:absolute;left:120px;top:84px;font-family:GeistMono;font-size:24px;letter-spacing:.16em;text-transform:uppercase;color:#A8643A}
+.f03-line{position:absolute;left:120px;top:122px;font-size:76px;line-height:1.06;letter-spacing:-.018em;white-space:nowrap}
+#f03-src-frame{position:absolute;left:114px;top:244px;width:1052px;height:597px;border-radius:16px;border:1px solid rgba(30,20,17,.14);background:#252220}
+#f03-src-label{position:absolute;left:120px;top:858px;font-family:GeistMono;font-size:22px;color:rgba(30,20,17,.62)}
+#f03-crop{position:absolute;left:0;top:250px;width:329px;height:585px;border:4px solid #D08A57;border-radius:10px;box-shadow:0 0 0 1px rgba(250,246,241,.35)}
+#f03-crop-tag{position:absolute;left:10px;top:10px;font-family:GeistMono;font-size:17px;padding:5px 8px;border-radius:6px;background:#D08A57;color:#1E1411;white-space:nowrap}
+#f03-ghost{position:absolute;left:0;top:250px;width:329px;height:585px;border:4px solid #D08A57;border-radius:10px;transform-origin:0 0}
+#f03-phone{position:absolute;left:1332px;top:92px;width:466px;height:816px;border-radius:26px;background:#181615;box-shadow:0 1px 3px rgba(30,20,17,.08),0 18px 40px -16px rgba(30,20,17,.45)}
+#f03-clip-label{position:absolute;left:1332px;top:52px;width:466px;text-align:center;font-family:GeistMono;font-size:20px;color:rgba(30,20,17,.62);white-space:nowrap}
+</style>
+<div id="f03-ground" class="clip" data-start="0" data-duration="8" data-track-index="0"></div>
+<div id="f03-stage" class="clip" data-start="0" data-duration="8" data-track-index="1">
+  <div id="f03-src-frame"></div>
+  <div id="f03-phone"></div>
+  <div id="f03-kicker">The same 8 seconds</div>
+  <div id="f03-l1" class="f03-line">Finds the moment.</div>
+  <div id="f03-l2" class="f03-line">Follows the speaker.</div>
+  <div id="f03-l3" class="f03-line">Captions every word.</div>
+  <div id="f03-src-label">As recorded · 16:9 · minute 4:44 of 48</div>
+  <div id="f03-clip-label">choco.video output · 9:16 · unedited</div>
+</div>
+
+
+<div id="f03-overlay" class="clip" data-start="0" data-duration="8" data-track-index="4" style="inset:0">
+  
+  <div id="f03-ghost"></div>
+</div>
+<!-- approved frame video hoisted by assemble-index --><!-- approved frame video hoisted by assemble-index --><script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<script>
+(function () {
+  window.__timelines = window.__timelines || {};
+  var tl = gsap.timeline({ paused: true });
+  // Source rect: x 120, w 1040. Crop width = 585 * 9/16 = 329.
+  // Real crop centres measured from choco.video's own output: host at 64.5% before the camera cut at 2.133 s, guest at 36% after.
+  var HOST = 120 + 0.645 * 1040 - 164.5, GUEST = 120 + 0.36 * 1040 - 164.5;
+  var CUT = 2.133;
+  // Scene 1: line, kicker, crop box eases onto the host's face.
+  tl.fromTo("#f03-kicker", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power3.out" }, 0);
+  tl.fromTo("#f03-l1", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.1);
+  tl.fromTo("#f03-src-label", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 0.3);
+  // Scene 2: at the real camera cut the crop jumps to the guest, exactly as the reframe did.
+  tl.to("#f03-l1", { opacity: 0, y: -14, duration: 0.25, ease: "power2.in" }, CUT - 0.1);
+  tl.fromTo("#f03-l2", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, CUT + 0.12);
+  // The crop lifts off and travels onto the phone, landing exactly on the clip rect as the real clip starts (3.4 s).
+  tl.set("#f03-ghost", { x: GUEST, y: 0, scaleX: 1, scaleY: 1, opacity: 0 }, 0);
+  tl.to("#f03-ghost", { opacity: 1, duration: 0.15 }, 2.55);
+  tl.to("#f03-ghost", { x: 1340, y: 100 - 250, scaleX: 450 / 329, scaleY: 800 / 585, duration: 0.85, ease: "power3.inOut" }, 2.55);
+  tl.fromTo("#f03-phone", { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" }, 2.9);
+  tl.to("#f03-ghost", { opacity: 0, duration: 0.3 }, 3.45);
+  tl.fromTo("#f03-clip-label", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 3.5);
+  // Scene 3: captions line, then a still hold while both videos play in sync.
+  tl.to("#f03-l2", { opacity: 0, y: -14, duration: 0.25, ease: "power2.in" }, 4.45);
+  tl.fromTo("#f03-l3", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 4.6);
+  tl.set({}, {}, 8);
+  window.__timelines["03-follow"] = tl;
+})();
+</script>
+</div></template>

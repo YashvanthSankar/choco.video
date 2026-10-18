@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" integrity="sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2" crossorigin="anonymous"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #FAF6F1;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="39.5"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div
+        id="el-01-hook"
+        class="scene"
+        data-composition-id="01-hook"
+        data-composition-src="compositions/frames/01-hook.html"
+        data-start="0"
+        data-duration="5"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-02-machine"
+        class="scene"
+        data-composition-id="02-machine"
+        data-composition-src="compositions/frames/02-machine.html"
+        data-start="4.5"
+        data-duration="6"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-03-follow"
+        class="scene"
+        data-composition-id="03-follow"
+        data-composition-src="compositions/frames/03-follow.html"
+        data-start="10"
+        data-duration="8"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-04-why"
+        class="scene"
+        data-composition-id="04-why"
+        data-composition-src="compositions/frames/04-why.html"
+        data-start="18"
+        data-duration="6"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-05-breadth"
+        class="scene"
+        data-composition-id="05-breadth"
+        data-composition-src="compositions/frames/05-breadth.html"
+        data-start="23.5"
+        data-duration="6.5"
+        data-track-index="0"
+      ></div>
+
+      <div
+        id="el-06-privacy"
+        class="scene"
+        data-composition-id="06-privacy"
+        data-composition-src="compositions/frames/06-privacy.html"
+        data-start="29.5"
+        data-duration="5.5"
+        data-track-index="1"
+      ></div>
+
+      <div
+        id="el-07-cta"
+        class="scene"
+        data-composition-id="07-cta"
+        data-composition-src="compositions/frames/07-cta.html"
+        data-start="34.5"
+        data-duration="5"
+        data-track-index="0"
+      ></div>
+
+      <video id="f01-vid-source" src="assets/graham-source.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:220px;top:196px;width:1480px;height:604px;object-fit:cover"
+        data-start="0"
+        data-duration="4.5"
+        data-track-index="1002"
+      ></video>
+
+      <video id="f02-vid-source" src="assets/graham-source.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:85px;top:78px;width:360px;height:205px;object-fit:cover"
+        data-start="4.5"
+        data-duration="5.5"
+        data-track-index="2002"
+      ></video>
+
+      <video id="f03-vid-source" src="assets/graham-source-crop.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:120px;top:250px;width:1040px;height:585px;object-fit:cover"
+        data-start="10"
+        data-duration="8"
+        data-track-index="3002"
+      ></video>
+
+      <video id="f03-vid-clip" src="assets/clip-graham-02-from3.4.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:1340px;top:100px;width:450px;height:800px;object-fit:cover"
+        data-start="13.4"
+        data-duration="4.6"
+        data-track-index="3003"
+      ></video>
+
+      <video id="f04-vid-clip" src="assets/clip-graham-02-from8.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:1340px;top:100px;width:450px;height:800px;object-fit:cover"
+        data-start="18"
+        data-duration="5.5"
+        data-track-index="4005"
+      ></video>
+
+      <video id="f05-vid-1" src="assets/clip-graham-01.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:236px;top:210px;width:338px;height:600px;object-fit:cover"
+        data-start="25.7"
+        data-duration="3.8"
+        data-track-index="5002"
+      ></video>
+
+      <video id="f05-vid-2" src="assets/clip-graham-02.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:606px;top:210px;width:338px;height:600px;object-fit:cover"
+        data-start="26.15"
+        data-duration="3.35"
+        data-track-index="5003"
+      ></video>
+
+      <video id="f05-vid-3" src="assets/clip-graham-04.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:976px;top:210px;width:338px;height:600px;object-fit:cover"
+        data-start="26.6"
+        data-duration="2.9"
+        data-track-index="5004"
+      ></video>
+
+      <video id="f05-vid-4" src="assets/clip-danaylov-01.mp4" muted playsinline
+        class="clip"
+        style="position:absolute;left:1346px;top:210px;width:338px;height:600px;object-fit:cover"
+        data-start="27.05"
+        data-duration="2.45"
+        data-track-index="5005"
+      ></video>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+      // ── frame transitions (injected by transitions.mjs) ──
+      (function () { var tl = window.__timelines["main"];
+        tl.to("#el-01-hook", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 4.5);
+        tl.fromTo("#el-02-machine", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 4.5);
+        tl.to("#el-02-machine", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 10);
+        tl.fromTo("#el-03-follow", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 10);
+        tl.to("#el-04-why", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 23.5);
+        tl.fromTo("#el-05-breadth", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 23.5);
+        tl.to("#el-05-breadth", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 29.5);
+        tl.fromTo("#el-06-privacy", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 29.5);
+        tl.to("#el-06-privacy", { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 34.5);
+        tl.fromTo("#el-07-cta", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 34.5);
+        tl.to({}, { duration: 39.5 }, 0); // full-span anchor — main.duration() == composition total (Studio master duration)
+      })();
+    </script>
+  </body>
+</html>
