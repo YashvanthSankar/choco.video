@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "danaylov",
+      "media": "fixtures/media/danaylov.webm",
+      "transcript": "fixtures/media/danaylov.transcript.json",
+      "license": "CC BY 3.0",
+      "attribution": "The Disruptors - Science, Technology and Ethics (Wikimedia Commons)",
+      "drafted_by": "editor agent (Claude), 2026-10-18",
+      "reviewed_by_human": false,
+      "clips": [
+        {
+          "start_ms": 2404440,
+          "end_ms": 2493060,
+          "why": "Goggins: 60 days to lose 120 lb for the SEALs; real change is internal."
+        },
+        {
+          "start_ms": 1711320,
+          "end_ms": 1745220,
+          "why": "A good leader eats last, sleeps last, gets paid last."
+        },
+        {
+          "start_ms": 3691080,
+          "end_ms": 3747120,
+          "why": "A capitalist because he grew up under communism, yet on its own merit a terrible system."
+        },
+        {
+          "start_ms": 1076940,
+          "end_ms": 1161000,
+          "why": "Singularity University is neither about the singularity nor a university; you are your message."
+        },
+        {
+          "start_ms": 2082000,
+          "end_ms": 2151060,
+          "why": "No such thing as climate change: our power has outgrown our wisdom."
+        },
+        {
+          "start_ms": 2682780,
+          "end_ms": 2744460,
+          "why": "Socrates asks for free meals for life and is sentenced to death."
+        },
+        {
+          "start_ms": 3406560,
+          "end_ms": 3472740,
+          "why": "Building walls takes less courage than tearing them down."
+        },
+        {
+          "start_ms": 4239840,
+          "end_ms": 4281960,
+          "why": "Technology is the how, not the what or the why."
+        }
+      ]
+    }
+  ]
+}

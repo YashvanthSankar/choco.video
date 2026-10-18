@@ -61,6 +61,24 @@ enum Cmd {
         #[arg(long, short)]
         out: Option<PathBuf>,
     },
+    /// Score the picker against the golden set (precision@5, recall@10).
+    Eval {
+        /// Golden set JSON.
+        #[arg(long, default_value = "eval/golden.json")]
+        golden: PathBuf,
+        /// Score saved `choco highlights -o` files named `<fixture>.json` in this directory
+        /// instead of running the picker.
+        #[arg(long)]
+        results: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = PickerArg::Auto)]
+        picker: PickerArg,
+        /// Label for the results file, e.g. the model name.
+        #[arg(long)]
+        label: Option<String>,
+        /// Where to write per-run results.
+        #[arg(long, default_value = "eval/results")]
+        out_dir: PathBuf,
+    },
     /// Write a PNG frame from the video.
     Thumbnail {
         file: PathBuf,
@@ -261,6 +279,57 @@ fn main() -> Result<()> {
                     }
                 }
             }
+        }
+        Cmd::Eval { golden, results, picker: pk, label, out_dir } => {
+            use choco_engine::eval;
+            let set: eval::GoldenSet = serde_json::from_str(&std::fs::read_to_string(&golden).with_context(|| format!("reading {}", golden.display()))?)?;
+            let base = golden.parent().and_then(|p| p.parent()).unwrap_or(std::path::Path::new("."));
+            let llm = if results.is_none() { Some(make_picker(pk)?) } else { None };
+            let pr = progress_printer(false);
+            let mut scores = Vec::new();
+            let mut cost_tokens = picker::Usage::default();
+            let mut source_ms = 0u64;
+            for f in &set.fixtures {
+                let cands: Vec<choco_engine::Candidate> = if let Some(dir) = &results {
+                    let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join(format!("{}.json", f.id)))?)?;
+                    serde_json::from_value(v["candidates"].clone())?
+                } else {
+                    let llm = llm.as_ref().expect("picker built when not scoring saved results");
+                    let t: Transcript = serde_json::from_str(&std::fs::read_to_string(base.join(&f.transcript))?)?;
+                    let asset = ingest::probe(&base.join(&f.media))?;
+                    let tmp = tempfile::tempdir()?;
+                    let wav = tmp.path().join("audio.wav");
+                    ingest::extract_audio(&asset, &wav, &pr)?;
+                    let feats = audio::analyze(&wav)?;
+                    let before = llm.usage();
+                    let (c, _) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &HighlightOptions::default(), &pr)?;
+                    let after = llm.usage();
+                    cost_tokens.score_input += after.score_input - before.score_input;
+                    cost_tokens.score_output += after.score_output - before.score_output;
+                    cost_tokens.summarize_input += after.summarize_input - before.summarize_input;
+                    cost_tokens.summarize_output += after.summarize_output - before.summarize_output;
+                    source_ms += asset.duration_ms;
+                    c
+                };
+                scores.push(eval::score_fixture(&f.id, &cands, &f.clips));
+            }
+            let total = eval::aggregate(scores, &set);
+            let label = label.unwrap_or_else(|| llm.as_ref().map(|l| format!("{}-{}", l.tier(), l.model(picker::Role::Score))).unwrap_or_else(|| "saved".into()));
+            println!("{:<12} {:>6} {:>6} {:>6} {:>5}", "fixture", "P@5", "R@10", "IoU", "picks");
+            for f in &total.fixtures {
+                println!("{:<12} {:>6.2} {:>6.2} {:>6.2} {:>5}", f.id, f.precision_at_5, f.recall_at_10, f.mean_iou, f.picks);
+            }
+            println!("{:<12} {:>6.2} {:>6.2} {:>6.2}", "MEAN", total.precision_at_5, total.recall_at_10, total.mean_iou);
+            if !total.human_reviewed {
+                println!("note: golden clips are not yet human-reviewed; treat these numbers as provisional");
+            }
+            std::fs::create_dir_all(&out_dir)?;
+            let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
+            let path = out_dir.join(format!("{stamp}-{}.json", label.replace(['/', ' '], "_")));
+            std::fs::write(&path, serde_json::to_string_pretty(&serde_json::json!({
+                "label": label, "score": total, "usage": cost_tokens, "source_ms": source_ms,
+            }))?)?;
+            eprintln!("wrote {}", path.display());
         }
         Cmd::Thumbnail { file, at_ms, width, out } => {
             let a = ingest::probe(&file)?;
