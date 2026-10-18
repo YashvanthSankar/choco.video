@@ -2,128 +2,92 @@
 
 Companion docs: `PLAN.md` (what and why), `STACK.md` (tools), `TECH.md` (how), `COMPETITORS.md` (what others ship). Root `AGENTS.md` is the agent's memory.
 
-Legend: `[x]` done and verified on the dev Mac · `[~]` in progress or partly verified · `[ ]` not started. Notes after `→` record what was actually measured.
+Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) · `[~]` partly done, note says what is missing · `[ ]` not started. Notes after `→` are measurements from the current build, not estimates. **Mac only until the Mac app ships; Windows is M6.** Audited 2026-10-18: every `[x]` below was re-run on the current build (87 engine tests, clippy, license gates, frontend check, size check, three full pipeline runs).
 
-Rules: one milestone in progress at a time. A box is checked only when it works and is measured on the dev Mac. **No Windows work until M6** (user decision, 2026-10-18). Move finished milestones to the bottom. Keep this file short; details go in `TECH.md`.
+## Where things stand
 
-## Done: M1 Engine skeleton (weeks 1–2) — Mac complete; CI runs on first push
+- The product works end to end on real files, from the app and from the CLI: a 14-minute video chosen in the app became 3 speaker-followed, captioned clips; a 48-minute show became 4 clips in 226 s including transcription; a 72-minute podcast in 149 s with a reused transcript.
+- Bundle: 20 MB installed, 9.9 MB DMG (budgets 50 / 25). First run on macOS 26+ downloads nothing.
+- Not done: human review of the golden set, the final model recommendation (eval reruns in progress), signing and notarization, updater, launch. Windows (M6) and the local-model tier are untouched by design.
 
-- [x] `git init`, `.gitignore` (target/, fixtures media, models, vendor/, *.chocoproj), `LICENSE` (MIT) in `engine/`
-- [x] Cargo workspace: `choco-engine`, `choco`, `choco-ffi`; shared lints; `deny.toml` with license allowlist and bans (x264, x265, openh264, ort) → builds clean, clippy clean; `cargo deny check` passes
-- [x] `model/` types from `TECH.md §2` with serde round-trip tests → 2 tests pass
-- [x] `backend/`: trait, `detect()`, `mac.rs` (AppleSpeech on 26+, Metal, VideoToolbox), `windows.rs` (placeholder, untouched until M6), `cpu.rs`, `recommended_models()` by memory → detects M3 Pro, 18 GB, macOS 27.0.1, AppleSpeech → Whisper Metal
-- [x] Release profile in workspace `Cargo.toml` (fat LTO, 1 codegen unit, abort, strip, opt-level z with overrides); arm64-only Mac target; toolchain pinned to 1.99.1
-- [x] FFmpeg minimal LGPL: build recipe with `--disable-everything` plus an allowlist (mov/mp4/matroska/webm demux, h264/hevc/vp9/aac/opus/mp3 decode, hw encoders, aac encode, loudnorm/aresample/scale filters, VideoToolbox/D3D11VA/NVENC/AMF/QSV/MF hwaccel), `--disable-gpl --disable-nonfree`; pin version; record the dylib sizes in `AGENTS.md` Benchmarks; document in `scripts/ffmpeg/README.md`; Windows link path verified in CI → Mac done: 8.1.3, 7.5 MB of dylibs, LGPL 2.1 confirmed, `@rpath` install names
-- [x] `ingest/`: `probe`, `extract_audio` (16 kHz mono f32), `thumbnail` → probes MP4, MOV, MKV/WebM (VP9, Opus), audio-only M4A; rotated phone clip thumbnail matches FFmpeg's reference pixel for pixel
-- [x] `transcribe/`: `Transcriber` trait + shared cleanup (sentence re-split, hallucination filter, clamp)
-- [x] `transcribe/apple.rs`: Swift helper (168 KB) for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+ → 45 locales; 0% WER on the synthetic script, 20x realtime, zero download
-- [x] `transcribe/whisper.rs`: `whisper-rs` with Metal/CPU, word timestamps from tokens, quantized turbo default → 0% WER on the synthetic script; fixed a progress deadlock caused by whisper-rs leaking its callback. whisper.cpp windows long audio itself, so no manual overlap windowing
-- [x] `models_registry/`: manifests pinned to a Hugging Face revision, resumable download, sha256 verify (upstream publishes sha256, so not blake3), `choco models list|pull|rm`
-- [x] CLI: `choco probe`, `choco transcribe`, `choco thumbnail`, `choco doctor` with fix hints, `choco models`, `--json` → doctor reports ready
-- [x] `fixtures/generate.sh` (synthetic, macOS `say` voices with known text: speech, rotated phone clip, silent, two voices, audio-only, VP9/Opus MKV) and `fixtures/fetch.sh` + `sources.tsv` (5 CC BY 3.0 long-form recordings from Wikimedia Commons, 48–72 min, sha1-verified)
-- [~] CI `engine.yml` on `macos-15` + cargo-deny: release build, test, clippy, size report → written; runs on the first push. `cargo deny check` passes locally. Windows job removed until M6
-- [x] Size budget check script (`scripts/size-check.sh`), 25 MB installer / 50 MB installed → engine part measures 11.3 MB installed, 4.9 MB compressed; wired into `app.yml` at M5
-- [x] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5 → 72-min CC BY podcast: Apple 112 s (42x), ~30 MB; whisper 267 s (17x), 1.7 GB, loses ~11% of words to hallucination loops. Ground-truth timing: Apple 103 ms median error, whisper 256 ms (captions fix in M3)
+## Done: M1 Engine skeleton
 
-## Now: M2 Picker (weeks 3–4)
+- [x] Cargo workspace (`choco-engine`, `choco`, `choco-ffi`), toolchain 1.99.1 pinned, size-first release profile, `cargo deny` allowlist with bans on x264/x265/openh264/ort → bans, licenses, sources pass (advisory DB fetch needs network)
+- [x] Minimal LGPL FFmpeg 8.1.3 (`--disable-everything` + allowlist) with dav1d 1.5.4 static for AV1 and VideoToolbox hwaccel → 8.3 MB of dylibs, LGPL 2.1 confirmed, `@rpath` install names; recipe `scripts/ffmpeg/build-mac.sh`
+- [x] `model/` serde contracts; `backend/` detection (AppleSpeech on 26+, Metal, VideoToolbox; CPU fallback)
+- [x] `ingest/`: probe from codec parameters (no decoder needed), display rotation, content hash, 16 kHz WAV extraction, rotated thumbnails → 7 format tests: H.264/AAC MP4, rotated phone clip, no-audio, audio-only M4A, VP9/Opus MKV, AV1/Opus WebM, float WAV
+- [x] `transcribe/`: Apple SpeechAnalyzer via the `choco-apple` helper process (zero download) and whisper.cpp quantized turbo (~550 MB runtime download); shared cleanup (loop collapse up to 16 words, clamp, resegment); per-engine timing bias correction → 72-min podcast: Apple 112 s (42x realtime), whisper 267 s (17x, 1.7 GB, loses ~11% of words to loops)
+- [x] `models_registry/`: manifests pinned to a Hugging Face revision, resumable download, sha256 → `choco models list|pull|rm`
+- [x] CLI: `probe`, `transcribe`, `thumbnail`, `doctor` with fix hints, `models`, `provider models|test`, `--json`
+- [x] Fixtures: synthetic set (`generate.sh`, macOS voices, known text, exact word onsets) and five CC BY 3.0 recordings from Wikimedia Commons (48–72 min; VP8, VP9, AV1), sha1-verified
+- [x] CI workflow (`macos-15` + cargo-deny) and `scripts/size-check.sh` → written; CI has not run because nothing is pushed
 
-- [x] `highlights/windows.rs` candidate generation with pre-filters (min words, dead-air ratio, filler-only openings) → 2,925 windows from the 72-min podcast; 3 tests
-- [x] Complete-thought boundaries: every window starts after and ends on a sentence end (punctuation or ≥ 700 ms pause) → tested, including unpunctuated segments
-- [x] Audio energy + pause features (loudness z-score, spikes per minute, pause ratio, longest pause) from the 16 kHz wav → fixed a silence-threshold bug that counted speech as silence when silence is rare
-- [x] `highlights/search.rs` shortlist: quality prior (pace, hook words, questions, numbers, length, weak openers, audio), BM25 prompt mode with synonym and inflection expansion, near-duplicate removal. No embedding model
-- [x] `highlights/picker/openai_compat.rs`: one `/chat/completions` client (ureq), `json_schema` → `json_object` fallback, 429/5xx backoff, refusal handling, explicit User-Agent (OpenCode's Cloudflare blocks default ones), token usage per role, `list_models`, `test_connection` → verified live on OpenCode Zen: 48 models listed, valid scores in 5.1 s, wrong key → 401, wrong model → 400
-- [x] `highlights/picker/` `Llm` trait with shared batching, map-reduce summary, strict parse + key repair (UTF-8 safe) + retry, re-ask for skipped ids, summary failure is non-fatal → Apple and OpenCode tiers run end to end on real podcasts
-- [x] Shortlist recall measured (`choco eval --shortlist-only`): 60 windows at 85% overlap let only 47% of golden clips reach the model; spreading coverage fixes it: 60 @ 10% → 80%, 80 @ 20% → 93% (new default), 90 @ 10% → 100%
-- [~] Pick the scoring and summary models on OpenCode Zen (budget ≤ 3¢ per source hour) → with the new shortlist, provisional P@5: MiniMax M3 0.40, DeepSeek V4.1 Flash 0.32 (0.44 on an earlier run: single runs are noisy); GLM run failed on a 180 s timeout (fixed: 420 s, summary now optional); repeat runs in progress. MiniMax M3 is the provisional default: fastest, cheapest
-- [x] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hash (blake3, 16 hex) on every candidate
-- [x] ~~`cloud/` hosted service~~ dropped: no backend (decision 2026-10-18). Provider tier calls the user's endpoint directly
-- [x] `rank.rs` overlap suppression (> 40% of the shorter clip), same-content suppression, score floor 55, `--n` is a max
-- [x] `choco highlights` with `--n`, `--prompt`, `--picker auto|apple|provider`, `--min-score`, `--transcript` reuse, `-o` JSON with a diagnostic report and token usage
-- [x] Apple on-device tier → 48/60 scored, 0 declined after retrying guardrail false positives as plain text under permissive guardrails
-- [~] Golden set → 5 real CC BY fixtures (48–72 min; VP8, VP9, AV1), 40 clips drafted by separate editor agents from transcripts only, validated against segment boundaries and for overlaps; notes, ASR errors and alternates in `eval/REVIEW.md`. **Needs human review** before numbers count; `choco eval` prints them as provisional until then
-- [~] `choco eval` runner (precision@5, recall@10, IoU; saved results or live runs; token usage and source duration recorded) → built and tested; baseline per model pending the last two golden fixtures
-- [ ] Compare Apple speech vs whisper on the golden set per language; decide per-language fallback list
-- [ ] `LocalLlama` behind `local-llm` feature with GBNF grammar; pick the default 4B model (Qwen3-4B vs Gemma-3-4B class) by eval and speed; model is opt-in download only
-- [ ] Provider settings (base URL, key, scoring model, summary model, test button) with the key in the macOS Keychain via `keyring`; "transcript text only" stated next to the picker setting
+## Done: M2 Picker
 
-- [x] AV1 input: dav1d (static, BSD-2) + VideoToolbox AV1 in the minimal FFmpeg (+0.8 MB); probe no longer needs a decoder; `tests/media.rs` covers H.264/AAC MP4, rotated phone clip, no-audio, audio-only M4A, VP9/Opus MKV, AV1/Opus WebM, float WAV (7 tests)
+- [x] Candidate windows: complete-thought boundaries (sentence end or ≥ 700 ms pause), 15–90 s, several lengths per start, dead-air/sparse/disfluency filters → 2,925 windows on the 72-min podcast; 3 tests
+- [x] Audio features (loudness z-score, spikes, pauses) feeding the shortlist prior
+- [x] Shortlist: quality prior, BM25 prompt mode with synonym and stem expansion (stop words never become terms), near-duplicate removal, overlap limit → golden clips reachable by the model: 60 @ 85% overlap 0.47 → 80 @ 20% 0.93 (default)
+- [x] Picker `Llm` trait: batching, map-reduce summary (non-fatal if it fails), strict parse with key repair (UTF-8 safe), bare arrays and fenced replies, per-entry leniency, retry, re-ask for skipped ids, batches split when a model's context overflows, fail-fast on config errors and on two consecutive failed batches, cancellation between batches
+- [x] OpenAI-compatible client (`ureq`): `json_schema` → `json_object` fallback remembered per client, 429/5xx backoff, explicit User-Agent (OpenCode's Cloudflare rejects defaults), content-as-parts, truncation detection, token usage per role, `list_models`, `test_connection` → verified live on OpenCode Zen (48 models; wrong key → 401, wrong model → 400)
+- [x] Apple on-device tier through the helper: guided generation, guardrail false positives retried under permissive guardrails, stderr drained on a thread, context overflow mapped and split → 0 declined on the 72-min podcast; in-app run on a 14-min video: 20/23 scored before the split fix, now none lost
+- [x] Rank: overlap and same-content suppression, score floor, max count ("content decides the count")
+- [x] `choco highlights` (`--prompt`, `--picker auto|apple|provider`, `--transcript` reuse, diagnostic report with token usage)
+- [x] `choco eval`: precision@5 (distinct golden clips in the top five, over five), recall@10, IoU, shortlist-only mode, per-run results with tokens and source hours → `eval/results/`
+- [~] Golden set: 5 fixtures × 8 clips drafted by editor agents from transcripts, validated against segment boundaries; notes and alternates in `eval/REVIEW.md` → **needs a human to watch and confirm** (`reviewed_by_human: false`); eval numbers are provisional until then
+- [~] Model recommendation on OpenCode Zen (budget ≤ 3¢ per source hour) → measured so far (P@5, old definition, single runs): MiniMax M3 0.48 / 0.40, DeepSeek V4.1 Flash 0.44 / 0.32, Qwen 3.8 Flash 0.28, GLM 5.3 Flash timed out on summaries (fixed). Running five evals in parallel made every batch fail on four of five runs (rate limits; the build at the time hid the reason). A sequential rerun with the fixed build is in progress; `OPENCODE_RECOMMENDED` in `openai_compat.rs` carries the provisional table shown at onboarding
+- [ ] Compare Apple speech vs whisper per language on the golden set; per-language fallback list (Apple speech turned a Dutch reading into nonsense when run as en-US)
+- [ ] `LocalLlama` tier (`local-llm` feature, 4B GGUF, opt-in download) — deferred, not needed for the Mac launch
 
-- [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`
+## Done: M3 Captions + render
 
-## M3 Captions + render (weeks 5–6)
+- [x] Captions: ≤ 4-word chunks on clause punctuation, pauses and measured width; four presets (clean, bold, karaoke, minimal); bundled OFL fonts (233 KB); deterministic rasterizer (shadow, outline, active-word colour and scale, progressive highlight, pill); SRT + VTT sidecars → pixel-identical output test
+- [x] Render: constant-frame-rate from VFR sources, any codec normalised to 8-bit 4:2:0, display rotation, interpolated `CropPlan` (static / single / split / fit with blurred background), caption sprites blended in YUV, `h264_videotoolbox` High with `allow_sw`, AAC at 48 kHz with `loudnorm` −14 LUFS (measured −14.5), MP4 `+faststart` → 10 integration tests + 3 snapshot tests; 45–62 s clips render at 5–6x realtime
+- [x] Export: size presets (9:16, 1:1, 4:5, 16:9), `<source>-<rank>-<slug>` naming, poster PNG, SRT, VTT, metadata JSON (title, description, hashtags, score, reasons, timecodes, picker provenance); re-export a clip with another style/size/framing without re-transcribing
+- [x] `choco render` and `choco run`; engine `pipeline` module shared by CLI and app (temp files cleaned on every path, cancellation between stages, batches and clips)
+- [~] Word timing: per-engine bias correction (Apple +100 ms, whisper +260 ms) verified on a held-out voice → remaining scatter median 52–95 ms; the ≤ 50 ms target is not met. Energy-onset snapping was tried and rejected. Next idea: whisper DTW timestamps
 
-- [~] Word timing accuracy → per-engine bias correction shipped (Apple +100 ms, whisper +260 ms, from medians on two synthesized voices; bias on a held-out third voice now −16 to +40 ms). Remaining per-word scatter: median 52–95 ms, 53–67% within 100 ms; **≤ 50 ms target not met**. Tried snapping to energy onsets: mixed (helped 2 clips, hurt 1), not shipped. Next: whisper DTW timestamps; measure caption readability, not just onsets
-- [x] `captions/` chunker: ≤ 4 words, breaks on clause punctuation, pauses ≥ 350 ms and measured frame width; exact hand-over between chunks, 400 ms hold after pauses → 4 tests
-- [x] `CaptionStyle` JSON + four built-in styles (clean, bold, karaoke, minimal) + bundled OFL fonts (Inter 600/800, Montserrat 800/900, Latin subset, 233 KB) → preview PNGs checked by eye
-- [x] Rasterization with `cosmic-text` 0.19 + `swash`, bundled fonts only: shadow, outline, active-word colour and scale, progressive highlight, pill/box → deterministic pixels test passes
-- [x] SRT + WebVTT sidecars with clip-relative times (in `captions/subtitles.rs`)
-- [x] Compositor decision: CPU (swscale crop/scale in YUV + caption sprites blended in YUV) instead of `wgpu` → 12 s clip in 2.6 s (4.6x realtime) on M3 Pro; no GPU dependency
-- [x] Decode: any codec to 8-bit 4:2:0, display rotation applied, constant-frame-rate output from VFR sources, exact integer frame counts
-- [x] Compose: crop rect per frame from an interpolated `CropPlan`, layouts static/single/split/fit (blurred background), caption sprites cached per word state
-- [x] Encode: `h264_videotoolbox` High, BT.709, `allow_sw` fallback; encoders drained on EAGAIN
-- [x] Mux: MP4 `+faststart`, audio interleaved by timestamp → verified moov before mdat
-- [x] `export/` presets (shorts/tiktok/reels 9:16, square, portrait 4:5, landscape), `<source>-<rank>-<slug>` naming, sidecar JSON (title, description, hashtags, score, reasons, timecodes, picker, files), poster PNG, SRT + VTT
-- [x] Loudness normalization: single-pass `loudnorm` I=-14 TP=-1.5 → measured -14.5 LUFS, -4.5 dBFS peak on the test clip
-- [x] `choco render` and `choco run` end to end with `Static` (and `Fit`) layout → 72-min podcast to 3 finished clips in 149 s with DeepSeek V4.1 Flash; 2 of 3 picks match the editor agent's golden clips
-- [x] Tests: 10 render integration tests (H.264, VP9, AV1, rotated, no-audio, fit, past-the-end) + 3 snapshot tests on composed frames (luma fingerprints, tolerance 2/255)
-- [x] Render benchmark: 45–62 s clips from a VP9 640x360 source to 1080x1920 at 25 fps in 8.2–10.8 s (5.6–5.7x realtime) on M3 Pro
+## Done: M4 Reframe
 
-## M4 Reframe (weeks 7–8)
+- [x] YuNet face detection (OpenCV Zoo, MIT, 233 KB, compiled in) on `tract` at 640×640 → 22 ms per frame on CPU
+- [x] 5 fps sampling through the shared decode path; IoU tracking with scene-cut reset; mouth-motion speaker heuristic with a 1 s switch lead
+- [x] Planner: speaker follow with dead zone and eased moves, per-shot following for edited multi-camera footage, split screen when two people share the frame (captions move to the seam), centre crop with no faces → 6 tests; checked by eye on four real recordings
+- [ ] Side-by-side against Opus Clip on three fixtures (needs an Opus Clip account; human task)
 
-- [x] `reframe/faces.rs` YuNet (OpenCV Zoo, MIT, 233 KB, compiled in) via `tract-onnx` on CPU, letterboxed to its fixed 640x640 input → 22 ms per frame; every op loads, no ONNX Runtime needed
-- [x] Frame sampler at 5 fps (`render::sample_frames`, shared decode path, display orientation)
-- [x] IoU tracker with stable ids, scene-cut reset (luma histogram), short-track pruning → tested
-- [x] Speaker heuristic: mouth-region motion while words are spoken, 1 s sustained lead to switch → tested
-- [x] Planner: `Single` follow with 12% dead zone and 400 ms eased moves, per-shot following for edited multi-camera footage, `Split` when two people share the screen ≥ 70% (captions moved to the seam), `Static` when no face → 6 planner tests; verified by eye on 4 real recordings (single, split ×2, multi-camera)
-- [x] `CropPlan` keyframes consumed by the compositor with interpolation (Hold / Linear / EaseInOut)
-- [x] Tracker and planner tests on synthetic tracks (no face imagery needed)
-- [ ] Side-by-side review against Opus Clip output on three real fixtures (needs an Opus Clip account; human task)
+## Now: M5 Mac app + launch
 
-## M5 Mac app + launch (in progress)
+- [x] Tauri 2 + Svelte 5 app over the engine: onboarding (privacy line → picker with live key test and pre-selected models showing cents per hour → speech setup), home (drop or choose a file, prompt, count, style, size, framing, output folder), job progress with cancel, results grid (poster, inline playback, Show in Finder, copy caption, restyle), settings → used for a real run by the project owner
+- [x] Keychain-only key storage; key saved only after the model list succeeds; strict CSP; scoped asset protocol; capabilities limited to dialogs, reveal, and OpenCode/GitHub links; app `deny.toml` passes
+- [x] Release bundle: `scripts/build-app.sh` (Apple helper sidecar, six FFmpeg dylibs in `Contents/Frameworks`, no build-machine rpath in release) → `choco.video.app` 20 MB, DMG 9.9 MB, launches and stays up
+- [x] README, CONTRIBUTING (DCO), `llms.txt`; landing page in `site/` with a live canvas demo
+- [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`; then rerun `choco eval` per model and freeze `OPENCODE_RECOMMENDED`
+- [ ] Push to GitHub so CI runs; fix whatever the first run reports
+- [ ] Developer ID signing + notarization (needs your Apple Developer account); without it the DMG only runs after right-click → Open
+- [ ] Tauri updater with signed manifests and a release channel
+- [ ] App icon (the bundle still carries Tauri's placeholder icon)
+- [ ] First-launch guidance when Apple Intelligence is off and no key is set (today the Apple option is disabled with a one-line reason)
+- [ ] Demo video and launch posts (Product Hunt, r/podcasting, r/NewTubers, creator Discords)
 
-- [x] Tauri 2 + SvelteKit (static SPA) + TypeScript scaffold in `app/`, path dependency on `choco-engine`; release profile size-first with fast engine hot paths
-- [x] Engine `pipeline` module shared by CLI and app (probe → transcribe → highlights → reframe → export, one progress stream, cancellation)
-- [x] App backend commands: `status`, `save_settings`, `set_api_key` (macOS Keychain only, never on disk), `provider_models`, `provider_test`, `start_job` (worker thread, `job-progress` / `job-done` / `job-error` events), `cancel_job`, `reexport_clip`, `load_run`, `download_speech_model` → builds, clippy clean, settings test passes
-- [x] Security: strict CSP, asset protocol scoped to `$HOME` and `/Volumes`, capabilities limited to file dialogs, reveal in Finder, opening OpenCode and GitHub links
-- [ ] UI: onboarding (welcome + privacy line → picker: OpenCode with key test and pre-selected models showing cents per source hour / other OpenAI-compatible provider / Apple on-device → speech: ready on macOS 26+, else Whisper download with progress)
-- [ ] UI: home (drop a video or choose file, prompt, clip count, style, size, layout), job progress with cancel, results grid (poster, title, score, reasons, inline playback, reveal in Finder, re-export with another style/size/layout), settings
-- [ ] Release bundle: FFmpeg dylibs in `Contents/Frameworks`, `choco-apple` helper as a sidecar, `scripts/build-app.sh`; size check against 25 MB / 50 MB
-- [ ] Updater with signed manifests; Developer ID signing + notarization (needs your Apple Developer account)
-- [ ] Landing page, demo video, engine repo public with README, CONTRIBUTING (DCO), `llms.txt`, credits
-- [ ] Launch posts
+## M6 Windows (after the Mac launch)
 
-## M6 Windows (weeks 11–14)
+Groundwork: `backend/windows.rs` placeholder; pinned Windows LGPL FFmpeg build and sha256 in `scripts/ffmpeg/README.md`.
 
-Nothing here starts before the Mac app ships. Groundwork already prepared: `backend/windows.rs` placeholder; pinned Windows LGPL FFmpeg 8.1.3 build and its sha256 noted in `scripts/ffmpeg/README.md`.
-
-- [ ] Re-add the `windows-latest` CI job (engine build with `--no-default-features --features choco-engine/whisper`, pinned FFmpeg, tests, clippy)
-- [ ] Minimal LGPL FFmpeg build for Windows (same allowlist) replacing the general BtbN build
-- [ ] Whisper loop recovery: detect a collapsed loop and re-decode that window with temperature fallback or VAD (whisper.cpp Silero VAD), so no speech is lost. Measured need: ~11% of words lost on a 72-min podcast. Also benefits Macs older than macOS 26
-
-- [ ] `backend/windows.rs`: NVIDIA, AMD, Intel all on Vulkan for whisper; CPU-only path
-- [ ] whisper.cpp Vulkan build verified on at least one machine per vendor; local-llm Vulkan verified on one
-- [ ] D3D11VA decode, NVENC/AMF/QSV/MF encode through FFmpeg; MF software H.264 as the fallback
-- [ ] Windows installer measured against the size budget
-- [ ] Compatibility matrix in `docs/windows-hardware.md`
-- [ ] Tauri Windows build, NSIS installer, code signing cert
-- [ ] Windows beta with 20 testers, then launch; one license covers both OSes
+- [ ] Whisper loop recovery (re-decode collapsed windows with temperature fallback or VAD): Windows depends on whisper, which loses ~11% of words on real conversation today
+- [ ] `windows-latest` CI job; minimal LGPL FFmpeg for Windows; Vulkan whisper; D3D11VA decode; NVENC/AMF/QSV/MF encode
+- [ ] NSIS installer, code signing, hardware matrix, beta with 20 testers
 
 ## M7 After launch
 
-- [ ] v1.1: Tighten cuts (filler words + dead air removed, captions retimed)
-- [ ] v1.1: NLE export (Premiere XML, Resolve EDL, CapCut draft)
-- [ ] v1.1: Gaming / reaction layout (gameplay full frame, webcam PiP corner)
-- [ ] v1.1: Profanity bleep from transcript words
-- [ ] v1.2: Highlights reel export (ordered clips concatenated to 16:9)
-
-- [ ] Audio diarization (evaluate pyannote-derived ONNX models under `tract`) replacing the mouth heuristic
-- [ ] Semantic prompt search as an opt-in embedding model download
-- [ ] Second cloud region and a status page
+- [ ] Tighten cuts (filler words + dead air removed, captions retimed)
+- [ ] NLE export (Premiere XML, Resolve EDL, CapCut draft)
+- [ ] Gaming / reaction layout; profanity bleep; highlights reel
+- [ ] Audio diarization replacing the mouth heuristic
 - [ ] YouTube ingest via optional `yt-dlp` download
-- [ ] More caption styles from community PRs
-- [ ] Audiogram mode for audio-only input
-- [ ] Revenue model decision (paid signed build, App Store, sponsorship, or hosted tier), only after the Mac app has users
+- [ ] Semantic prompt search as an opt-in embedding model
+- [ ] Revenue model decision (paid signed build, App Store, sponsorship), only once the app has users
 
-## Done
+## Needs you
 
-(nothing yet)
+1. Watch the 40 golden clips (`eval/REVIEW.md`) and correct them. Every picker number depends on this.
+2. Push to GitHub and tell me, so CI gets its first run.
+3. An Apple Developer account for signing, when you want a DMG others can open without the right-click dance.
+4. An app icon, or say the word and I draft one.
