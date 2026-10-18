@@ -8,7 +8,9 @@ use crate::model::{Progress, Segment, Transcript, Word};
 use crate::models_registry;
 use crate::ProgressFn;
 use std::path::Path;
-use std::sync::mpsc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::time::Duration;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 fn werr(e: impl std::fmt::Display) -> TranscribeError {
@@ -35,7 +37,11 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
     let lang_ref = lang.as_deref().unwrap_or("auto");
 
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8) as i32;
-    let (tx, rx) = mpsc::channel::<i32>();
+    // whisper-rs leaks the boxed progress closure (no Drop on FullParams), so anything it
+    // captures lives forever. A channel sender inside it would never close; a shared atomic
+    // polled until the worker finishes cannot deadlock and leaks only one small Arc.
+    let pct = Arc::new(AtomicI32::new(0));
+    let pct_cb = Arc::clone(&pct);
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(threads);
     params.set_language(Some(lang_ref));
@@ -47,14 +53,18 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
     params.set_print_realtime(false);
     params.set_print_special(false);
     params.set_print_timestamps(false);
-    params.set_progress_callback_safe(move |p: i32| {
-        let _ = tx.send(p);
-    });
+    params.set_progress_callback_safe(move |p: i32| pct_cb.store(p, Ordering::Relaxed));
 
     let result = std::thread::scope(|s| {
         let worker = s.spawn(|| state.full(params, &audio).map(|_| ()));
-        for p in rx {
-            progress(Progress::new(STAGE, p as f32 / 100.0, "transcribing"));
+        let mut last = -1;
+        while !worker.is_finished() {
+            let p = pct.load(Ordering::Relaxed);
+            if p != last {
+                progress(Progress::new(STAGE, p as f32 / 100.0, "transcribing"));
+                last = p;
+            }
+            std::thread::sleep(Duration::from_millis(200));
         }
         worker.join()
     });
