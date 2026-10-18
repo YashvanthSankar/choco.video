@@ -2,23 +2,25 @@
 
 Companion docs: `PLAN.md` (what and why), `STACK.md` (tools), `TECH.md` (how), `COMPETITORS.md` (what others ship). Root `AGENTS.md` is the agent's memory.
 
+Legend: `[x]` done and verified on Mac and Windows CI · `[~]` works on the dev Mac, Windows CI not yet green · `[ ]` not started. Notes after `→` record what was actually measured.
+
 Rules: one milestone in progress at a time. A box is checked only when the thing works on the dev Mac **and** Windows CI is green (for engine items). Move finished milestones to the bottom. Keep this file short; details go in `TECH.md`.
 
 ## Now: M1 Engine skeleton (weeks 1–2)
 
-- [ ] `git init`, `.gitignore` (target/, fixtures media, models, *.chocoproj), `LICENSE` (MIT) in `engine/`
-- [ ] Cargo workspace: `choco-engine`, `choco`, `choco-ffi`; shared lints; `deny.toml` with license allowlist (MIT, Apache-2.0, BSD-2/3, ISC, Unlicense, LGPL-2.1+ dynamic, OFL for fonts)
-- [ ] `model/` types from `TECH.md §2` with serde round-trip tests
-- [ ] `backend/`: trait, `detect()`, `mac.rs` (AppleSpeech on 26+, Metal, VideoToolbox), `windows.rs` (stub that reports Whisper on CPU), `cpu.rs`, `recommended_models()` by memory
-- [ ] Release profile in workspace `Cargo.toml` (fat LTO, 1 codegen unit, abort, strip, opt-level z with overrides); arm64-only Mac target
-- [ ] FFmpeg minimal LGPL: build recipe with `--disable-everything` plus an allowlist (mov/mp4/matroska/webm demux, h264/hevc/vp9/aac/opus/mp3 decode, hw encoders, aac encode, loudnorm/aresample/scale filters, VideoToolbox/D3D11VA/NVENC/AMF/QSV/MF hwaccel), `--disable-gpl --disable-nonfree`; pin version; record the dylib sizes in `AGENTS.md` Benchmarks; document in `scripts/ffmpeg/README.md`; Windows link path verified in CI
+- [x] `git init`, `.gitignore` (target/, fixtures media, models, vendor/, *.chocoproj), `LICENSE` (MIT) in `engine/`
+- [~] Cargo workspace: `choco-engine`, `choco`, `choco-ffi`; shared lints; `deny.toml` with license allowlist and bans (x264, x265, openh264, ort) → builds clean, clippy clean; `cargo deny` not yet run
+- [~] `model/` types from `TECH.md §2` with serde round-trip tests → 2 tests pass
+- [~] `backend/`: trait, `detect()`, `mac.rs` (AppleSpeech on 26+, Metal, VideoToolbox), `windows.rs` (stub that reports Whisper on CPU), `cpu.rs`, `recommended_models()` by memory → detects M3 Pro, 18 GB, macOS 27.0.1, AppleSpeech → Whisper Metal
+- [~] Release profile in workspace `Cargo.toml` (fat LTO, 1 codegen unit, abort, strip, opt-level z with overrides); arm64-only Mac target; toolchain pinned to 1.99.1
+- [~] FFmpeg minimal LGPL: build recipe with `--disable-everything` plus an allowlist (mov/mp4/matroska/webm demux, h264/hevc/vp9/aac/opus/mp3 decode, hw encoders, aac encode, loudnorm/aresample/scale filters, VideoToolbox/D3D11VA/NVENC/AMF/QSV/MF hwaccel), `--disable-gpl --disable-nonfree`; pin version; record the dylib sizes in `AGENTS.md` Benchmarks; document in `scripts/ffmpeg/README.md`; Windows link path verified in CI → Mac done: 8.1.3, 7.5 MB of dylibs, LGPL 2.1 confirmed, `@rpath` install names; Windows link path pending (no CI yet)
 - [ ] `ingest/`: `probe`, `extract_audio` (16 kHz mono f32), `thumbnail`
-- [ ] `transcribe/`: `Transcriber` trait + shared cleanup (sentence re-split, hallucination filter, clamp)
-- [ ] `transcribe/apple.rs`: Swift shim in `engine/crates/apple/` for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+, availability-gated
+- [~] `transcribe/`: `Transcriber` trait + shared cleanup (sentence re-split, hallucination filter, clamp)
+- [~] `transcribe/apple.rs`: Swift shim in `engine/crates/apple/` for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+, availability-gated
 - [ ] `transcribe/whisper.rs`: `whisper-rs` with Metal/Vulkan/CPU, windowed decode with overlap, word timestamps, quantized turbo default
-- [ ] `models_registry/`: manifest format, download with resume + blake3, storage dir, `choco models list|pull|rm`; only Whisper and the optional local picker model are ever listed
-- [ ] CLI: `choco probe`, `choco transcribe`, `choco doctor` with fix hints, `--json`
-- [ ] `fixtures/generate.sh` (synthetic) and `fixtures/fetch.sh` (CC media list with licenses)
+- [~] `models_registry/`: manifests pinned to a Hugging Face revision, resumable download, sha256 verify (upstream publishes sha256, so not blake3), `choco models list|pull|rm`
+- [~] CLI: `choco probe`, `choco transcribe`, `choco thumbnail`, `choco doctor` with fix hints, `choco models`, `--json` → doctor reports ready
+- [x] `fixtures/generate.sh` (synthetic, macOS `say` voices with known text: speech, rotated phone clip, silent, two voices, audio-only, VP9/Opus MKV) and `fixtures/fetch.sh` + `sources.tsv` (5 CC BY 3.0 long-form recordings from Wikimedia Commons, 48–72 min, sha1-verified)
 - [ ] CI `engine.yml` on `macos-14` + `windows-latest`: release build, test, clippy, deny, `cargo bloat` summary
 - [ ] Size budget check script (`scripts/size-check.sh`) that fails over 25 MB installer / 50 MB installed; wired into `app.yml` at M5, run by hand before then
 - [ ] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5; record wall time, peak memory and word-timing agreement in `AGENTS.md` Benchmarks
@@ -31,7 +33,7 @@ Rules: one milestone in progress at a time. A box is checked only when the thing
 - [ ] `highlights/search.rs` shortlist: quality prior, BM25 prompt mode, Jaccard dedupe. No embedding model.
 - [ ] `highlights/picker/` `Picker` trait; `Hosted` client; `Byok`; `AppleFoundation` shim; batch of 8 with episode context
 - [ ] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hashing
-- [ ] `cloud/`: axum service with `/v1/score`, `/v1/summarize`, `/v1/quota`; license-key auth against Lemon Squeezy; per-key usage counter; Anthropic call with structured output and server-side fallbacks; no transcript logging; Dockerfile; deployed to one small host; `cloud.yml`
+- [ ] `cloud/`: axum service with `/v1/score` (Haiku), `/v1/summarize` and `/v1/title` (Opus), `/v1/quota`; measure tokens and cost per source hour against the $0.03 budget; license-key auth against Lemon Squeezy; per-key usage counter; Anthropic call with structured output and server-side fallbacks; no transcript logging; Dockerfile; deployed to one small host; `cloud.yml`
 - [ ] `rank.rs` NMS + diversity penalty + score floor; `--n` is a max, content decides the count
 - [ ] `choco highlights` with `--n`, `--prompt`, `--picker hosted|apple|byok|local`
 - [ ] Golden set: 10 fixtures, 5–8 human-picked ranges each, in `eval/golden.json`

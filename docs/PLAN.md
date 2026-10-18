@@ -8,7 +8,7 @@
 
 **Size principle:** the installer is about 20 MB and nothing heavy ships inside it. Video decoding, face tracking, captions and rendering are local and small. Speech recognition uses the OS engine where one exists and a one-time download where it does not. The highlight picker, the only step that needs a large model, runs on a hosted frontier model by default, with offline fallbacks. We never trade output quality for size; we trade *where* the model runs.
 
-**Why it exists:** Opus Clip and Vizard charge $15–29/month, meter by credits, watermark free exports, expire clips after 3 days, and upload every file to their cloud. Every review of both products complains about the same three things: credits, watermarks, expiry. Modern laptop GPUs and Apple Silicon can run the whole pipeline for free, which makes "unlimited, local, one-time price" a structural advantage rather than a feature.
+**Why it exists:** Opus Clip and Vizard charge $15–29/month, meter by credits, watermark free exports, expire clips after 3 days, and upload every file to their cloud. Every review of both products complains about the same three things: credits, watermarks, expiry. Modern laptop GPUs and Apple Silicon can run the whole pipeline for free, which makes "no credits, your video stays local, one-time price" a structural advantage rather than a feature.
 
 **Who it is for:** Solo creators, podcasters, and streamers who post clips weekly. Not agencies, not teams. They decide alone and pay by card.
 
@@ -167,7 +167,7 @@ The picker is the only generative step, and it is the product. It needs a large 
 
 | Tier | What | Download | OS | Quality | Default |
 |---|---|---|---|---|---|
-| hosted | choco cloud picker: our stateless service calls the Anthropic Messages API (`claude-opus-5-5`, `claude-haiku-5-5` on the economy path) with transcript text only. Authenticated by license key, fair-use capped. | none | both | best | yes |
+| hosted | choco cloud picker: our stateless service calls the Anthropic Messages API with transcript text only. `claude-haiku-5-5` scores candidate batches; `claude-opus-5-5` writes the episode summary and the final titles for the chosen clips. Authenticated by license key, fair-use capped. | none | both | best | yes |
 | apple | Apple on-device Foundation Models | none | macOS 26+ | adequate scoring, weaker titles | offline fallback on Mac, selectable |
 | byok | user's own Anthropic key, same prompts, called directly from the app | none | both | best | selectable |
 | local | 4B instruct GGUF at 4-bit via llama.cpp | ~2.5 GB once | both | good | opt-in, for fully offline on Windows |
@@ -181,7 +181,7 @@ Rules that hold across tiers:
 - The local tier never runs concurrently with the renderer; the model is unloaded before render. The default tiers have no in-process model at all.
 
 ### 5.3 Language helpers (local)
-- Sentence embeddings for prompt-mode search and duplicate detection.
+- BM25 keyword search for prompt mode and token-set Jaccard for duplicate detection. No embedding model in v1.
 - Filler-word and disfluency detection is rule-based, not ML.
 
 ### 5.4 Building it (dev-time AI)
@@ -253,7 +253,7 @@ choco.video/
 | Windows hardware variance breaks encode or inference | CPU fallback for every stage. Compatibility matrix documented. Windows beta before Windows launch. |
 | Apple SpeechAnalyzer is worse than Whisper on some languages | Golden set compares both in M1. Per-language fallback to the Whisper download, offered in the UI. |
 | The hosted picker is a server we must run | Stateless, no media, a few hundred lines, rate-limited by license key. On outage the app falls back to the Apple tier on Mac or BYOK and says so, instead of failing silently. |
-| Hosted inference cost per user | ~100k tokens per source hour, cents on Claude. The 50 h/month cap bounds the worst case at a few dollars per user per month, far under the one-time price. |
+| Hosted inference cost per user | Rough estimate ~35k input + ~6k output tokens per source hour. Opus for everything would be ≈ $0.26/hour, ≈ $13/month at the cap, which a one-time price cannot carry. So Haiku 5.5 scores and Opus 5.5 only summarizes and titles: ≈ $0.02–0.03/hour, ≈ $1.50/month worst case. Measured in M2; budget ≤ $0.03 per source hour. |
 | 18 GB RAM machines swap when the optional local picker model and a 4K decode run together | Local tier only: run picker and render sequentially, unload the model before render. Default tiers use no in-process LLM. |
 | Tauri webview feels less native than SwiftUI on Mac | Accept the trade for Windows. Match system appearance, use native menus and tray, keep the UI small. Cap and Handy are the proof it is good enough. |
 | Someone ships a polished cross-platform clipper first | Ship Mac v1 in 10 weeks. Engine repo public early for mindshare. |

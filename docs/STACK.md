@@ -8,7 +8,7 @@ Canonical list of what we build with and why. Implementation detail is in `TECH.
 | Platforms | macOS 14+ Apple Silicon only (arm64 build, no universal binary); Windows 11 x64; Linux CLI only | Mac is one hardware family, so v1 is testable on one machine. Single-arch builds halve the binary. Windows needs a compatibility matrix. |
 | Engine packaging | Cargo workspace: `choco-engine` (lib), `choco` (CLI), `choco-ffi` (C ABI for shells) | The crate is the open-source unit. The app depends on it exactly as a third party would. |
 | Transcription | Apple SpeechAnalyzer on macOS 26+ (zero download, Swift shim); whisper.cpp via `whisper-rs` elsewhere, quantized turbo ~550 MB downloaded on first run | Same `Transcript` type from both engines. Metal on older Macs, Vulkan on Windows, CPU everywhere. No CUDA builds: hundreds of MB for a minority of machines. |
-| Picker, hosted (default) | `choco-cloud`: a small Rust `axum` service that calls the Anthropic Messages API, `claude-opus-5-5` default, `claude-haiku-5-5` economy | Frontier quality with zero download. Transcript text only. Authenticated by license key, fair-use capped. Deployed as one container. |
+| Picker, hosted (default) | `choco-cloud`: a small Rust `axum` service that calls the Anthropic Messages API, `claude-haiku-5-5` for batch scoring, `claude-opus-5-5` for the episode summary and final titles | Frontier quality with zero download, at ≈ $0.02–0.03 per source hour. Transcript text only. Authenticated by license key, fair-use capped. Deployed as one container. |
 | Picker, Apple tier | Foundation Models framework via a small Swift shim behind the `Backend` trait | Zero-download offline option on macOS 26+. Compiled out elsewhere. |
 | Picker, BYOK | Anthropic Messages API over `reqwest` from the app, same prompts as hosted | For users who want their own key. |
 | Picker, local (opt-in) | llama.cpp via `llama-cpp-2`, 4B GGUF Q4 ~2.5 GB | Fully offline on Windows for those who want it. Code compiled in, model downloaded only when chosen. Metal / Vulkan / CPU. |
@@ -40,7 +40,7 @@ Canonical list of what we build with and why. Implementation detail is in `TECH.
 
 Release profile: `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `strip = true`, `opt-level = "z"` for the workspace with `opt-level = 3` overridden on `render` and `transcribe`. `cargo bloat` output is attached to every release PR. A new dependency over 2 MB compiled needs a line in `AGENTS.md` Decisions.
 
-**What stays Mac-first even with a cross-platform engine:** the Mac app ships before any Windows UI work starts. Mac gets the Apple on-device picker tier and the CoreML Whisper encoder. The Mac build is the reference for render quality; Windows must match it pixel-for-pixel on the golden set.
+**What stays Mac-first even with a cross-platform engine:** the Mac app ships before any Windows UI work starts. Mac gets Apple SpeechAnalyzer and the Apple on-device picker tier; the CoreML Whisper encoder is only an optional speed-up for older Macs. The Mac build is the reference for render quality; Windows must match it pixel-for-pixel on the golden set.
 
 ## Pinned versions and crates (fill in at M1, keep current)
 
@@ -49,11 +49,11 @@ Release profile: `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `strip =
 | Rust toolchain | stable, `rust-toolchain.toml` pinned | 2024 edition |
 | whisper.cpp | `whisper-rs` (pin at M1) | features: `metal` on older macs; `vulkan` on win; shares one ggml with llama.cpp |
 | llama.cpp | `llama-cpp-2` (pin at M2) | opt-in `local-llm` feature; `metal` / `vulkan` |
-| Apple speech + Foundation Models | Swift shim in `engine/apple/` | macOS 26+ only, availability-gated |
+| Apple speech + Foundation Models | Swift shim in `engine/crates/apple/` | macOS 26+ only, availability-gated |
 | Face inference | `tract-onnx` | pure Rust, no runtime download |
 | Hosted picker | `axum`, `tokio`, `reqwest` | `cloud/`, one container |
 | FFmpeg | 7.x LGPL build, `ffmpeg-next` | recipe in `scripts/ffmpeg/`, `--disable-gpl --disable-nonfree` |
-| GPU | `wgpu` (pin at M3) | Metal / DX12 / Vulkan |
+| GPU | `wgpu` (pin at M3) | Metal + DX12 backends only |
 | Text | `cosmic-text`, `swash` | bundled OFL fonts only |
 | CLI | `clap` 4 | derive API |
 | Serialization | `serde`, `serde_json` | all stage types |

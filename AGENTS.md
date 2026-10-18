@@ -4,7 +4,7 @@ You are the development agent for choco.video. This file is your long-term memor
 
 ## What this project is
 
-A small desktop app (~20 MB installer), Mac first then Windows, that turns long videos into ranked, captioned, speaker-centered 9:16 shorts. Video is processed on-device; the highlight picker runs on a hosted frontier model by default with offline fallbacks. Open-source Rust engine (MIT), a paid Tauri app, and a tiny private cloud service for the picker. Competes with Opus Clip and Vizard on "unlimited, local, one-time price". Full context: `docs/PLAN.md`. Competitors and why we win: `docs/COMPETITORS.md`.
+A small desktop app (~20 MB installer), Mac first then Windows, that turns long videos into ranked, captioned, speaker-centered 9:16 shorts. Video is processed on-device; the highlight picker runs on a hosted frontier model by default with offline fallbacks. Open-source Rust engine (MIT), a paid Tauri app, and a tiny private cloud service for the picker. Competes with Opus Clip and Vizard on "no credits, your video stays local, one-time price". Full context: `docs/PLAN.md`. Competitors and why we win: `docs/COMPETITORS.md`.
 
 ## Non-negotiables
 
@@ -22,7 +22,7 @@ A small desktop app (~20 MB installer), Mac first then Windows, that turns long 
 
 Rust 2024 workspace in `engine/`. Apple SpeechAnalyzer (macOS 26+) or `whisper-rs` for transcription, `tract` + YuNet for faces, minimal LGPL `ffmpeg-next` for decode/encode/mux, `wgpu` (Metal + DX12 only) for compositing, `cosmic-text` + `swash` for captions, BM25 for prompt search, `clap` CLI, `cbindgen` FFI, optional `llama-cpp-2` behind `local-llm`. App in `app/` is Tauri 2 with a small TypeScript UI. `cloud/` is an `axum` service for the hosted picker. Payments and license keys via Lemon Squeezy. Details and rationale: `docs/STACK.md`, `docs/TECH.md`.
 
-Picker ladder: hosted (default, our service calling `claude-opus-5-5`, `claude-haiku-5-5` economy, license-key auth, 50 source hours/month fair use), Apple Foundation Models (macOS 26+, offline), BYOK (user's own key), local 4B GGUF (opt-in ~2.5 GB download). Structured JSON output on every tier. Transcript text only, always.
+Picker ladder: hosted (default, our service: `claude-haiku-5-5` scores candidate batches, `claude-opus-5-5` writes the episode summary and the final titles for the chosen clips only; license-key auth, 50 source hours/month fair use), Apple Foundation Models (macOS 26+, offline), BYOK (user's own key), local 4B GGUF (opt-in ~2.5 GB download). Structured JSON output on every tier. Transcript text only, always.
 
 ## Dev machine
 
@@ -81,6 +81,8 @@ cd ../app && npm install && npm run tauri dev
 | 2026-10-18 | Transcription via Apple SpeechAnalyzer on macOS 26+, whisper.cpp quantized turbo elsewhere | Zero download on Mac; same `Transcript` type either way; golden set decides per-language fallbacks. |
 | 2026-10-18 | `tract` instead of ONNX Runtime for YuNet; minimal FFmpeg allowlist build; `wgpu` Metal+DX12 only; no CUDA; arm64-only Mac; OS software encoders as fallback, no openh264 | Each is a size cut with identical output. openh264 also carries patent exposure. |
 | 2026-10-18 | BM25 keyword search for prompt mode in v1, no embedding model | Avoids a model download; semantic search becomes an opt-in later. |
+| 2026-10-18 | Hosted picker: Haiku 5.5 scores batches; Opus 5.5 only for the episode summary and final titles of chosen clips | Rough estimate per source hour: Opus-for-everything ≈ $0.26 (≈ $13/month at the cap, more than a one-time license can carry); Haiku scoring + Opus titles ≈ $0.02–0.03. Eval must confirm Haiku picks hold up. |
+| 2026-10-18 | Marketing says "no credits", never "unlimited" | There is a 50 h/month fair-use cap. |
 
 ## Benchmarks
 
@@ -90,12 +92,15 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 |---|---|---|---|
 | — | Transcribe 60 min podcast, Apple SpeechAnalyzer | not measured | M1 target |
 | — | Transcribe 60 min podcast, whisper turbo-q5, Metal | not measured | M1 target |
-| — | Minimal FFmpeg dylibs total size, Mac | not measured | M1 target |
+| 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 7.5 MB | LGPL 2.1; avcodec 4.5 MB is most of it |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
 | — | Picker on 300 candidates, hosted tier, wall time and tokens | not measured | M2 target |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
 | — | Render 60 s clip 1080x1920, VideoToolbox | not measured | M3 target |
-| — | Golden set precision@5, local picker | not measured | M2 baseline |
+| — | Golden set precision@5, hosted picker (Haiku scoring) | not measured | M2 baseline, the default tier |
+| — | Golden set precision@5, Haiku vs Opus scoring | not measured | M2; Opus scoring only if it beats Haiku by a margin worth its cost |
+| — | Golden set precision@5, apple and local tiers | not measured | M2 |
+| — | Hosted cost per source hour, measured tokens × price | not measured | M2; budget ≤ $0.03 |
 
 ## Known traps
 
@@ -109,7 +114,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 ## What not to do
 
 - Do not switch the engine language, the UI framework, or the license model. These were decided with reasons above.
-- Do not add a cloud-only feature. Everything must work offline except BYOK scoring.
+- Do not add a cloud-only feature. Everything must work offline except picker scoring (hosted or BYOK), and even that has the Apple and local offline tiers.
 - Do not use Apple-only APIs outside `backend/mac.rs` and the `apple-fm` shim.
 - Do not "quickly" use libx264 to get a render working. Use the hardware encoder or the LGPL fallback.
 - Do not inline prompts, bump `deny.toml`, or skip the eval to make progress look faster.
