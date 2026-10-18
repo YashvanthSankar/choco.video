@@ -111,6 +111,39 @@ impl OpenAiCompat {
     }
 }
 
+/// Model ids the endpoint offers (`GET {base_url}/models`), sorted. For onboarding pickers.
+pub fn list_models(base_url: &str, api_key: &str) -> Result<Vec<String>> {
+    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(20))).build().into();
+    let mut resp = agent
+        .get(&format!("{}/models", base_url.trim_end_matches('/')))
+        .header("Authorization", &format!("Bearer {api_key}"))
+        .header("User-Agent", concat!("choco-video/", env!("CARGO_PKG_VERSION")))
+        .call()
+        .map_err(|e| PickerError::Transport(e.to_string()))?;
+    let status = resp.status().as_u16();
+    let text = resp.body_mut().read_to_string().map_err(|e| PickerError::Transport(e.to_string()))?;
+    if status != 200 {
+        return Err(PickerError::Http { status, body: text.chars().take(300).collect() });
+    }
+    let v: Value = serde_json::from_str(&text).map_err(|e| PickerError::Transport(format!("bad /models JSON: {e}")))?;
+    let list = v["data"].as_array().or_else(|| v.as_array()).cloned().unwrap_or_default();
+    let mut ids: Vec<String> = list.iter().filter_map(|m| m["id"].as_str().map(str::to_string)).collect();
+    ids.sort();
+    Ok(ids)
+}
+
+/// One tiny scoring request: proves the key, the model and structured output all work.
+pub fn test_connection(cfg: OpenAiCompatConfig) -> Result<std::time::Duration> {
+    let started = std::time::Instant::now();
+    let c = OpenAiCompat::new(OpenAiCompatConfig { timeout: Duration::from_secs(60), ..cfg });
+    let raw = c.scores_json(
+        "Score each clip 0-100 for short-form appeal. Reply with JSON only.",
+        "Candidates:\n[t1] Why does nobody tell you pricing is the biggest mistake? We tripled our price and sales went up.",
+    )?;
+    super::parse_scores(&raw, &["t1".to_string()])?;
+    Ok(started.elapsed())
+}
+
 impl Llm for OpenAiCompat {
     fn tier(&self) -> &'static str {
         self.cfg.tier

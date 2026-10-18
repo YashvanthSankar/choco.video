@@ -154,11 +154,24 @@ enum Cmd {
     },
     /// Check hardware, engines, libraries and models, with fix hints.
     Doctor,
+    /// Check the configured picker provider (CHOCO_LLM_BASE_URL, CHOCO_LLM_API_KEY, CHOCO_LLM_MODEL).
+    Provider {
+        #[command(subcommand)]
+        cmd: ProviderCmd,
+    },
     /// Manage runtime-downloaded models.
     Models {
         #[command(subcommand)]
         cmd: ModelsCmd,
     },
+}
+
+#[derive(Subcommand)]
+enum ProviderCmd {
+    /// List the models the endpoint offers.
+    Models,
+    /// Send one tiny scoring request with CHOCO_LLM_MODEL.
+    Test,
 }
 
 #[derive(Subcommand)]
@@ -466,7 +479,7 @@ fn main() -> Result<()> {
             eprintln!("wrote {}", out.display());
         }
         Cmd::Run { file, n, prompt, picker: pk, style, preset, layout, transcript, min_score, out } => {
-            use choco_engine::{captions, export};
+            use choco_engine::{captions, export, pipeline};
             let started = Instant::now();
             if export::preset_size(&preset).is_none() {
                 bail!("unknown preset {preset} (use one of {:?})", export::PRESETS);
@@ -478,55 +491,28 @@ fn main() -> Result<()> {
                 other => bail!("unknown layout {other}"),
             };
             let llm = make_picker(pk)?;
-            let pr = progress_printer(false);
-            let asset = ingest::probe(&file).with_context(|| format!("probing {}", file.display()))?;
-            std::fs::create_dir_all(&out)?;
-            let tmp = tempfile::tempdir()?;
-            let wav = tmp.path().join("audio.wav");
-            ingest::extract_audio(&asset, &wav, &pr)?;
-            let feats = audio::analyze(&wav)?;
-            let stem = file.file_stem().map(|s| export::slug(&s.to_string_lossy())).unwrap_or_else(|| "video".into());
-            let t: Transcript = match transcript {
-                Some(p) => serde_json::from_str(&std::fs::read_to_string(&p)?)?,
-                None => {
-                    let b = backend::detect();
-                    let opts = TranscribeOptions {
-                        language: None,
-                        whisper_model: b.recommended_models().whisper_model.unwrap_or_else(|| models_registry::WHISPER_DEFAULT.into()),
-                        models_dir: models_registry::default_dir(),
-                    };
-                    let t = transcribe::transcribe(&wav, b.speech_engines()[0], &opts, &pr)?;
-                    std::fs::write(out.join(format!("{stem}.transcript.json")), serde_json::to_string(&t)?)?;
-                    t
-                }
-            };
             let mut hopts = HighlightOptions { prompt, ..Default::default() };
             hopts.rank.max_clips = n;
             hopts.rank.min_score = min_score;
-            let (cands, report) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &hopts, &pr)?;
-            if cands.is_empty() {
-                bail!("no clip scored at least {min_score}; try --min-score lower or a different picker");
-            }
-            let eopts = export::ExportOptions { preset, style, layout, out_dir: out.clone(), ..Default::default() };
-            let mut raster = choco_engine::captions::Rasterizer::new();
+            let transcript = match transcript {
+                Some(p) => Some(serde_json::from_str::<Transcript>(&std::fs::read_to_string(&p)?)?),
+                None => None,
+            };
+            let opts = pipeline::RunOptions {
+                highlights: hopts,
+                export: export::ExportOptions { preset, style, layout, out_dir: out.clone(), ..Default::default() },
+                transcript,
+                language: None,
+                speech: None,
+            };
+            let pr = progress_printer(false);
             let cancel = std::sync::atomic::AtomicBool::new(false);
-            let mut job = export::Job { raster: &mut raster, progress: &pr, cancel: &cancel };
-            let mut exported = Vec::new();
-            for (i, c) in cands.iter().enumerate() {
-                eprintln!("[{}/{}] {} ({}s, score {})", i + 1, cands.len(), c.title, (c.end_ms - c.start_ms) / 1000, c.score);
-                exported.push(export::export_clip(&asset, &t, c, i + 1, &eopts, &mut job)?);
-            }
-            std::fs::write(
-                out.join(format!("{stem}.run.json")),
-                serde_json::to_string_pretty(&serde_json::json!({
-                    "source": asset, "picker": report, "clips": exported,
-                }))?,
-            )?;
-            eprintln!("{} clips in {} · {:.0}s total", exported.len(), out.display(), started.elapsed().as_secs_f64());
+            let r = pipeline::run(&file, &opts, llm.as_ref(), &pr, &cancel)?;
+            eprintln!("{} clips in {} · {:.0}s total", r.clips.len(), out.display(), started.elapsed().as_secs_f64());
             if cli.json {
-                println!("{}", serde_json::to_string_pretty(&exported)?);
+                println!("{}", serde_json::to_string_pretty(&r)?);
             } else {
-                for e in &exported {
+                for e in &r.clips {
                     println!("{:>2}. [{:>3}] {}", e.rank, e.candidate.score, e.mp4.display());
                 }
             }
@@ -537,6 +523,24 @@ fn main() -> Result<()> {
             eprintln!("wrote {}", out.display());
         }
         Cmd::Doctor => doctor(cli.json)?,
+        Cmd::Provider { cmd } => {
+            use picker::openai_compat::{self, OpenAiCompatConfig};
+            match cmd {
+                ProviderCmd::Models => {
+                    let base = std::env::var("CHOCO_LLM_BASE_URL").unwrap_or_else(|_| openai_compat::OPENCODE_ZEN_BASE_URL.into());
+                    let key = std::env::var("CHOCO_LLM_API_KEY").context("set CHOCO_LLM_API_KEY")?;
+                    for m in openai_compat::list_models(&base, &key)? {
+                        println!("{m}");
+                    }
+                }
+                ProviderCmd::Test => {
+                    let cfg = OpenAiCompatConfig::from_env("provider")?;
+                    let (base, model) = (cfg.base_url.clone(), cfg.score_model.clone());
+                    let took = openai_compat::test_connection(cfg)?;
+                    println!("ok: {model} at {base} answered with valid scores in {:.1}s", took.as_secs_f64());
+                }
+            }
+        }
         Cmd::Models { cmd } => {
             let dir = models_registry::default_dir();
             match cmd {
