@@ -51,7 +51,7 @@ The four in bold are the ones the user flagged. The pattern across all nine: **P
 | Feature | AutoClip | OpenClip Studio | chopify | Klipzy | SupoClip | **choco v1** |
 |---|---|---|---|---|---|---|
 | Local Whisper, word timestamps | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| LLM highlight picking | ✅ Ollama local | ✗ heuristic | ◐ opt-in Ollama | ✅ Ollama local | ✅ hosted | ✅ hosted frontier model by default; Apple on-device, BYOK, or opt-in local 4B |
+| LLM highlight picking | ✅ Ollama local | ✗ heuristic | ◐ opt-in Ollama | ✅ Ollama local | ✅ hosted | ✅ user's provider (OpenCode recommended) or Apple on-device; opt-in local 4B |
 | BYOK cloud picking | ✅ | ◐ | ✗ | ✅ | ✅ | ✅ off by default |
 | Prompt / keyword search | ✗ | ✗ | ✅ | ✗ | ✗ | ✅ |
 | Complete-thought boundaries | ✗ | ◐ | ✅ | ✗ | ✗ | ✅ |
@@ -88,10 +88,10 @@ The four in bold are the ones the user flagged. The pattern across all nine: **P
 The feature list is not the moat. Every box above is a weekend for someone who already has the Python pipeline. The moat is the five rows at the bottom of the matrix, and none of the nine projects can get there without a rewrite:
 
 1. **Zero-install, signed, native.** Download, open, drop a video. No Python version, no ffmpeg flavour, no Ollama, no Node, no terminal. This alone puts us in front of every non-developer creator, which is almost all of them.
-2. **Frontier-model picks with zero download, and a 20 MB app.** The default picker is a hosted frontier model, so clip selection is better than any local 8B, and nothing heavy is installed. Competitors make the user install Ollama and pull a multi-gigabyte model, then get worse picks. Offline paths still exist for people who want them.
+2. **Strong-model picks with zero download, and a 20 MB app.** The user pastes one OpenCode key at onboarding (or uses Apple's on-device model with no key), so clip selection runs on a capable hosted model for cents per hour, and nothing heavy is installed. Competitors make the user install Ollama and pull a multi-gigabyte model, then get worse picks. Offline paths still exist for people who want them.
 3. **Quality is measured, in public.** Golden set and eval runner in the open repo. A picker change that lowers precision@5 cannot merge. AutoClip promised this; we ship it before anyone.
 4. **Same pixels on Mac and Windows.** One compositor, one text rasterizer, snapshot tests on both. Competitors depend on whatever ffmpeg and fonts the user happens to have.
-5. **A license chain that allows a business.** LGPL FFmpeg dynamically linked, hardware encoders, no GPL. Every competitor is welded to libx264 or AGPL, so none can sell a closed binary without re-plumbing their render.
+5. **A clean license chain.** LGPL FFmpeg dynamically linked, hardware encoders, no GPL, everything else MIT. Anyone can ship, sign and sell builds of it; competitors welded to libx264 or AGPL cannot offer that.
 
 Secondary edges that compound: hardware encode on every machine (minutes instead of tens of minutes per batch), project files that survive restarts, and a review UI that is a desktop window instead of a localhost tab.
 

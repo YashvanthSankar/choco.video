@@ -39,7 +39,7 @@ pub enum Role {
 }
 
 pub trait Llm: Send + Sync {
-    /// "hosted", "apple", "byok" or "local".
+    /// "provider", "apple" or "local".
     fn tier(&self) -> &'static str;
     fn model(&self, role: Role) -> String;
     /// Total context the backend can take, in tokens.
@@ -48,9 +48,30 @@ pub trait Llm: Send + Sync {
     fn batch_size(&self) -> usize {
         8
     }
+    /// Tokens consumed so far, per role, when the backend reports them.
+    fn usage(&self) -> Usage {
+        Usage::default()
+    }
     fn text(&self, role: Role, system: &str, user: &str) -> Result<String>;
     /// Must return a JSON string shaped like [`ScoresOut`]; the caller parses and validates it.
     fn scores_json(&self, system: &str, user: &str) -> Result<String>;
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Usage {
+    pub score_input: u64,
+    pub score_output: u64,
+    pub summarize_input: u64,
+    pub summarize_output: u64,
+}
+
+impl Usage {
+    /// Dollar cost given per-million-token prices for the scoring and summarizing models.
+    pub fn cost(&self, score: (f64, f64), summarize: (f64, f64)) -> f64 {
+        (self.score_input as f64 * score.0 + self.score_output as f64 * score.1 + self.summarize_input as f64 * summarize.0
+            + self.summarize_output as f64 * summarize.1)
+            / 1e6
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -111,9 +132,67 @@ pub(crate) fn extract_json(raw: &str) -> &str {
     }
 }
 
+/// Quote our own field names when a model leaves them bare or half-quoted
+/// (`{score:72` or `,reasons":`). Only touches the schema's keys, never values.
+pub(crate) fn repair_keys(s: &str) -> String {
+    const KEYS: &[&str] = &["scores", "id", "score", "reasons", "title", "description", "hashtags"];
+    let b = s.as_bytes();
+    let mut out = String::with_capacity(s.len() + 16);
+    let mut i = 0;
+    let mut in_str = false;
+    while i < b.len() {
+        let c = b[i] as char;
+        if in_str {
+            out.push(c);
+            if c == '\\' && i + 1 < b.len() {
+                out.push(b[i + 1] as char);
+                i += 2;
+                continue;
+            }
+            if c == '"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        if c == '{' || c == ',' {
+            out.push(c);
+            let mut j = i + 1;
+            while j < b.len() && (b[j] as char).is_whitespace() {
+                j += 1;
+            }
+            let ident_start = j;
+            while j < b.len() && ((b[j] as char).is_ascii_alphanumeric() || b[j] == b'_') {
+                j += 1;
+            }
+            let ident = &s[ident_start..j];
+            let mut k = j;
+            if k < b.len() && b[k] == b'"' {
+                k += 1; // half-quoted: reasons":
+            }
+            if KEYS.contains(&ident) && k < b.len() && b[k] == b':' && ident_start < b.len() && b[ident_start] != b'"' {
+                out.push('"');
+                out.push_str(ident);
+                out.push('"');
+                i = k;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        if c == '"' {
+            in_str = true;
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
 /// Parse scores; accept a bare array too, clamp scores, drop unknown ids.
 pub fn parse_scores(raw: &str, expected_ids: &[String]) -> Result<Vec<ScoreOut>> {
-    let body = extract_json(raw);
+    let repaired = repair_keys(extract_json(raw));
+    let body = repaired.as_str();
     let mut scores: Vec<ScoreOut> = match serde_json::from_str::<ScoresOut>(body) {
         Ok(s) => s.scores,
         Err(e) => match serde_json::from_str::<Vec<ScoreOut>>(raw.trim()) {
@@ -161,6 +240,15 @@ mod tests {
         assert_eq!(s.len(), 1);
         assert_eq!(s[0].score, 100.0);
         assert_eq!(s[0].hashtags, vec!["#a"]);
+    }
+
+    #[test]
+    fn repairs_bare_and_half_quoted_keys() {
+        let raw = r##"{"scores":[{"id":"w923",score:72,reasons":["a, b: c"],"title":"x:y","description":"d","hashtags":["#h"]}]}"##;
+        let s = parse_scores(raw, &["w923".into()]).unwrap();
+        assert_eq!(s[0].score, 72.0);
+        assert_eq!(s[0].reasons, vec!["a, b: c"]);
+        assert_eq!(s[0].title, "x:y");
     }
 
     #[test]

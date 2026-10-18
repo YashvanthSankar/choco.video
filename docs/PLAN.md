@@ -6,7 +6,7 @@
 
 **One sentence:** choco.video is a small desktop app, built on an open-source engine, that turns long-form video into short vertical clips with the video processed on-device and the heavy AI judgment run where it is cheapest, sold for a one-time price instead of a credit-metered subscription. macOS ships first, Windows follows on the same engine.
 
-**Size principle:** the installer is about 20 MB and nothing heavy ships inside it. Video decoding, face tracking, captions and rendering are local and small. Speech recognition uses the OS engine where one exists and a one-time download where it does not. The highlight picker, the only step that needs a large model, runs on a hosted frontier model by default, with offline fallbacks. We never trade output quality for size; we trade *where* the model runs.
+**Size principle:** the installer is about 20 MB and nothing heavy ships inside it. Video decoding, face tracking, captions and rendering are local and small. Speech recognition uses the OS engine where one exists and a one-time download where it does not. The highlight picker, the only step that needs a large model, runs on the user's own provider (OpenCode Zen recommended) or Apple's on-device model. We never trade output quality for size; we trade *where* the model runs. There is no backend of ours.
 
 **Why it exists:** Opus Clip and Vizard charge $15–29/month, meter by credits, watermark free exports, expire clips after 3 days, and upload every file to their cloud. Every review of both products complains about the same three things: credits, watermarks, expiry. Modern laptop GPUs and Apple Silicon can run the whole pipeline for free, which makes "no credits, your video stays local, one-time price" a structural advantage rather than a feature.
 
@@ -44,7 +44,7 @@
 - Generates a hook title and a one-line description per clip.
 - Prompt mode: "find every moment about pricing" filters candidates by semantic match before scoring.
 - De-duplicates overlapping candidates. Returns top N (default 10) ranked.
-- Model ladder, user-selectable: hosted choco picker (default, frontier model, transcript text only), Apple on-device model on macOS 26+ (zero download, offline), bring-your-own-key, and an optional ~2.5 GB local model download for fully offline use. See §5.
+- Picker, chosen at onboarding: the user's OpenAI-compatible provider (OpenCode Zen recommended; key in the Keychain; models pre-filled from our eval), Apple on-device (macOS 26+, no key), or an opt-in ~2.5 GB local model for fully offline use. See §5.
 
 ### 2.4 Reframe 16:9 → 9:16
 - Face detection and tracking on sampled frames using a small ONNX face model (same model on both OSes, so output is identical). Apple Vision is an optional Mac backend if it proves measurably better.
@@ -77,10 +77,10 @@
 
 ### 2.9 App shell
 - Tauri 2 window app with a tray/menubar item showing queue progress. One UI codebase for both OSes.
-- First-run on a current Mac: nothing to download. Drop a video. On Windows or older Macs: one speech-model download (~550 MB) with progress. No account; the license key is the only credential.
-- Settings: models, hardware backend, default style, export folder, BYOK key (OS keychain), telemetry opt-in (off).
+- Onboarding, three screens: (1) what choco does and the privacy line "your video never leaves this Mac"; (2) choose the picker: OpenCode Zen (recommended: paste key, test connection, scoring and summary models pre-selected with cost per hour shown), another OpenAI-compatible provider (base URL, key, model list fetched from `/models`), or Apple on-device (no key); (3) speech: nothing to download on macOS 26+, else one ~550 MB Whisper download with progress. No account.
+- Settings: picker provider, base URL, key (Keychain), scoring and summary models with a "test" button, speech engine, default style, export folder, telemetry opt-in (off).
 - Auto-update via Tauri's updater. Crash reports opt-in, local only.
-- License: free trial with a watermark on export. Paid key removes it. Validation works offline after first activation.
+- No license key, no trial watermark: the app is open source.
 
 ### 2.10 Parity features adopted from open-source competitors
 Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping them removes every "but X has it" objection.
@@ -111,7 +111,7 @@ Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping th
                  │       Transcribe (OS speech | whisper.cpp) ──▶ Transcript    │
                  │            │                          │                      │
                  │            │                          ▼                      │
-                 │            │                   Highlights (hosted|apple|byok|local) ──▶ [Candidate]
+                 │            │                   Highlights (provider|apple|local) ──▶ [Candidate]
                  │            │                          │                      │
                  │            ▼                          ▼                      │
                  │       Reframe (tract + YuNet) ◀── per candidate time range   │
@@ -151,7 +151,7 @@ Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping th
 
 ## 4. Tech stack
 
-Moved to `STACK.md`. Summary: Rust engine (OS speech or whisper.cpp, tract + YuNet, minimal FFmpeg LGPL, wgpu, cosmic-text), a tiny hosted picker service, Tauri 2 app, Lemon Squeezy, macOS CI with a size budget; Windows CI starts at M6. Swift was dropped when Windows became a requirement.
+Moved to `STACK.md`. Summary: Rust engine (OS speech or whisper.cpp, tract + YuNet, minimal FFmpeg LGPL, wgpu, cosmic-text), a client for any OpenAI-compatible provider, Tauri 2 app with a Svelte UI, macOS CI with a size budget; Windows CI starts at M6. Swift was dropped when Windows became a requirement. No backend.
 
 ## 5. How we use AI
 
@@ -165,12 +165,11 @@ AI is used in three places in the product and one place in building it.
 ### 5.2 Judgment (the picker, user-selectable ladder)
 The picker is the only generative step, and it is the product. It needs a large model, so by default it does not run on the user's machine. The ladder:
 
-| Tier | What | Download | OS | Quality | Default |
+| Tier | What | Setup | OS | Quality | Default |
 |---|---|---|---|---|---|
-| hosted | choco cloud picker: our stateless service calls an OpenAI-compatible provider (OpenCode Zen by default) with transcript text only. A cheap model scores candidate batches; a stronger model writes the episode summary and final titles. Both chosen by eval. Authenticated by license key, fair-use capped. | none | both | best | yes |
-| apple | Apple on-device Foundation Models | none | macOS 26+ | adequate scoring, weaker titles | offline fallback on Mac, selectable |
-| byok | the user's own OpenAI-compatible endpoint: base URL, key and model (OpenCode, OpenRouter, Groq, DeepSeek, LM Studio, Ollama's server, anything that speaks `/chat/completions`). Same prompts, called directly from the app | none | both | depends on model | selectable |
-| local | 4B instruct GGUF at 4-bit via llama.cpp | ~2.5 GB once | both | good | opt-in, for fully offline on Windows |
+| provider | Any OpenAI-compatible `/chat/completions` endpoint the user configures. OpenCode Zen is the recommended default; a cheap model scores batches and a stronger one writes the episode summary, both pre-selected from our golden-set eval and editable | paste a key | both | best | yes, when a key is set |
+| apple | Apple Intelligence on-device model | none | macOS 26+ | adequate scoring, weaker titles | yes, when no key is set |
+| local | 4B instruct GGUF at 4-bit via llama.cpp | ~2.5 GB download | both | good | opt-in, fully offline |
 
 Rules that hold across tiers:
 - The engine sends **transcript text only**, never audio or video, to any model or server. Hard rule, stated in the UI next to the picker setting.
@@ -194,11 +193,11 @@ Rules that hold across tiers:
 
 | Component | License | Visibility | Why |
 |---|---|---|---|
-| `choco-cloud` service | Proprietary | Private | The hosted picker: a tiny stateless service that scores transcript text with a frontier model. Never sees media. |
+| `choco-engine`, CLI, FFI, app, prompts, eval | MIT | One public repo | No backend means nothing to keep private. Users see exactly what is sent where. |
 | `choco-engine` crate | MIT | Public repo `choco-video/engine` | Permissive so anyone can embed it. Attracts contributors for caption styles, languages, model backends, Linux support. Stars are marketing. |
 | `choco` CLI | MIT | Same repo | Developers and power users script it on Mac, Windows, and Linux. The CLI is the demo that proves the engine works without the app. |
 | `choco-ffi` | MIT | Same repo | Lets anyone build a shell in any language. |
-| Choco app (Tauri shell, UI, licensing) | Proprietary | Private at launch | The paid product. Revisit opening it under a source-available license once revenue is stable. |
+| Choco app (Tauri shell, Svelte UI) | MIT | Same repo | Open source end to end. |
 | Caption styles, presets, prompts | MIT | In the engine repo | Community contributes styles and localized prompts. |
 | Golden eval set | CC BY where source licenses allow | In the engine repo | Contributors can prove their picker changes help. |
 
@@ -228,20 +227,18 @@ choco.video/
 │   ├── crates/choco-ffi/          C ABI
 │   ├── fixtures/                  scripts to fetch/generate sample media, media itself gitignored
 │   └── eval/                      golden set manifests and the eval runner
-├── app/              Tauri 2 project → private
+├── app/              Tauri 2 project (MIT)
 │   ├── src-tauri/                 Rust shell, depends on choco-engine
 │   └── src/                       TypeScript UI
-├── cloud/            hosted picker service (Rust, axum) → private, depends on choco-engine for prompts and schema
+
 └── scripts/          dev helpers, FFmpeg build recipes, signing
 ```
 
 ## 7. Business model
 
-- **Trial:** full features, watermark on export. The watermark is the exact thing people are leaving Opus Clip to escape, so it converts.
-- **Price:** $79 one-time including one year of updates, then $39/year optional for continued updates. Alternative $8/month for people who prefer it. Decide by week 10 based on landing-page signups. One license covers Mac and Windows.
-- **Hosted picker included.** The one-time license includes the hosted picker with a fair-use cap of 50 source hours per month, which no solo creator reaches. Beyond the cap: bring your own key, or a $4/month top-up. No credit meter in the normal path. Scoring one source hour costs us cents, so the cap bounds our worst case well under the license price.
-- **No account, no telemetry by default.** The license key is the only credential, and it is what authenticates picker calls. Opt-in anonymous usage stats only, and only after v1.
-- **Later:** hosted version on the same engine for people without a capable machine. Not before v1 has paying users.
+- **Open source, no backend.** The engine, CLI and app are MIT. Users pay their own provider directly (cents per source hour on the recommended models) or use Apple's on-device model for free.
+- **No account, no license key, no telemetry by default.**
+- **Revenue (open question, does not block building):** options include a paid signed build on the Mac App Store or Gumroad for people who do not build from source, sponsorships, or a paid hosted tier later. Decide after the Mac app ships and has users.
 
 ## 8. Risks and the honest answer to each
 
@@ -252,8 +249,8 @@ choco.video/
 | FFmpeg build and linking across two OSes eats weeks | Use prebuilt LGPL FFmpeg binaries from a known recipe (Cap's build scripts are a reference, MIT-licensed helpers). Pin versions. Do it in week 1, not week 8. |
 | Windows hardware variance breaks encode or inference | CPU fallback for every stage. Compatibility matrix documented. Windows beta before Windows launch. |
 | Apple SpeechAnalyzer is worse than Whisper on some languages | Golden set compares both in M1. Per-language fallback to the Whisper download, offered in the UI. |
-| The hosted picker is a server we must run | Stateless, no media, a few hundred lines, rate-limited by license key. On outage the app falls back to the Apple tier on Mac or BYOK and says so, instead of failing silently. |
-| Hosted inference cost per user | Rough estimate ~35k input + ~6k output tokens per source hour. A frontier model for every call costs ≈ $0.26/hour, ≈ $13/month at the cap, which a one-time price cannot carry. So a cheap open-weight model on OpenCode Zen scores and a stronger one only summarizes and titles, targeting ≤ $0.03 per source hour. Measured in M2 with real token counts and the provider's prices. |
+| Users must bring a provider key | Apple on-device needs no key on macOS 26+. Onboarding links straight to OpenCode Zen sign-up, tests the key live, and shows the cost per source hour of the pre-selected models. |
+| Provider cost per user | Measured per model on the 72-min podcast with real token counts and OpenCode Zen prices; the recommended default must stay ≤ $0.03 per source hour. |
 | 18 GB RAM machines swap when the optional local picker model and a 4K decode run together | Local tier only: run picker and render sequentially, unload the model before render. Default tiers use no in-process LLM. |
 | Tauri webview feels less native than SwiftUI on Mac | Accept the trade for Windows. Match system appearance, use native menus and tray, keep the UI small. Cap and Handy are the proof it is good enough. |
 | Someone ships a polished cross-platform clipper first | Ship Mac v1 in 10 weeks. Engine repo public early for mindshare. |

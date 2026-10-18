@@ -4,7 +4,7 @@
 
 use crate::model::{Candidate, Progress, Transcript};
 use crate::ProgressFn;
-use picker::{Llm, PickerError, Role, ScoreOut};
+use picker::{Llm, PickerError, Role, ScoreOut, Usage};
 
 pub mod audio;
 pub mod picker;
@@ -49,6 +49,7 @@ pub struct HighlightReport {
     pub model_calls: usize,
     /// First few failure messages, for diagnosis.
     pub errors: Vec<String>,
+    pub usage: Usage,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -202,6 +203,7 @@ pub fn highlights(
         }
     }
     report.model_calls = calls;
+    report.usage = llm.usage();
     report.scored = by_id.len();
     if by_id.is_empty() {
         return Err(PickerError::Parse(format!(

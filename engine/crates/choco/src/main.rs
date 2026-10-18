@@ -89,30 +89,27 @@ enum ModelsCmd {
 
 #[derive(Clone, Copy, ValueEnum, PartialEq)]
 enum PickerArg {
-    /// BYOK if CHOCO_LLM_API_KEY is set, else Apple on-device.
+    /// The configured provider if CHOCO_LLM_API_KEY is set, else Apple on-device.
     Auto,
-    /// Our hosted service (needs a license key; lands with cloud/).
-    Hosted,
+    /// Any OpenAI-compatible endpoint: CHOCO_LLM_BASE_URL (default OpenCode Zen), CHOCO_LLM_API_KEY, CHOCO_LLM_MODEL, CHOCO_LLM_SUMMARY_MODEL.
+    Provider,
     /// Apple Intelligence on-device model, macOS 26+.
     Apple,
-    /// Any OpenAI-compatible endpoint: CHOCO_LLM_BASE_URL (default OpenCode Zen), CHOCO_LLM_API_KEY, CHOCO_LLM_MODEL.
-    Byok,
 }
 
 fn make_picker(p: PickerArg) -> Result<Box<dyn picker::Llm>> {
     use picker::openai_compat::{OpenAiCompat, OpenAiCompatConfig};
     Ok(match p {
-        PickerArg::Byok => Box::new(OpenAiCompat::new(OpenAiCompatConfig::from_env("byok")?)),
+        PickerArg::Provider => Box::new(OpenAiCompat::new(OpenAiCompatConfig::from_env("provider")?)),
         PickerArg::Apple => {
             if !picker::apple::available() {
                 bail!("Apple Intelligence model is not available on this Mac (needs macOS 26+ with Apple Intelligence enabled)");
             }
             Box::new(picker::apple::AppleLlm)
         }
-        PickerArg::Hosted => bail!("the hosted picker arrives with the cloud service; use --picker byok or --picker apple"),
         PickerArg::Auto => {
             if std::env::var("CHOCO_LLM_API_KEY").is_ok_and(|k| !k.is_empty()) {
-                make_picker(PickerArg::Byok)?
+                make_picker(PickerArg::Provider)?
             } else {
                 make_picker(PickerArg::Apple)?
             }
@@ -241,6 +238,13 @@ fn main() -> Result<()> {
                 llm.tier(), llm.model(picker::Role::Score), report.windows, report.shortlisted, report.scored,
                 report.declined_batches, report.failed_batches, report.model_calls, started.elapsed().as_secs_f64()
             );
+            let u = report.usage;
+            if u.score_input + u.summarize_input > 0 {
+                eprintln!(
+                    "tokens · score {} in / {} out · summarize {} in / {} out",
+                    u.score_input, u.score_output, u.summarize_input, u.summarize_output
+                );
+            }
             let json = serde_json::to_string_pretty(&serde_json::json!({"candidates": cands, "report": report}))?;
             if let Some(out) = out {
                 std::fs::write(&out, &json)?;

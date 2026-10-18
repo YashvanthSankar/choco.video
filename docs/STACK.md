@@ -8,19 +8,19 @@ Canonical list of what we build with and why. Implementation detail is in `TECH.
 | Platforms | macOS 14+ Apple Silicon only (arm64 build, no universal binary); Windows 11 x64; Linux CLI only | Mac is one hardware family, so v1 is testable on one machine. Single-arch builds halve the binary. Windows needs a compatibility matrix. |
 | Engine packaging | Cargo workspace: `choco-engine` (lib), `choco` (CLI), `choco-ffi` (C ABI for shells) | The crate is the open-source unit. The app depends on it exactly as a third party would. |
 | Transcription | Apple SpeechAnalyzer on macOS 26+ (zero download, Swift shim); whisper.cpp via `whisper-rs` elsewhere, quantized turbo ~550 MB downloaded on first run | Same `Transcript` type from both engines. Metal on older Macs, Vulkan on Windows, CPU everywhere. No CUDA builds: hundreds of MB for a minority of machines. |
-| Picker, hosted (default) | `choco-cloud`: a small Rust `axum` service that calls an OpenAI-compatible `/chat/completions` endpoint, OpenCode Zen (`https://opencode.ai/zen/v1`) by default. Cheap model for batch scoring, stronger model for the episode summary and final titles, both set by config | Frontier-class quality with zero download, within a ≤ $0.03 per source hour budget. Transcript text only. Authenticated by license key, fair-use capped. Provider swappable without a release. |
+| Picker, provider (default with a key) | One OpenAI-compatible `/chat/completions` client (`ureq`), OpenCode Zen recommended. Cheap model scores, stronger model summarizes; both user-selectable, pre-filled from the eval | Frontier-class quality with zero download, cents per source hour paid by the user to their provider. No server of ours. |
 | Picker, Apple tier | Foundation Models framework via a small Swift shim behind the `Backend` trait | Zero-download offline option on macOS 26+. Compiled out elsewhere. |
-| Picker, BYOK | Same OpenAI-compatible client in the app, pointed at the user's base URL, key and model | Works with OpenCode, OpenRouter, Groq, DeepSeek, LM Studio, Ollama's server and other compatible endpoints. |
+
 | Picker, local (opt-in) | llama.cpp via `llama-cpp-2`, 4B GGUF Q4 ~2.5 GB | Fully offline on Windows for those who want it. Code compiled in, model downloaded only when chosen. Metal / Vulkan / CPU. |
 | Prompt-mode search | BM25 keyword search over transcript sentences, pure Rust | No embedding model download. Semantic search is a later opt-in. |
 | Face detection / landmarks | `tract` (pure-Rust inference) running YuNet ONNX, ~300 KB model | ~3 MB total instead of 20–40 MB for ONNX Runtime. Identical results on both OSes. Fallback if `tract` lacks an op: a minimal ONNX Runtime build with only the needed ops. |
 | Video decode / encode | Minimal LGPL FFmpeg via `ffmpeg-next`: `--disable-everything` plus an allowlist of the demuxers, decoders, encoders, filters and hwaccels we use; `--disable-gpl --disable-nonfree` | ~6 MB instead of ~60. Hardware encoders on every machine; software fallback is the OS encoder (VideoToolbox software path, Media Foundation H.264), **never libx264 or openh264**. |
 | GPU compose | `wgpu` with only the Metal and DX12 backends compiled | One shader path for crop, scale, blur background, caption blit. Vulkan and GL backends compiled out. |
 | Text rasterization | `cosmic-text` + `swash`, three OFL fonts subset to Latin plus common symbols | Same caption pixels on both OSes. No platform text APIs in the render path. ~1 MB of fonts. |
-| App shell | Tauri 2 + a small TypeScript UI (Svelte or React) | One UI for both OSes, ~10 MB, native webview, tray support, updater, signing helpers. Cap and Handy prove it feels native enough. |
+| App shell | Tauri 2 + Svelte 5 + Vite, TypeScript | Svelte compiles to small vanilla JS with no runtime framework, the smallest UI bundle of the mainstream options. One UI for both OSes, native webview, tray, updater, signing helpers. |
 | Preview playback | Native `<video>` in the webview for rendered proxies; engine generates low-res proxies | Avoids building a custom player. |
 | Updates | Tauri updater with signed manifests | Built in. |
-| Payments / licensing | Lemon Squeezy (merchant of record) | Handles VAT and license keys. Offline validation after activation. |
+| Licensing | MIT for everything | No backend, no license keys. |
 | Signing | Developer ID + `notarytool` on Mac; EV or standard code signing cert on Windows | Required for one-click installs. |
 | CI | GitHub Actions: `macos-15` (arm64) builds, tests, lints and size-checks on every push; `cargo-deny` on licenses. Windows job added at M6 | Mac first; Windows compatibility is kept by design (backend trait) and verified when the port starts, not discovered at port time. |
 | Tests | Rust unit tests + golden set of fixtures + snapshot tests for render frames | Picker quality is measured, not eyeballed. |
@@ -34,7 +34,7 @@ Canonical list of what we build with and why. Implementation detail is in `TECH.
 |---|---|---|
 | Installer (DMG / NSIS) | ≤ 25 MB | CI fails the release job over budget |
 | Installed app, no models | ≤ 50 MB | CI measures `.app` / install dir |
-| First run, current Mac | 0 MB to download | Apple speech + hosted picker |
+| First run, current Mac | 0 MB to download | Apple speech + provider or Apple picker |
 | First run, Windows or older Mac | ~550 MB, one download | quantized Whisper turbo |
 | Fully offline opt-in | +2.5 GB | local picker model, only if chosen |
 
@@ -51,18 +51,18 @@ Release profile: `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `strip =
 | llama.cpp | `llama-cpp-2` (pin at M2) | opt-in `local-llm` feature; `metal` / `vulkan` |
 | Apple speech + Foundation Models | Swift shim in `engine/crates/apple/` | macOS 26+ only, availability-gated |
 | Face inference | `tract-onnx` | pure Rust, no runtime download |
-| Hosted picker | `axum`, `tokio`, `reqwest` | `cloud/`, one container |
+
 | FFmpeg | 7.x LGPL build, `ffmpeg-next` | recipe in `scripts/ffmpeg/`, `--disable-gpl --disable-nonfree` |
 | GPU | `wgpu` (pin at M3) | Metal + DX12 backends only |
 | Text | `cosmic-text`, `swash` | bundled OFL fonts only |
 | CLI | `clap` 4 | derive API |
 | Serialization | `serde`, `serde_json` | all stage types |
 | Hashing | `blake3` | content hashes, cache keys, model checksums |
-| HTTP | `ureq` 3 with `rustls` (app side: model downloads, picker client); `reqwest` only inside `cloud/` | one small sync client in the engine |
+| HTTP | `ureq` 3 with `rustls` | model downloads and the picker client; one small sync client |
 | Secrets | `keyring` | OS keychain for BYOK keys and license grant |
 | Errors | `thiserror`, `anyhow` | per-module / binaries |
-| App | Tauri 2, TypeScript, Vite | Svelte or React, decide at M5 |
-| Payments | Lemon Squeezy | license keys, MoR |
+| App | Tauri 2, Svelte 5, TypeScript, Vite | decided: Svelte for bundle size |
+| Secrets | macOS Keychain via `keyring` | provider key only |
 | CI | GitHub Actions `macos-15` (+ `windows-latest` at M6) | `cargo deny` license gate |
 
 ## Dev prerequisites

@@ -1,9 +1,9 @@
-//! One client for every OpenAI-compatible `/chat/completions` endpoint: OpenCode Zen, our
-//! hosted service (which proxies to it), and any BYOK provider. No vendor SDKs.
+//! One client for every OpenAI-compatible `/chat/completions` endpoint: OpenCode Zen (the
+//! recommended default) or any provider the user configures. No vendor SDKs, no server of ours.
 
-use super::{Llm, PickerError, Result, Role, scores_schema};
+use super::{Llm, PickerError, Result, Role, Usage, scores_schema};
 use serde_json::{Value, json};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 pub const OPENCODE_ZEN_BASE_URL: &str = "https://opencode.ai/zen/v1";
@@ -20,7 +20,7 @@ pub struct OpenAiCompatConfig {
 }
 
 impl OpenAiCompatConfig {
-    /// BYOK from `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`, optional
+    /// Provider config from `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`, optional
     /// `CHOCO_LLM_SUMMARY_MODEL` and `CHOCO_LLM_CONTEXT_TOKENS`.
     pub fn from_env(tier: &'static str) -> Result<Self> {
         let get = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
@@ -43,6 +43,8 @@ pub struct OpenAiCompat {
     agent: ureq::Agent,
     /// Flipped off the first time the provider rejects `json_schema`.
     json_schema_ok: AtomicBool,
+    /// score in, score out, summarize in, summarize out
+    tokens: [AtomicU64; 4],
 }
 
 impl OpenAiCompat {
@@ -52,7 +54,7 @@ impl OpenAiCompat {
             .timeout_global(Some(cfg.timeout))
             .build()
             .into();
-        Self { cfg, agent, json_schema_ok: AtomicBool::new(true) }
+        Self { cfg, agent, json_schema_ok: AtomicBool::new(true), tokens: Default::default() }
     }
 
     fn post(&self, body: &Value) -> Result<(u16, String)> {
@@ -61,6 +63,9 @@ impl OpenAiCompat {
             .agent
             .post(&url)
             .header("Authorization", &format!("Bearer {}", self.cfg.api_key))
+            // OpenCode Zen sits behind Cloudflare, which rejects some default client signatures
+            // (error 1010). Always identify ourselves.
+            .header("User-Agent", concat!("choco-video/", env!("CARGO_PKG_VERSION")))
             .header("Content-Type", "application/json")
             .send(body.to_string().as_bytes())
             .map_err(|e| PickerError::Transport(e.to_string()))?;
@@ -69,7 +74,8 @@ impl OpenAiCompat {
         Ok((status, text))
     }
 
-    fn complete(&self, model: &str, system: &str, user: &str, format: Option<Value>) -> Result<String> {
+    fn complete(&self, role: Role, system: &str, user: &str, format: Option<Value>) -> Result<String> {
+        let model = self.model(role);
         let mut body = json!({
             "model": model,
             "temperature": 0.2,
@@ -83,6 +89,9 @@ impl OpenAiCompat {
             let (status, text) = self.post(&body)?;
             if status == 200 {
                 let v: Value = serde_json::from_str(&text).map_err(|e| PickerError::Transport(format!("bad response JSON: {e}")))?;
+                let base = if role == Role::Score { 0 } else { 2 };
+                self.tokens[base].fetch_add(v["usage"]["prompt_tokens"].as_u64().unwrap_or(0), Ordering::Relaxed);
+                self.tokens[base + 1].fetch_add(v["usage"]["completion_tokens"].as_u64().unwrap_or(0), Ordering::Relaxed);
                 let msg = &v["choices"][0]["message"];
                 if let Some(r) = msg["refusal"].as_str().filter(|r| !r.is_empty()) {
                     return Err(PickerError::Declined(r.to_string()));
@@ -115,21 +124,24 @@ impl Llm for OpenAiCompat {
     fn context_tokens(&self) -> usize {
         self.cfg.context_tokens
     }
+    fn usage(&self) -> Usage {
+        let t = |i: usize| self.tokens[i].load(Ordering::Relaxed);
+        Usage { score_input: t(0), score_output: t(1), summarize_input: t(2), summarize_output: t(3) }
+    }
     fn text(&self, role: Role, system: &str, user: &str) -> Result<String> {
-        self.complete(&self.model(role), system, user, None)
+        self.complete(role, system, user, None)
     }
     fn scores_json(&self, system: &str, user: &str) -> Result<String> {
-        let model = self.model(Role::Score);
         if self.json_schema_ok.load(Ordering::Relaxed) {
             let fmt = json!({"type": "json_schema", "json_schema": {"name": "scores", "strict": true, "schema": scores_schema()}});
-            match self.complete(&model, system, user, Some(fmt)) {
+            match self.complete(Role::Score, system, user, Some(fmt)) {
                 Err(PickerError::Http { status: 400 | 422, body }) if body.contains("response_format") || body.contains("json_schema") => {
                     self.json_schema_ok.store(false, Ordering::Relaxed);
                 }
                 other => return other,
             }
         }
-        self.complete(&model, system, user, Some(json!({"type": "json_object"})))
+        self.complete(Role::Score, system, user, Some(json!({"type": "json_object"})))
     }
 }
 
@@ -173,7 +185,7 @@ mod tests {
 
     fn client(base: String) -> OpenAiCompat {
         OpenAiCompat::new(OpenAiCompatConfig {
-            tier: "byok",
+            tier: "provider",
             base_url: base,
             api_key: "k".into(),
             score_model: "cheap".into(),
@@ -184,7 +196,7 @@ mod tests {
     }
 
     fn ok(content: &str) -> (u16, String) {
-        (200, json!({"choices": [{"message": {"role": "assistant", "content": content}}]}).to_string())
+        (200, json!({"choices": [{"message": {"role": "assistant", "content": content}}], "usage": {"prompt_tokens": 10, "completion_tokens": 3}}).to_string())
     }
 
     #[test]
@@ -193,6 +205,7 @@ mod tests {
         let c = client(base);
         assert_eq!(c.scores_json("sys", "user").unwrap(), "{\"scores\":[]}");
         assert_eq!(c.text(Role::Summarize, "sys", "user").unwrap(), "a summary");
+        assert_eq!(c.usage(), Usage { score_input: 10, score_output: 3, summarize_input: 10, summarize_output: 3 });
         let reqs = seen.lock().unwrap();
         let first: Value = serde_json::from_str(&reqs[0]).unwrap();
         assert_eq!(first["model"], "cheap");

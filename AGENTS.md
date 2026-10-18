@@ -4,14 +4,14 @@ You are the development agent for choco.video. This file is your long-term memor
 
 ## What this project is
 
-A small desktop app (~20 MB installer), Mac first then Windows, that turns long videos into ranked, captioned, speaker-centered 9:16 shorts. Video is processed on-device; the highlight picker runs on a hosted frontier model by default with offline fallbacks. Open-source Rust engine (MIT), a paid Tauri app, and a tiny private cloud service for the picker. Competes with Opus Clip and Vizard on "no credits, your video stays local, one-time price". Full context: `docs/PLAN.md`. Competitors and why we win: `docs/COMPETITORS.md`.
+A small, fully open-source desktop app (~20 MB installer), Mac first then Windows, that turns long videos into ranked, captioned, speaker-centered 9:16 shorts. Video is processed on-device. The highlight picker runs on the user's own OpenAI-compatible provider (OpenCode Zen recommended at onboarding) or Apple's on-device model. There is no backend: no server, no accounts, no license keys. Competes with Opus Clip and Vizard on "no credits, your video stays local, no subscription to us". Full context: `docs/PLAN.md`. Competitors and why we win: `docs/COMPETITORS.md`.
 
 ## Non-negotiables
 
 1. **Mac first, Windows after the Mac app ships.** Do no Windows work (builds, CI, testing, Windows-only code) before M6. Still keep platform-specific code only in `engine/crates/choco-engine/src/backend/`.
 2. **No GPL anywhere in the engine or app.** FFmpeg is LGPL-only (`--disable-gpl`), dynamically linked. No libx264, no libx265. `cargo deny` enforces the allowlist; do not edit `deny.toml` to make a failure go away. Never copy code from SupoClip, ViralCutter, HotClip, or any GPL/AGPL project.
 3. **No Python, no Node at runtime.** The shipped app is Rust + a webview. Dev scripts may use anything.
-4. **Video and audio never leave the machine.** Only transcript text may be sent anywhere, and only to the picker: our `cloud/` service, or the user's own OpenAI-compatible endpoint. The cloud service never logs transcripts. Never add telemetry, analytics, or other network calls without an explicit opt-in setting and a line in this file.
+4. **Video and audio never leave the machine.** Only transcript text may be sent anywhere, and only to the picker provider the user configured. We run no server and receive nothing. Never add telemetry, analytics, or other network calls without an explicit opt-in setting and a line in this file.
 4b. **Small by default.** Installer ≤ 25 MB, installed app ≤ 50 MB without models, enforced in CI. Nothing heavy ships in the installer; models are runtime downloads and the default path on a current Mac downloads nothing. Prefer pure-Rust crates (`tract`, `cosmic-text`) over C runtimes when output is identical. A dependency over 2 MB compiled needs a Decisions entry. Never trade output quality for size; trade where the model runs.
 5. **Stages are pure functions over serde types.** No globals, no stage reading another stage's cache. `pipeline/` owns caching and orchestration.
 6. **The optional local picker and the renderer never run concurrently.** Unload the model before rendering. The default tiers have no in-process LLM. Target machine has 16–18 GB.
@@ -20,9 +20,9 @@ A small desktop app (~20 MB installer), Mac first then Windows, that turns long 
 
 ## Stack at a glance
 
-Rust 2024 workspace in `engine/`. Apple SpeechAnalyzer (macOS 26+) or `whisper-rs` for transcription, `tract` + YuNet for faces, minimal LGPL `ffmpeg-next` for decode/encode/mux, `wgpu` (Metal + DX12 only) for compositing, `cosmic-text` + `swash` for captions, BM25 for prompt search, `clap` CLI, `cbindgen` FFI, optional `llama-cpp-2` behind `local-llm`. App in `app/` is Tauri 2 with a small TypeScript UI. `cloud/` is an `axum` service for the hosted picker. Payments and license keys via Lemon Squeezy. Details and rationale: `docs/STACK.md`, `docs/TECH.md`.
+Rust 2024 workspace in `engine/`. Apple SpeechAnalyzer (macOS 26+) or `whisper-rs` for transcription, `tract` + YuNet for faces, minimal LGPL `ffmpeg-next` for decode/encode/mux, `wgpu` (Metal + DX12 only) for compositing, `cosmic-text` + `swash` for captions, BM25 for prompt search, `ureq` for the picker client and model downloads, `clap` CLI, `cbindgen` FFI, optional `llama-cpp-2` behind `local-llm`. App in `app/` is Tauri 2 with a Svelte UI. Everything MIT. Details and rationale: `docs/STACK.md`, `docs/TECH.md`.
 
-Picker ladder: hosted (default; our `cloud/` service calls an OpenAI-compatible provider, OpenCode Zen first, via one client configured by `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`; license-key auth; 50 source hours/month fair use), Apple Foundation Models (macOS 26+, offline), BYOK (the user's own OpenAI-compatible base URL, key and model), local 4B GGUF (opt-in ~2.5 GB download). No Anthropic SDK or Anthropic-specific API anywhere in the product. Structured JSON on every tier. Transcript text only, always.
+Picker tiers, chosen at onboarding: **provider** (any OpenAI-compatible `/chat/completions` endpoint; OpenCode Zen `https://opencode.ai/zen/v1` is the recommended default; key in the macOS Keychain; scoring and summary models selectable, pre-filled with the eval's picks), **apple** (Apple Intelligence on-device, macOS 26+, zero setup), **local** (opt-in 4B GGUF, ~2.5 GB, fully offline). CLI reads `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`, `CHOCO_LLM_SUMMARY_MODEL`. Structured JSON on every tier. Transcript text only, always.
 
 ## Dev machine
 
@@ -56,7 +56,7 @@ cd ../app && npm install && npm run tauri dev
 - Timestamps are `u64` milliseconds everywhere. Never floats for time.
 - Options structs derive `Hash` so the pipeline cache can key on them.
 - Tests next to code in `#[cfg(test)]`; fixtures-based tests under `tests/`. Snapshot references under `tests/snapshots/`, updated only with a commit message that says why.
-- Prompts are markdown files under `highlights/picker/prompts/`, versioned by filename, shared with `cloud/`. Never inline prompt text in Rust.
+- Prompts are markdown files under `highlights/picker/prompts/`, versioned by filename. Never inline prompt text in Rust.
 - Commit messages: `stage: what changed` (`transcribe: filter repeated 4-grams`). Small commits.
 - Do not add dependencies without checking the license and noting it in the PR or commit body.
 
@@ -68,7 +68,7 @@ cd ../app && npm install && npm run tauri dev
 | 2026-10-18 | Name: choco.video | User's choice. |
 | 2026-10-18 | Engine in Rust, not Swift | Windows is a requirement. Swift/AVFoundation would have meant a full rewrite. Rust + Tauri is the proven path (Handy, Cap). |
 | 2026-10-18 | Mac first, Windows at M6 | One hardware family to test on; creators on Mac pay for polished tools; Windows hardware variance needs its own beta. |
-| 2026-10-18 | Engine MIT public, app proprietary private | Open core model as VoiceInk, Cap, Cal.com. Stars are marketing; the paid binary is the business. |
+| 2026-10-18 | ~~Engine MIT public, app proprietary private~~ superseded 2026-10-18: everything is open source (see below) | Kept for history. |
 | 2026-10-18 | FFmpeg LGPL dynamic, no GPL codecs | Proprietary app compatibility. Hardware encoders cover quality. |
 | 2026-10-18 | YuNet ONNX for faces instead of Apple Vision | Identical results on both OSes. Vision stays an optional Mac backend only if measurably better. |
 | 2026-10-18 | Captions rasterized with cosmic-text, not platform text APIs | Pixel-identical output across OSes; snapshot tests depend on it. |
@@ -77,12 +77,13 @@ cd ../app && npm install && npm run tauri dev
 | 2026-10-18 | Adopt parity features from chopify, Klipzy, AutoClip, OpenClip Studio (complete-thought clips, multi-aspect, SRT/VTT, poster+meta, loudnorm, audio-energy prior); skip SFX, AI chat, B-roll | Cheap, expected, removes objections. See `docs/COMPETITORS.md §5–6`. |
 | 2026-10-18 | Never read SupoClip, ViralCutter, HotClip source for implementation | Copyleft. Feature lists only. |
 | 2026-10-18 | Small-app principle: ~20 MB installer, no bundled models, zero download on current Macs | User requirement. "All local" would mean multi-GB downloads for worse picks. |
-| 2026-10-18 | Picker default is hosted (our `cloud/` service), included in the one-time price with a 50 h/month fair-use cap; Apple on-device, BYOK and an opt-in local 4B model are the fallbacks | Best quality with zero download; cents per source hour; keeps the "no credits" promise; offline paths still exist. |
+| 2026-10-18 | ~~Picker default is hosted (our `cloud/` service) with a fair-use cap~~ superseded below | Kept for history. |
 | 2026-10-18 | Transcription via Apple SpeechAnalyzer on macOS 26+, whisper.cpp quantized turbo elsewhere | Zero download on Mac; same `Transcript` type either way; golden set decides per-language fallbacks. |
 | 2026-10-18 | `tract` instead of ONNX Runtime for YuNet; minimal FFmpeg allowlist build; `wgpu` Metal+DX12 only; no CUDA; arm64-only Mac; OS software encoders as fallback, no openh264 | Each is a size cut with identical output. openh264 also carries patent exposure. |
 | 2026-10-18 | BM25 keyword search for prompt mode in v1, no embedding model | Avoids a model download; semantic search becomes an opt-in later. |
 | 2026-10-18 | ~~Hosted picker on Anthropic (Haiku scores, Opus titles)~~ superseded below | Kept for history: the cost reasoning still applies. A frontier model for every call would cost ≈ $0.26 per source hour, too much for a one-time price. Score with a cheap model, title with a strong one. |
-| 2026-10-18 | Picker providers are OpenAI-compatible only: OpenCode Zen (`https://opencode.ai/zen/v1`) for the hosted service, any compatible endpoint for BYOK. One `/chat/completions` client, configured by `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`. Cheap model scores batches, stronger model writes the summary and final titles; both picked by golden-set eval within a ≤ $0.03 per source hour budget | User decision: no Anthropic. OpenAI-compatible is the common denominator across OpenCode, OpenRouter, Groq, DeepSeek, local servers. |
+| 2026-10-18 | Picker providers are OpenAI-compatible only, via one `/chat/completions` client. No Anthropic SDK or API | User decision. OpenAI-compatible is the common denominator across OpenCode, OpenRouter, Groq, DeepSeek and local servers. |
+| 2026-10-18 | No backend. Client-only app; users bring their own provider key at onboarding (OpenCode Zen recommended) and pick models from our eval-backed defaults; Apple on-device needs no key. Whole project open source (MIT); no license keys, no watermark trial, no Lemon Squeezy | User decision ("client only, open source"). No server to run or secure, no inference cost on us, smaller scope, nothing hidden from users. Revenue model is an open question that does not block building. |
 | 2026-10-18 | Mac only until the Mac app ships; all Windows work (CI job, FFmpeg, backend, testing) moves to M6 | User decision: finish Mac first. Platform code stays behind `backend/` so the port remains a backend-and-shell job. |
 | 2026-10-18 | Marketing says "no credits", never "unlimited" | There is a 50 h/month fair-use cap. |
 
@@ -98,13 +99,13 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
 | 2026-10-18 | Word-start error vs synthesized ground truth (62 words, `fixtures/timing.py`) | Apple: median 103 ms, bias −100 ms, 49% within 100 ms. Whisper turbo-q5 token times: median 256 ms, bias −232 ms, 11% within 100 ms | Both early. Captions need ≤ 50 ms; fix in M3 (DTW, offset calibration) |
-| — | Picker on 300 candidates, hosted tier, wall time and tokens | not measured | M2 target |
+| — | Picker on the 72-min podcast per OpenCode model: wall time, tokens, cost per source hour | in progress | M2 |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
 | — | Render 60 s clip 1080x1920, VideoToolbox | not measured | M3 target |
-| — | Golden set precision@5, hosted picker (scoring model) | not measured | M2 baseline, the default tier |
+| — | Golden set precision@5, provider tier (recommended scoring model) | not measured | M2 baseline |
 | — | Golden set precision@5 and cost per source hour, candidate scoring models on OpenCode Zen | not measured | M2; pick the cheapest model within 2 points of the best |
 | — | Golden set precision@5, apple and local tiers | not measured | M2 |
-| — | Hosted cost per source hour, measured tokens × price | not measured | M2; budget ≤ $0.03 |
+| — | Provider cost per source hour, measured tokens × OpenCode Zen price | not measured | M2; recommended default must be ≤ $0.03 |
 
 ## Known traps
 
@@ -115,21 +116,23 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 - whisper turbo-q5 falls into hallucination loops on real conversation (measured: one 8-word sentence 174 times in a row, real speech under it lost). `cleanup` collapses periods up to 16 words; the lost speech is not recovered. Apple speech had no such loops on the same file.
 - Both speech engines stamp words early (Apple ~100 ms, whisper token times ~230 ms). Do not drive caption highlights from raw times until M3's timing fix lands; measure with `fixtures/timing.py`.
 - AVSpeechSynthesizer word-marker offsets restart at each internal synthesis chunk (an empty buffer marks it). `fixtures/say_aligned.swift` rebases them; keep that if you touch it.
+- OpenCode Zen is behind Cloudflare and returns HTTP 403 "error code: 1010" to some default client user agents (Python urllib, measured). The client always sends `User-Agent: choco-video/<version>`; keep it.
+- Apple's default guardrails decline podcast batches about war, ethics or health as "sensitive content" (5–7 of 15 batches on the 72-min podcast). The helper retries declined batches as plain text under `.permissiveContentTransformations`, which fixed all declines in that run.
 - Phone footage carries a rotation tag. Probe must apply it or faces will be detected sideways.
 - `wgpu` readback is the slow path. Prefer handing textures to the encoder when the backend supports it.
 
 ## What not to do
 
 - Do not switch the engine language, the UI framework, or the license model. These were decided with reasons above.
-- Do not add a cloud-only feature. Everything must work offline except picker scoring (hosted or BYOK), and even that has the Apple and local offline tiers.
+- Do not add a cloud-only feature or any server of ours. Everything works offline except picker scoring on a remote provider, and the Apple and local tiers cover offline.
 - Do not use Apple-only APIs outside `backend/mac.rs` and the `apple-fm` shim.
 - Do not "quickly" use libx264 to get a render working. Use the hardware encoder or the LGPL fallback.
 - Do not inline prompts, bump `deny.toml`, or skip the eval to make progress look faster.
 - Do not start the Windows UI before the Mac app has shipped.
 - Do not install Ollama, Python, or system ffmpeg as a runtime dependency to "get it working". Competitors did; that is why they have no users.
 - Do not bundle a model in the installer, add ONNX Runtime, CUDA, a universal binary, or a general FFmpeg build. Each one blows the size budget for no output gain.
-- Do not log, store, or forward transcript text in `cloud/` beyond the single scoring request. Usage counters only.
-- Do not let the hosted picker become a dependency for anything but scoring. Transcription, reframe, captions and render must keep working offline.
+- Never write the user's provider key to disk outside the Keychain, to logs, to project files, or to git. The CLI reads it from the environment only.
+- Do not let the picker become a dependency for anything but scoring. Transcription, reframe, captions and render must keep working with no provider configured.
 
 ## Status
 

@@ -92,7 +92,7 @@ pub struct Candidate {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PickerProvenance {
-    /// "hosted", "apple", "byok" or "local".
+    /// "provider", "apple" or "local".
     pub tier: String,
     pub model: String,
     /// blake3 of the prompt file contents used.

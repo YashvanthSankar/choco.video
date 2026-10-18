@@ -40,7 +40,7 @@ engine/
 ```
 
 Feature flags on `choco-engine`:
-- `apple-speech` (macOS 26+ SpeechAnalyzer transcriber, default on macOS), `whisper` (whisper.cpp, default on Windows, optional on macOS), `metal` / `vulkan` (whisper and local-llm acceleration), `apple-fm` (Foundation Models picker, macOS 26+), `cloud` (hosted picker client and BYOK, pulls `reqwest`, default), `local-llm` (llama.cpp picker, opt-in build feature; the model is a runtime download).
+- `apple-speech` (macOS 26+ SpeechAnalyzer transcriber, default on macOS), `whisper` (whisper.cpp, default on Windows, optional on macOS), `metal` / `vulkan` (whisper and local-llm acceleration), `apple-fm` (Foundation Models picker, macOS 26+), `cloud` was planned for a hosted client and is not needed: the provider client uses `ureq`, always compiled, `local-llm` (llama.cpp picker, opt-in build feature; the model is a runtime download).
 
 ## 2. Core types (`model/`)
 
@@ -158,13 +158,13 @@ Windows specifics: whisper on Vulkan (NVIDIA, AMD, Intel) or CPU. D3D11VA decode
 - Dedupe by token-set Jaccard rather than embeddings.
 
 ### 6.3 Scoring (`picker/`)
-- `trait Picker { fn score(&self, ctx: &EpisodeContext, batch: &[CandidateText]) -> Result<Vec<Score>> }` with four impls: `Hosted` (default), `AppleFoundation` (feature `apple-fm`), `Byok` (feature `cloud`), `LocalLlama` (feature `local-llm`).
+- `trait Llm` (`picker/mod.rs`) with two calls, plain text and scores JSON; batching, map-reduce summaries for small contexts, strict parsing, key repair, retries and re-asking for skipped ids are shared. Backends: `OpenAiCompat` (provider tier), `AppleLlm` (feature `apple-fm` via the helper), `LocalLlama` (feature `local-llm`).
 - `EpisodeContext` = a 300-word summary of the whole transcript (generated once by the same picker) + title + speaker count. Sent with every batch so scores are relative to the episode, not absolute.
 - Batches of 8 candidates. Output schema:
   ```json
   {"scores":[{"id":"c17","score":82,"reasons":["strong hook","complete story"],"title":"...","description":"...","hashtags":["..."]}]}
   ```
-- `Hosted`: `POST https://api.choco.video/v1/score` with the license key as bearer token. The cloud service forwards to its configured OpenAI-compatible provider. It lives in `cloud/` and shares the prompt files and schema types with the engine by depending on `choco-engine`. Retry on 429/5xx with backoff; on repeated failure, fall back to `AppleFoundation` on Mac or tell the user, never silently degrade.
+
 - `Byok` / shared client (`picker/openai_compat.rs`): `POST {base_url}/chat/completions` with `Authorization: Bearer {key}`, `model`, `messages` (system prompt from the prompt file, user content = episode context + candidate batch), `temperature: 0.2`, and `response_format: {type: "json_schema", json_schema: {name, strict: true, schema}}`. If the provider rejects `json_schema` (HTTP 400 naming `response_format`), retry once with `{type: "json_object"}` and remember that per base URL. Always strict-parse; on parse failure retry once with the parse error appended. Configured by `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL` (CLI and dev) or Settings (app; key in the OS keychain via `keyring`). No vendor SDKs.
 - `AppleFoundation`: Swift shim exposing a C function, prompt in, JSON out. Guided generation where available, else strict parse plus one retry. macOS 26+ only, zero download.
 - `LocalLlama`: GBNF grammar from the schema. Default model a 4B instruct at Q4_K_M (~2.5 GB), chosen on the golden set between Qwen3-4B and Gemma-3-4B class models. Context 8k, temperature 0.2. Build feature `local-llm`; the model is a runtime download the user explicitly chooses.
@@ -254,7 +254,7 @@ Output JSON with `--json` for scripting. Progress on stderr.
 - `src/`: TypeScript UI. Screens: Drop/Queue, Processing, Review (grid + clip editor), Settings, First-run. State in a small store; everything persisted is in `project.json` or app settings, not in the webview.
 - Preview: `<video>` playing the 540p proxy with `currentTime` driven by the clip range; caption overlay drawn by the UI from `CaptionTrack` for live style preview, final pixels come from the engine.
 - Tray / menubar: queue status, open last export folder.
-- Licensing: Lemon Squeezy license key activation over HTTPS once, signed grant stored locally, validated offline thereafter. Grace period 14 days if revalidation fails.
+- No licensing code: open source, no keys, no watermark.
 - Updater: Tauri updater, signed manifests, separate channels `stable` and `beta`.
 - Packaging: Mac `.dmg` Developer ID signed and notarized; Windows `.msi` or NSIS signed. Bundle FFmpeg LGPL dynamic libs beside the binary on both.
 
@@ -269,26 +269,18 @@ Output JSON with `--json` for scripting. Progress on stderr.
 
 - `engine.yml`: `macos-15` (arm64) now; `windows-latest` added at M6. Steps: cache FFmpeg prebuilt, `cargo build --all --release`, `cargo test --all`, `cargo deny check`, `cargo clippy -- -D warnings`, snapshot render tests on the synthetic fixtures (no model downloads in CI; tests that need models are `#[ignore]` and run locally), `cargo bloat --release -n 20` output as a job summary.
 - `app.yml`: builds the Tauri app on both, unsigned, on tags only. Measures installer and installed size and **fails over the budget** in `STACK.md`.
-- `cloud.yml`: builds and tests `cloud/`, deploys on tags.
+
 
 ## 17. Milestone definitions of done
 
 - **M1 Engine skeleton (wk 1–2):** workspace builds on both OSes in CI. `choco probe`, `choco transcribe` work on Mac via Apple speech and via whisper, same `Transcript`. `choco doctor` reports backend. Minimal FFmpeg LGPL build recipe pinned and its size recorded. Release profile set.
-- **M2 Picker (wk 3–4):** `choco highlights` with the hosted tier against a deployed `cloud/` service, plus BYOK and Apple tiers. Golden set built. Eval runner reports a baseline per tier. Prompt mode works. Local tier compiles but is not yet tuned.
+- **M2 Picker (wk 3–4):** `choco highlights` on the provider tier (OpenCode Zen) and the Apple tier against real long-form fixtures; models chosen by golden-set precision and measured cost; eval runner reports a baseline per model. Local tier compiles but is not yet tuned.
 - **M3 Captions + render (wk 5–6):** `choco render` produces a 1080x1920 clip with `Static` crop and `bold` captions, hardware encoded, snapshot tests green on both OSes.
 - **M4 Reframe (wk 7–8):** `Single` and `Split` layouts with tracking and smoothing. Side-by-side with Opus Clip on three fixtures looks as good or better.
 - **M5 Mac app (wk 9–10):** Tauri app with drop, processing, review, export, settings, first-run model download, licensing, updater. Signed and notarized DMG. Landing page and demo video. Launch.
 - **M6 Windows (wk 11–14):** Windows backend validated on NVIDIA, AMD, Intel, and CPU-only. Signed installer. Beta, then launch.
-- **M7 Post-launch (wk 15+):** diarization, YouTube ingest, more styles, hosted option research.
+- **M7 Post-launch (wk 15+):** diarization, YouTube ingest, more styles, revenue model.
 
-## 18. Cloud service (`cloud/`, private)
+## 18. No backend
 
-The hosted picker. Deliberately tiny so it never becomes the product.
-
-- **Stack:** Rust, `axum`, `tokio`, `reqwest`. Depends on `choco-engine` for the prompt files, the JSON schema and the `Score` types, so the app and the service can never drift.
-- **Endpoints:** `POST /v1/score` (episode context + batch of candidate texts → scores), `POST /v1/summarize` (transcript → 300-word episode context), `POST /v1/title` (chosen clips → final titles, descriptions, hashtags), `GET /v1/quota` (remaining fair-use for this key). All JSON, all authenticated with the Lemon Squeezy license key as a bearer token, validated against the Lemon Squeezy API with a short cache.
-- **Model call:** the same OpenAI-compatible client as the app, pointed at OpenCode Zen (`https://opencode.ai/zen/v1`). `/v1/score` uses the scoring model; `/v1/summarize` and `/v1/title` use the titling model. Models are config, not code, and are chosen by the golden-set eval and measured cost. Prefer models served on Zen's `/chat/completions` path (DeepSeek, GLM, Kimi, MiniMax families); models Zen serves only on other API shapes are out unless the client grows support. Reuse the episode context prefix across batches so providers with prefix caching bill it once.
-- **What it stores:** per-key usage counters (source minutes this month) and nothing else. No transcripts are logged or retained. Request bodies are not written to disk. This is stated on the website and in the app.
-- **Limits:** 50 source hours per key per month by default, 429 with a clear message over that. Per-key rate limit of 10 requests per second. Body size cap of 2 MB.
-- **Deploy:** one container on a small host, two regions later. Health endpoint. Tags from `cloud.yml` deploy automatically.
-- **Failure behaviour in the app:** on 5xx or timeout, retry three times with backoff, then offer the Apple tier on Mac or BYOK, and say exactly what happened. Never block the rest of the pipeline; transcription, reframe and render keep working offline.
+There is no server. The picker calls the provider the user configured, directly from the app. Earlier drafts had a hosted proxy (`cloud/`); it was dropped on 2026-10-18 (see `AGENTS.md` Decisions).

@@ -32,18 +32,18 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [x] Audio energy + pause features (loudness z-score, spikes per minute, pause ratio, longest pause) from the 16 kHz wav → fixed a silence-threshold bug that counted speech as silence when silence is rare
 - [x] `highlights/search.rs` shortlist: quality prior (pace, hook words, questions, numbers, length, weak openers, audio), BM25 prompt mode with synonym and inflection expansion, near-duplicate removal. No embedding model
 - [~] `highlights/picker/openai_compat.rs`: one `/chat/completions` client (ureq), `json_schema` → `json_object` fallback remembered per client, 429/5xx backoff, refusal handling, `<think>` and code-fence stripping → 3 tests against a local mock server; **not yet run against OpenCode Zen (needs a key)**
-- [~] `highlights/picker/` `Llm` trait with shared batching, map-reduce summary for small contexts, strict parse + one retry, re-ask for skipped ids → end-to-end test with a fake model passes. Apple tier works on the real 72-min podcast; `Byok` wired; `Hosted` waits for `cloud/`
+- [~] `highlights/picker/` `Llm` trait with shared batching, map-reduce summary for small contexts, strict parse + key repair + one retry, re-ask for skipped ids → fake-model end-to-end test passes; Apple tier: 48/60 scored, 0 declined after the guardrail fix; provider tier running against OpenCode Zen
 - [ ] Pick the scoring and titling models on OpenCode Zen by golden-set precision@5 and measured cost per source hour (budget ≤ $0.03); record both in `AGENTS.md`
 - [x] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hash (blake3, 16 hex) on every candidate
-- [ ] `cloud/`: axum service with `/v1/score`, `/v1/summarize`, `/v1/title`, `/v1/quota`; license-key auth against Lemon Squeezy; per-key usage counter; OpenAI-compatible provider (OpenCode Zen) via config; no transcript logging; Dockerfile; deployed to one small host; `cloud.yml`
+- [x] ~~`cloud/` hosted service~~ dropped: no backend (decision 2026-10-18). Provider tier calls the user's endpoint directly
 - [x] `rank.rs` overlap suppression (> 40% of the shorter clip), same-content suppression, score floor 55, `--n` is a max
-- [x] `choco highlights` with `--n`, `--prompt`, `--picker auto|apple|byok|hosted`, `--min-score`, `--transcript` reuse, `-o` JSON with a diagnostic report
+- [x] `choco highlights` with `--n`, `--prompt`, `--picker auto|apple|provider`, `--min-score`, `--transcript` reuse, `-o` JSON with a diagnostic report and token usage
 - [~] Apple on-device tier on the real podcast → 10 sensible clips in ~5 min, but Apple's default guardrails declined 5–7 of 15 batches as "sensitive content" (false positives on ethics/war talk). Fix in progress: retry declined batches under the permissive content-transformation guardrails. Calibration is loose (a clip with "weak hook, low energy" reasons scored 68); revisit with the eval
 - [ ] Golden set: 10 fixtures, 5–8 human-picked ranges each, in `eval/golden.json`
 - [ ] `choco eval` runner, baseline numbers per tier recorded in `AGENTS.md` Benchmarks
 - [ ] Compare Apple speech vs whisper on the golden set per language; decide per-language fallback list
 - [ ] `LocalLlama` behind `local-llm` feature with GBNF grammar; pick the default 4B model (Qwen3-4B vs Gemma-3-4B class) by eval and speed; model is opt-in download only
-- [ ] BYOK settings (base URL, key, model) with the key in the OS keychain via `keyring`; Settings copy that states "transcript text only" next to every picker option
+- [ ] Provider settings (base URL, key, scoring model, summary model, test button) with the key in the macOS Keychain via `keyring`; "transcript text only" stated next to the picker setting
 
 ## M3 Captions + render (weeks 5–6)
 
@@ -79,7 +79,7 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [ ] Screens: Drop/Queue, Processing, Review grid, Clip editor (trim, layout, style, transcript edit, reject), Settings, First-run
 - [ ] Proxy generation on import; `<video>` preview with caption overlay rendered by the engine's own rasterizer so preview and export match
 - [ ] Tray item with queue status
-- [ ] Licensing: Lemon Squeezy activation, offline grant, 14-day grace, watermark toggle; the same key authenticates the hosted picker
+- [ ] Onboarding: welcome + privacy line; picker choice (OpenCode Zen with key test and pre-selected models showing cost per source hour / other OpenAI-compatible provider with base URL, key and model list from `/models` / Apple on-device); speech setup (nothing on macOS 26+, else Whisper download with progress)
 - [ ] First-run flow: on macOS 26+ nothing to download; elsewhere one Whisper download with progress; picker tier explained in one sentence
 - [ ] Size budget check wired into `app.yml`; installer and installed size recorded in `AGENTS.md` Benchmarks
 - [ ] Updater with signed manifests, `stable` and `beta` channels
@@ -118,7 +118,7 @@ Nothing here starts before the Mac app ships. Groundwork already prepared: `back
 - [ ] YouTube ingest via optional `yt-dlp` download
 - [ ] More caption styles from community PRs
 - [ ] Audiogram mode for audio-only input
-- [ ] Hosted version research, only if v1 has paying users
+- [ ] Revenue model decision (paid signed build, App Store, sponsorship, or hosted tier), only after the Mac app has users
 
 ## Done
 
