@@ -14,6 +14,17 @@
   let ok = $state<boolean | null>(null);
 
   const appleReady = $derived(!!status.apple?.llm_available);
+  const SIRI_SETTINGS = "x-apple.systempreferences:com.apple.Siri-Settings.extension";
+  // Turn the helper's availability string into one instruction the user can act on.
+  const appleHint = $derived.by((): { text: string; settings: boolean } => {
+    const s = status.apple?.llm_status ?? "";
+    const os = status.apple?.os ?? "";
+    if (!status.apple || s.includes("needs macOS 26")) return { text: `Needs macOS 26 or later${os ? `; this Mac runs ${os}` : ""}.`, settings: false };
+    if (s.includes("appleIntelligenceNotEnabled")) return { text: "Turn on Apple Intelligence in System Settings, then reopen choco.video.", settings: true };
+    if (s.includes("modelNotReady")) return { text: "Apple Intelligence is still downloading its model. Try again in a few minutes.", settings: true };
+    if (s.includes("deviceNotEligible")) return { text: "This Mac does not support Apple Intelligence. Use a key instead.", settings: false };
+    return { text: "Apple's on-device model is not available on this Mac right now.", settings: false };
+  });
   const rec = $derived(status.recommended);
   const recIds = $derived(new Set(rec.map((r) => r.id)));
   const ordered = $derived([...rec.map((r) => r.id).filter((id) => models.length === 0 || models.includes(id)), ...models.filter((m) => !recIds.has(m))]);
@@ -90,10 +101,16 @@
   <button class="option" class:selected={settings.provider.kind === "apple"} disabled={!appleReady} onclick={() => choose("apple")}>
     <strong>Apple on-device</strong> <span class="pill">no key</span>
     <span class="small muted">
-      {appleReady ? "Free and offline. Slower, and picks are weaker than a hosted model." : "Needs macOS 26 with Apple Intelligence turned on."}
+      {appleReady ? "Free and offline. Slower, and picks are weaker than a hosted model." : appleHint.text}
     </span>
   </button>
 </div>
+{#if !appleReady && appleHint.settings}
+  <p class="small muted hint">
+    No key yet? Apple's free picker works once Apple Intelligence is on.
+    <button class="link" onclick={() => openUrl(SIRI_SETTINGS).catch(() => {})}>Open Apple Intelligence settings</button>
+  </p>
+{/if}
 
 {#if settings.provider.kind !== "apple"}
   <div class="card setup">
@@ -142,6 +159,8 @@
 {/if}
 
 <style>
+  .hint { margin: 10px 2px 0; }
+  .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
   .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
   .option { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 14px; border-radius: var(--radius); background: var(--panel); }
   .option.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }

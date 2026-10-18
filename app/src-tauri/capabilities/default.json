@@ -10,7 +10,7 @@
     "opener:allow-open-path",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://opencode.ai/*" }, { "url": "https://github.com/*" }]
+      "allow": [{ "url": "https://opencode.ai/*" }, { "url": "https://github.com/*" }, { "url": "x-apple.systempreferences:*" }]
     }
   ]
 }

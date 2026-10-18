@@ -148,31 +148,31 @@ Windows specifics: whisper on Vulkan (NVIDIA, AMD, Intel) or CPU. D3D11VA decode
 ## 6. Highlights (`highlights/`)
 
 ### 6.1 Candidate generation (`windows.rs`)
-- Walk segments. Start a window at each segment start. Extend until 15–90 s, ending on a sentence boundary followed by a gap ≥ 300 ms. Produce overlapping windows with a 50% stride.
+- Walk segments. A window starts where the previous segment closed a thought (sentence punctuation, or a pause ≥ 700 ms) and ends on one; 15–90 s; one window per reached target length (15/30/45/60 s) per start. Dead air, sparse speech and disfluency-only openings are dropped.
 - Cheap pre-filters: drop windows with > 25% silence, drop windows with < 20 words, drop windows whose first 3 s are filler.
 - Typical 60-minute episode yields 200–400 candidates before scoring.
 
 ### 6.2 Shortlist (`search.rs`)
-- Default mode: keep the top 60 candidates by a quality prior (word rate, question marks, numbers, named entities, laughter markers, audio energy and pause features from the 16 kHz wav).
-- Prompt mode: BM25 over candidate text with the user prompt as the query, keep the top 60. Pure Rust, no model. Synonym expansion from a small built-in list. Semantic search with a downloadable embedding model is a later opt-in, not v1.
+- Default mode: keep the top 80 candidates by a quality prior (word rate, question marks, numbers, laughter markers, audio energy and pause features from the 16 kHz wav), with at most 20% overlap between kept windows. Measured: this lets 93% of golden clips reach the model (60 @ 85% overlap reached 47%).
+- Prompt mode: BM25 over candidate text with the user prompt as the query; only windows with a match are candidates, the prior breaks ties, and no match means no model call. Stop words are never query terms. Pure Rust, no model. Synonym expansion from a small built-in list. Semantic search with a downloadable embedding model is a later opt-in, not v1.
 - Dedupe by token-set Jaccard rather than embeddings.
 
 ### 6.3 Scoring (`picker/`)
 - `trait Llm` (`picker/mod.rs`) with two calls, plain text and scores JSON; batching, map-reduce summaries for small contexts, strict parsing, key repair, retries and re-asking for skipped ids are shared. Backends: `OpenAiCompat` (provider tier), `AppleLlm` (feature `apple-fm` via the helper), `LocalLlama` (feature `local-llm`).
-- `EpisodeContext` = a 300-word summary of the whole transcript (generated once by the same picker) + title + speaker count. Sent with every batch so scores are relative to the episode, not absolute.
+- Episode context = a 250-word summary of the whole transcript (generated once by the summary model, map-reduced when it does not fit, capped at 1.5x the requested length). Optional: if it fails, batches are scored without it. Sent with every batch so scores are relative to the episode, not absolute.
 - Batches of 8 candidates. Output schema:
   ```json
   {"scores":[{"id":"c17","score":82,"reasons":["strong hook","complete story"],"title":"...","description":"...","hashtags":["..."]}]}
   ```
 
 - `Byok` / shared client (`picker/openai_compat.rs`): `POST {base_url}/chat/completions` with `Authorization: Bearer {key}`, `model`, `messages` (system prompt from the prompt file, user content = episode context + candidate batch), `temperature: 0.2`, and `response_format: {type: "json_schema", json_schema: {name, strict: true, schema}}`. If the provider rejects `json_schema` (HTTP 400 naming `response_format`), retry once with `{type: "json_object"}` and remember that per base URL. Always strict-parse; on parse failure retry once with the parse error appended. Configured by `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL` (CLI and dev) or Settings (app; key in the OS keychain via `keyring`). No vendor SDKs.
-- `AppleFoundation`: Swift shim exposing a C function, prompt in, JSON out. Guided generation where available, else strict parse plus one retry. macOS 26+ only, zero download.
+- `AppleLlm`: the `choco-apple` helper process in `generate` mode (JSON on stdin and stdout, errors as JSON lines on stderr, stderr drained on its own thread). Guided generation for scores; a declined batch is retried as text under permissive guardrails; context overflow is reported and the batch split in half. macOS 26+ only, zero download.
 - `LocalLlama`: GBNF grammar from the schema. Default model a 4B instruct at Q4_K_M (~2.5 GB), chosen on the golden set between Qwen3-4B and Gemma-3-4B class models. Context 8k, temperature 0.2. Build feature `local-llm`; the model is a runtime download the user explicitly chooses.
 - Prompt versions are files under `highlights/picker/prompts/*.md`, referenced by hash in `PickerProvenance`. The same files are used by every tier and by the cloud service.
 
 ### 6.4 Rank and dedupe (`rank.rs`)
 - Non-maximum suppression on time overlap > 40%: keep the higher score.
-- Prefer diversity: penalize candidates whose embedding is within 0.08 cosine of an already-chosen one.
+- Prefer diversity: drop a candidate whose token-set Jaccard similarity with an already-chosen one exceeds 0.5, or that overlaps one by more than 40% of the shorter clip.
 - Return top N with a minimum score floor (default 55).
 
 ## 7. Reframe (`reframe/`)
