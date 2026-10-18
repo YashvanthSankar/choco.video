@@ -54,15 +54,15 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [x] `CaptionStyle` JSON + four built-in styles (clean, bold, karaoke, minimal) + bundled OFL fonts (Inter 600/800, Montserrat 800/900, Latin subset, 233 KB) → preview PNGs checked by eye
 - [x] Rasterization with `cosmic-text` 0.19 + `swash`, bundled fonts only: shadow, outline, active-word colour and scale, progressive highlight, pill/box → deterministic pixels test passes
 - [x] SRT + WebVTT sidecars with clip-relative times (in `captions/subtitles.rs`)
-- [ ] Compositor decision: CPU (swscale crop/scale in YUV + caption sprites blended in YUV) instead of `wgpu`, for size and simplicity; revisit only if the render benchmark is too slow
-- [ ] `render/decode.rs` with hwaccel + bounded channel
-- [ ] `render/compose.rs`: crop rect per frame (interpolated `CropPlan`), scale to preset size, blurred-background `Fit`, caption sprite blend
-- [ ] `render/encode.rs` VideoToolbox on Mac; software fallback is the OS encoder, never libx264 or openh264
-- [ ] `render/mux.rs` MP4 faststart, audio copy/re-encode
+- [x] Compositor decision: CPU (swscale crop/scale in YUV + caption sprites blended in YUV) instead of `wgpu` → 12 s clip in 2.6 s (4.6x realtime) on M3 Pro; no GPU dependency
+- [x] Decode: any codec to 8-bit 4:2:0, display rotation applied, constant-frame-rate output from VFR sources, exact integer frame counts
+- [x] Compose: crop rect per frame from an interpolated `CropPlan`, layouts static/single/split/fit (blurred background), caption sprites cached per word state
+- [x] Encode: `h264_videotoolbox` High, BT.709, `allow_sw` fallback; encoders drained on EAGAIN
+- [x] Mux: MP4 `+faststart`, audio interleaved by timestamp → verified moov before mdat
 - [ ] `export/` presets (9:16, 1:1, 4:5, 16:9), naming, sidecar JSON, PNG poster, SRT + VTT per clip (no watermark: open source, no trial)
-- [ ] Loudness normalization to -14 LUFS on the clip audio (`loudnorm` two-pass or single-pass)
+- [x] Loudness normalization: single-pass `loudnorm` I=-14 TP=-1.5 → measured -14.5 LUFS, -4.5 dBFS peak on the test clip
 - [ ] `choco render` and `choco run` end to end with `Static` layout
-- [ ] Snapshot tests on synthetic fixtures, green on Mac CI (Windows parity checked in M6)
+- [x] Tests: 10 render integration tests (H.264, VP9, AV1, rotated, no-audio, fit, past-the-end) + 3 snapshot tests on composed frames (luma fingerprints, tolerance 2/255)
 - [ ] Render benchmark: 60 s clip wall time on M3 Pro, recorded
 
 ## M4 Reframe (weeks 7–8)
