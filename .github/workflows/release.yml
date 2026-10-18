@@ -83,6 +83,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: app/pnpm-lock.yaml
 
+      - name: Generate test fixtures
+        # Dev-only Homebrew ffmpeg writes synthetic media; it is never linked or shipped.
+        run: brew install ffmpeg && ./engine/fixtures/generate.sh
+
       - name: Engine tests
         working-directory: engine
         run: cargo test --all
