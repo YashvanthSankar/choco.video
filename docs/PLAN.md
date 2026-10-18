@@ -14,7 +14,7 @@
 
 **Platform order and why:**
 1. **macOS first.** Every M-series Mac has the same GPU and Neural Engine family, so one build behaves the same everywhere. Testing is one machine. Creators on Mac pay for polished native tools.
-2. **Windows second, on the same engine.** The engine is written to compile on both from day one, with platform-specific acceleration behind a backend interface. The Windows shell is added once the Mac app has paying users. Windows hardware is varied (NVIDIA, AMD, Intel, no GPU), so the Windows release needs a compatibility matrix and a CPU fallback.
+2. **Windows second, on the same engine.** Platform-specific code lives behind a backend interface from day one, but no Windows work happens until the Mac app has shipped (M6). The Windows shell is added once the Mac app has paying users. Windows hardware is varied (NVIDIA, AMD, Intel, no GPU), so the Windows release needs a compatibility matrix and a CPU fallback.
 
 **What winning looks like:**
 - Month 3: Mac v1 shipped, signed and notarized, on Product Hunt and the creator subreddits. Engine repo public with a working CLI on both OSes.
@@ -151,7 +151,7 @@ Studied in `COMPETITORS.md`. These are cheap, users expect them, and shipping th
 
 ## 4. Tech stack
 
-Moved to `STACK.md`. Summary: Rust engine (OS speech or whisper.cpp, tract + YuNet, minimal FFmpeg LGPL, wgpu, cosmic-text), a tiny hosted picker service, Tauri 2 app, Lemon Squeezy, CI on macOS and Windows from week 1 with a size budget. Swift was dropped when Windows became a requirement.
+Moved to `STACK.md`. Summary: Rust engine (OS speech or whisper.cpp, tract + YuNet, minimal FFmpeg LGPL, wgpu, cosmic-text), a tiny hosted picker service, Tauri 2 app, Lemon Squeezy, macOS CI with a size budget; Windows CI starts at M6. Swift was dropped when Windows became a requirement.
 
 ## 5. How we use AI
 
@@ -186,7 +186,7 @@ Rules that hold across tiers:
 
 ### 5.4 Building it (dev-time AI)
 - Claude Code running Claude Opus 5.5 is the primary development agent. `AGENTS.md` is its long-term memory for this project: decisions, conventions, what not to do, how to run things.
-- The agent must run the golden-set eval before claiming the picker improved, and must keep the Windows CI green, not just the Mac build.
+- The agent must run the golden-set eval before claiming the picker improved, and must not start Windows work before M6.
 
 ## 6. Open-source strategy
 

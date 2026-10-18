@@ -8,7 +8,7 @@ A small desktop app (~20 MB installer), Mac first then Windows, that turns long 
 
 ## Non-negotiables
 
-1. **Mac ships first, but every engine change must build and test on Windows CI.** Never merge engine code that breaks the Windows job. Platform-specific code lives only in `engine/crates/choco-engine/src/backend/`.
+1. **Mac first, Windows after the Mac app ships.** Do no Windows work (builds, CI, testing, Windows-only code) before M6. Still keep platform-specific code only in `engine/crates/choco-engine/src/backend/`.
 2. **No GPL anywhere in the engine or app.** FFmpeg is LGPL-only (`--disable-gpl`), dynamically linked. No libx264, no libx265. `cargo deny` enforces the allowlist; do not edit `deny.toml` to make a failure go away. Never copy code from SupoClip, ViralCutter, HotClip, or any GPL/AGPL project.
 3. **No Python, no Node at runtime.** The shipped app is Rust + a webview. Dev scripts may use anything.
 4. **Video and audio never leave the machine.** Only transcript text may be sent anywhere, and only to the picker (our `cloud/` service or the user's own Anthropic key). The cloud service never logs transcripts. Never add telemetry, analytics, or other network calls without an explicit opt-in setting and a line in this file.
@@ -29,7 +29,7 @@ Picker ladder: hosted (default, our service: `claude-haiku-5-5` scores candidate
 - Apple M3 Pro, 18 GB unified memory, macOS 27.0.1, Xcode 27.1, Swift 6.4, Homebrew ffmpeg at `/opt/homebrew/bin/ffmpeg` (dev scripts only, never shipped). No `yt-dlp`.
 - macOS 27 means Apple SpeechAnalyzer and Foundation Models are available here; the zero-download path can be tested on this machine. Whisper and the local picker must still be tested here for Windows parity.
 - Memory matters only on the opt-in local tier: a 4B Q4 model (~2.5 GB) plus whisper turbo-q5 (~550 MB) plus a decoder fits comfortably; never load more than one model.
-- There is no Windows machine. Windows is verified by CI until M6, when real hardware is needed.
+- There is no Windows machine, and no Windows work happens before M6. Then it needs CI plus real hardware.
 
 ## Commands
 
@@ -82,6 +82,7 @@ cd ../app && npm install && npm run tauri dev
 | 2026-10-18 | `tract` instead of ONNX Runtime for YuNet; minimal FFmpeg allowlist build; `wgpu` Metal+DX12 only; no CUDA; arm64-only Mac; OS software encoders as fallback, no openh264 | Each is a size cut with identical output. openh264 also carries patent exposure. |
 | 2026-10-18 | BM25 keyword search for prompt mode in v1, no embedding model | Avoids a model download; semantic search becomes an opt-in later. |
 | 2026-10-18 | Hosted picker: Haiku 5.5 scores batches; Opus 5.5 only for the episode summary and final titles of chosen clips | Rough estimate per source hour: Opus-for-everything ≈ $0.26 (≈ $13/month at the cap, more than a one-time license can carry); Haiku scoring + Opus titles ≈ $0.02–0.03. Eval must confirm Haiku picks hold up. |
+| 2026-10-18 | Mac only until the Mac app ships; all Windows work (CI job, FFmpeg, backend, testing) moves to M6 | User decision: finish Mac first. Platform code stays behind `backend/` so the port remains a backend-and-shell job. |
 | 2026-10-18 | Marketing says "no credits", never "unlimited" | There is a 50 h/month fair-use cap. |
 
 ## Benchmarks

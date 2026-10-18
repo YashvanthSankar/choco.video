@@ -22,7 +22,7 @@ Canonical list of what we build with and why. Implementation detail is in `TECH.
 | Updates | Tauri updater with signed manifests | Built in. |
 | Payments / licensing | Lemon Squeezy (merchant of record) | Handles VAT and license keys. Offline validation after activation. |
 | Signing | Developer ID + `notarytool` on Mac; EV or standard code signing cert on Windows | Required for one-click installs. |
-| CI | GitHub Actions: `macos-14` (arm64) and `windows-latest` build the engine and run tests on every push from week 1 | Windows compatibility is enforced continuously, not discovered at port time. |
+| CI | GitHub Actions: `macos-15` (arm64) builds, tests, lints and size-checks on every push; `cargo-deny` on licenses. Windows job added at M6 | Mac first; Windows compatibility is kept by design (backend trait) and verified when the port starts, not discovered at port time. |
 | Tests | Rust unit tests + golden set of fixtures + snapshot tests for render frames | Picker quality is measured, not eyeballed. |
 | Dev agent | Claude Code with Claude Opus 5.5, instructions in `AGENTS.md` | Consistent decisions across sessions. |
 
@@ -63,7 +63,7 @@ Release profile: `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `strip =
 | Errors | `thiserror`, `anyhow` | per-module / binaries |
 | App | Tauri 2, TypeScript, Vite | Svelte or React, decide at M5 |
 | Payments | Lemon Squeezy | license keys, MoR |
-| CI | GitHub Actions `macos-14`, `windows-latest` | `cargo deny` license gate |
+| CI | GitHub Actions `macos-15` (+ `windows-latest` at M6) | `cargo deny` license gate |
 
 ## Dev prerequisites
 

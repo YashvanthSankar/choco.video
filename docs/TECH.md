@@ -4,7 +4,7 @@ This is the how. `PLAN.md` is the what and why. When they disagree, fix the one 
 
 ## 0. Ground rules
 
-- **One engine, two platforms.** Everything in `engine/` compiles on macOS (arm64) and Windows (x64) on every push. Platform differences live only behind the `Backend` trait in `backend/`. A `#[cfg(target_os)]` anywhere else is a smell.
+- **One engine, two platforms, Mac first.** Everything in `engine/` targets macOS (arm64) until the Mac app ships; Windows (x64) work starts at M6. Platform differences live only behind the `Backend` trait in `backend/`. A `#[cfg(target_os)]` anywhere else is a smell.
 - **Stages are pure functions over serde types.** `fn transcribe(&MediaAsset, &TranscribeOptions, &dyn Backend, progress) -> Result<Transcript>`. No globals. No stage reads another stage's cache directly; `pipeline/` owns caching.
 - **Progress is an event stream.** Every long stage takes a `&dyn Fn(Progress)` sink. The CLI prints it, the app forwards it to the UI over Tauri events. Same events.
 - **Determinism.** Given the same input, model, and options, output must be byte-identical across runs and across OSes for everything except LLM text. Render snapshot tests enforce this.
@@ -267,7 +267,7 @@ Output JSON with `--json` for scripting. Progress on stderr.
 
 ## 16. CI (`.github/workflows/`)
 
-- `engine.yml`: matrix `macos-14` (arm64) and `windows-latest`. Steps: cache FFmpeg prebuilt, `cargo build --all --release`, `cargo test --all`, `cargo deny check`, `cargo clippy -- -D warnings`, snapshot render tests on the synthetic fixtures (no model downloads in CI; tests that need models are `#[ignore]` and run locally), `cargo bloat --release -n 20` output as a job summary.
+- `engine.yml`: `macos-15` (arm64) now; `windows-latest` added at M6. Steps: cache FFmpeg prebuilt, `cargo build --all --release`, `cargo test --all`, `cargo deny check`, `cargo clippy -- -D warnings`, snapshot render tests on the synthetic fixtures (no model downloads in CI; tests that need models are `#[ignore]` and run locally), `cargo bloat --release -n 20` output as a job summary.
 - `app.yml`: builds the Tauri app on both, unsigned, on tags only. Measures installer and installed size and **fails over the budget** in `STACK.md`.
 - `cloud.yml`: builds and tests `cloud/`, deploys on tags.
 

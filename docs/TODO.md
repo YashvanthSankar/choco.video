@@ -2,27 +2,27 @@
 
 Companion docs: `PLAN.md` (what and why), `STACK.md` (tools), `TECH.md` (how), `COMPETITORS.md` (what others ship). Root `AGENTS.md` is the agent's memory.
 
-Legend: `[x]` done and verified on Mac and Windows CI · `[~]` works on the dev Mac, Windows CI not yet green · `[ ]` not started. Notes after `→` record what was actually measured.
+Legend: `[x]` done and verified on the dev Mac · `[~]` in progress or partly verified · `[ ]` not started. Notes after `→` record what was actually measured.
 
-Rules: one milestone in progress at a time. A box is checked only when the thing works on the dev Mac **and** Windows CI is green (for engine items). Move finished milestones to the bottom. Keep this file short; details go in `TECH.md`.
+Rules: one milestone in progress at a time. A box is checked only when it works and is measured on the dev Mac. **No Windows work until M6** (user decision, 2026-10-18). Move finished milestones to the bottom. Keep this file short; details go in `TECH.md`.
 
 ## Now: M1 Engine skeleton (weeks 1–2)
 
 - [x] `git init`, `.gitignore` (target/, fixtures media, models, vendor/, *.chocoproj), `LICENSE` (MIT) in `engine/`
-- [~] Cargo workspace: `choco-engine`, `choco`, `choco-ffi`; shared lints; `deny.toml` with license allowlist and bans (x264, x265, openh264, ort) → builds clean, clippy clean; `cargo deny` not yet run
-- [~] `model/` types from `TECH.md §2` with serde round-trip tests → 2 tests pass
-- [~] `backend/`: trait, `detect()`, `mac.rs` (AppleSpeech on 26+, Metal, VideoToolbox), `windows.rs` (stub that reports Whisper on CPU), `cpu.rs`, `recommended_models()` by memory → detects M3 Pro, 18 GB, macOS 27.0.1, AppleSpeech → Whisper Metal
-- [~] Release profile in workspace `Cargo.toml` (fat LTO, 1 codegen unit, abort, strip, opt-level z with overrides); arm64-only Mac target; toolchain pinned to 1.99.1
-- [~] FFmpeg minimal LGPL: build recipe with `--disable-everything` plus an allowlist (mov/mp4/matroska/webm demux, h264/hevc/vp9/aac/opus/mp3 decode, hw encoders, aac encode, loudnorm/aresample/scale filters, VideoToolbox/D3D11VA/NVENC/AMF/QSV/MF hwaccel), `--disable-gpl --disable-nonfree`; pin version; record the dylib sizes in `AGENTS.md` Benchmarks; document in `scripts/ffmpeg/README.md`; Windows link path verified in CI → Mac done: 8.1.3, 7.5 MB of dylibs, LGPL 2.1 confirmed, `@rpath` install names; Windows link path pending (no CI yet)
-- [~] `ingest/`: `probe`, `extract_audio` (16 kHz mono f32), `thumbnail` → probes MP4, MOV, MKV/WebM (VP9, Opus), audio-only M4A; rotated phone clip thumbnail matches FFmpeg's reference pixel for pixel
-- [~] `transcribe/`: `Transcriber` trait + shared cleanup (sentence re-split, hallucination filter, clamp)
-- [~] `transcribe/apple.rs`: Swift helper (168 KB) for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+ → 45 locales; 0% WER on the synthetic script, 20x realtime, zero download
-- [~] `transcribe/whisper.rs`: `whisper-rs` with Metal/CPU, word timestamps from tokens, quantized turbo default → 0% WER on the synthetic script; fixed a progress deadlock caused by whisper-rs leaking its callback. whisper.cpp windows long audio itself, so no manual overlap windowing
-- [~] `models_registry/`: manifests pinned to a Hugging Face revision, resumable download, sha256 verify (upstream publishes sha256, so not blake3), `choco models list|pull|rm`
-- [~] CLI: `choco probe`, `choco transcribe`, `choco thumbnail`, `choco doctor` with fix hints, `choco models`, `--json` → doctor reports ready
+- [x] Cargo workspace: `choco-engine`, `choco`, `choco-ffi`; shared lints; `deny.toml` with license allowlist and bans (x264, x265, openh264, ort) → builds clean, clippy clean; `cargo deny check` passes
+- [x] `model/` types from `TECH.md §2` with serde round-trip tests → 2 tests pass
+- [x] `backend/`: trait, `detect()`, `mac.rs` (AppleSpeech on 26+, Metal, VideoToolbox), `windows.rs` (placeholder, untouched until M6), `cpu.rs`, `recommended_models()` by memory → detects M3 Pro, 18 GB, macOS 27.0.1, AppleSpeech → Whisper Metal
+- [x] Release profile in workspace `Cargo.toml` (fat LTO, 1 codegen unit, abort, strip, opt-level z with overrides); arm64-only Mac target; toolchain pinned to 1.99.1
+- [x] FFmpeg minimal LGPL: build recipe with `--disable-everything` plus an allowlist (mov/mp4/matroska/webm demux, h264/hevc/vp9/aac/opus/mp3 decode, hw encoders, aac encode, loudnorm/aresample/scale filters, VideoToolbox/D3D11VA/NVENC/AMF/QSV/MF hwaccel), `--disable-gpl --disable-nonfree`; pin version; record the dylib sizes in `AGENTS.md` Benchmarks; document in `scripts/ffmpeg/README.md`; Windows link path verified in CI → Mac done: 8.1.3, 7.5 MB of dylibs, LGPL 2.1 confirmed, `@rpath` install names
+- [x] `ingest/`: `probe`, `extract_audio` (16 kHz mono f32), `thumbnail` → probes MP4, MOV, MKV/WebM (VP9, Opus), audio-only M4A; rotated phone clip thumbnail matches FFmpeg's reference pixel for pixel
+- [x] `transcribe/`: `Transcriber` trait + shared cleanup (sentence re-split, hallucination filter, clamp)
+- [x] `transcribe/apple.rs`: Swift helper (168 KB) for SpeechAnalyzer with word timings, built by `build.rs` on macOS 26+ → 45 locales; 0% WER on the synthetic script, 20x realtime, zero download
+- [x] `transcribe/whisper.rs`: `whisper-rs` with Metal/CPU, word timestamps from tokens, quantized turbo default → 0% WER on the synthetic script; fixed a progress deadlock caused by whisper-rs leaking its callback. whisper.cpp windows long audio itself, so no manual overlap windowing
+- [x] `models_registry/`: manifests pinned to a Hugging Face revision, resumable download, sha256 verify (upstream publishes sha256, so not blake3), `choco models list|pull|rm`
+- [x] CLI: `choco probe`, `choco transcribe`, `choco thumbnail`, `choco doctor` with fix hints, `choco models`, `--json` → doctor reports ready
 - [x] `fixtures/generate.sh` (synthetic, macOS `say` voices with known text: speech, rotated phone clip, silent, two voices, audio-only, VP9/Opus MKV) and `fixtures/fetch.sh` + `sources.tsv` (5 CC BY 3.0 long-form recordings from Wikimedia Commons, 48–72 min, sha1-verified)
-- [~] CI `engine.yml` on `macos-15` + `windows-latest` + cargo-deny: release build, test, clippy, size report → written; not run yet because nothing has been pushed. `cargo deny check` passes locally. Windows links a pinned BtbN LGPL 8.1.3 build until M6
-- [~] Size budget check script (`scripts/size-check.sh`) that fails over 25 MB installer / 50 MB installed; measures the engine part until the app exists at M5
+- [~] CI `engine.yml` on `macos-15` + cargo-deny: release build, test, clippy, size report → written; runs on the first push. `cargo deny check` passes locally. Windows job removed until M6
+- [x] Size budget check script (`scripts/size-check.sh`), 25 MB installer / 50 MB installed → engine part measures 11.3 MB installed, 4.9 MB compressed; wired into `app.yml` at M5
 - [ ] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5; record wall time, peak memory and word-timing agreement in `AGENTS.md` Benchmarks
 
 ## Next: M2 Picker (weeks 3–4)
@@ -55,7 +55,7 @@ Rules: one milestone in progress at a time. A box is checked only when the thing
 - [ ] `export/` presets (9:16, 1:1, 4:5, 16:9), naming, sidecar JSON, PNG poster, SRT + VTT per clip, watermark flag
 - [ ] Loudness normalization to -14 LUFS on the clip audio (`loudnorm` two-pass or single-pass)
 - [ ] `choco render` and `choco run` end to end with `Static` layout
-- [ ] Snapshot tests on synthetic fixtures, green on Mac and Windows CI
+- [ ] Snapshot tests on synthetic fixtures, green on Mac CI (Windows parity checked in M6)
 - [ ] Render benchmark: 60 s clip wall time on M3 Pro, recorded
 
 ## M4 Reframe (weeks 7–8)
@@ -86,6 +86,11 @@ Rules: one milestone in progress at a time. A box is checked only when the thing
 - [ ] Launch: Product Hunt, r/podcasting, r/NewTubers, r/Twitch, creator Discords
 
 ## M6 Windows (weeks 11–14)
+
+Nothing here starts before the Mac app ships. Groundwork already prepared: `backend/windows.rs` placeholder; pinned Windows LGPL FFmpeg 8.1.3 build and its sha256 noted in `scripts/ffmpeg/README.md`.
+
+- [ ] Re-add the `windows-latest` CI job (engine build with `--no-default-features --features choco-engine/whisper`, pinned FFmpeg, tests, clippy)
+- [ ] Minimal LGPL FFmpeg build for Windows (same allowlist) replacing the general BtbN build
 
 - [ ] `backend/windows.rs`: NVIDIA, AMD, Intel all on Vulkan for whisper; CPU-only path
 - [ ] whisper.cpp Vulkan build verified on at least one machine per vendor; local-llm Vulkan verified on one
