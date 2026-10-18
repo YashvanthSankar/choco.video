@@ -1,0 +1,36 @@
+# License gate for the engine. Do not loosen this to make CI pass. See AGENTS.md non-negotiable 2.
+[graph]
+all-features = false
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+  "MIT", "MIT-0", "Apache-2.0", "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unlicense", "Zlib", "0BSD",
+  "Unicode-3.0", "Unicode-DFS-2016", "CC0-1.0", "MPL-2.0", "CDLA-Permissive-2.0", "BSL-1.0",
+]
+# FFmpeg itself is linked dynamically as an LGPL-2.1 shared library built by scripts/ffmpeg/.
+# Its Rust bindings (ffmpeg-next, ffmpeg-sys-next) are WTFPL; allowed explicitly below.
+exceptions = [
+  { allow = ["WTFPL"], crate = "ffmpeg-next" },
+  { allow = ["WTFPL"], crate = "ffmpeg-sys-next" },
+]
+
+[bans]
+multiple-versions = "allow"
+deny = [
+  { crate = "x264", reason = "GPL" },
+  { crate = "x265", reason = "GPL" },
+  { crate = "openh264", reason = "patent exposure; use OS encoders" },
+  { crate = "openh264-sys2", reason = "patent exposure; use OS encoders" },
+  { crate = "ort", reason = "size budget; use tract" },
+]
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -1,0 +1,51 @@
+[workspace]
+resolver = "3"
+members = ["crates/choco-engine", "crates/choco", "crates/choco-ffi"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/choco-video/engine"
+rust-version = "1.91"
+
+[workspace.dependencies]
+choco-engine = { path = "crates/choco-engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+blake3 = "1"
+dirs = "7"
+clap = { version = "4", features = ["derive"] }
+ffmpeg-next = { version = "9", default-features = false, features = ["codec", "format", "filter", "software-resampling", "software-scaling"] }
+whisper-rs = { version = "0.16" }
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Size budget: see docs/STACK.md. Small by default, fast where it matters.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+opt-level = "z"
+
+[profile.release.package.choco-engine]
+opt-level = 3
+
+[profile.release.package.whisper-rs-sys]
+opt-level = 3
+
+# whisper.cpp compiled at opt-level 0 is ~50x slower; keep it optimized even in dev builds.
+[profile.dev.package.whisper-rs-sys]
+opt-level = 3
+
+[profile.dev.package.whisper-rs]
+opt-level = 3

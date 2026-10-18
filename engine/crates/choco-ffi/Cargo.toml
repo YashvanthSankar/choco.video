@@ -1,0 +1,18 @@
+[package]
+name = "choco-ffi"
+description = "C ABI over choco-engine for shells written in other languages."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+choco-engine.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

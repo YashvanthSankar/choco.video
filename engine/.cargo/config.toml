@@ -1,0 +1,7 @@
+# Point ffmpeg-sys-next at the vendored minimal LGPL build (scripts/ffmpeg/build-mac.sh).
+[env]
+PKG_CONFIG_PATH = { value = "../vendor/ffmpeg/8.1.3-macos-arm64/lib/pkgconfig", relative = true }
+CHOCO_FFMPEG_LIB_DIR = { value = "../vendor/ffmpeg/8.1.3-macos-arm64/lib", relative = true }
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-mmacosx-version-min=14.0"]

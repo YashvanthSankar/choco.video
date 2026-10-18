@@ -1,0 +1,24 @@
+[package]
+name = "choco"
+description = "Command-line interface to choco-engine."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "choco"
+path = "src/main.rs"
+
+[dependencies]
+choco-engine.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
