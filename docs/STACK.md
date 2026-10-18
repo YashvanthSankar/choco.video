@@ -8,9 +8,9 @@ Canonical list of what we build with and why. Implementation detail is in `TECH.
 | Platforms | macOS 14+ Apple Silicon only (arm64 build, no universal binary); Windows 11 x64; Linux CLI only | Mac is one hardware family, so v1 is testable on one machine. Single-arch builds halve the binary. Windows needs a compatibility matrix. |
 | Engine packaging | Cargo workspace: `choco-engine` (lib), `choco` (CLI), `choco-ffi` (C ABI for shells) | The crate is the open-source unit. The app depends on it exactly as a third party would. |
 | Transcription | Apple SpeechAnalyzer on macOS 26+ (zero download, Swift shim); whisper.cpp via `whisper-rs` elsewhere, quantized turbo ~550 MB downloaded on first run | Same `Transcript` type from both engines. Metal on older Macs, Vulkan on Windows, CPU everywhere. No CUDA builds: hundreds of MB for a minority of machines. |
-| Picker, hosted (default) | `choco-cloud`: a small Rust `axum` service that calls the Anthropic Messages API, `claude-haiku-5-5` for batch scoring, `claude-opus-5-5` for the episode summary and final titles | Frontier quality with zero download, at ≈ $0.02–0.03 per source hour. Transcript text only. Authenticated by license key, fair-use capped. Deployed as one container. |
+| Picker, hosted (default) | `choco-cloud`: a small Rust `axum` service that calls an OpenAI-compatible `/chat/completions` endpoint, OpenCode Zen (`https://opencode.ai/zen/v1`) by default. Cheap model for batch scoring, stronger model for the episode summary and final titles, both set by config | Frontier-class quality with zero download, within a ≤ $0.03 per source hour budget. Transcript text only. Authenticated by license key, fair-use capped. Provider swappable without a release. |
 | Picker, Apple tier | Foundation Models framework via a small Swift shim behind the `Backend` trait | Zero-download offline option on macOS 26+. Compiled out elsewhere. |
-| Picker, BYOK | Anthropic Messages API over `reqwest` from the app, same prompts as hosted | For users who want their own key. |
+| Picker, BYOK | Same OpenAI-compatible client in the app, pointed at the user's base URL, key and model | Works with OpenCode, OpenRouter, Groq, DeepSeek, LM Studio, Ollama's server and other compatible endpoints. |
 | Picker, local (opt-in) | llama.cpp via `llama-cpp-2`, 4B GGUF Q4 ~2.5 GB | Fully offline on Windows for those who want it. Code compiled in, model downloaded only when chosen. Metal / Vulkan / CPU. |
 | Prompt-mode search | BM25 keyword search over transcript sentences, pure Rust | No embedding model download. Semantic search is a later opt-in. |
 | Face detection / landmarks | `tract` (pure-Rust inference) running YuNet ONNX, ~300 KB model | ~3 MB total instead of 20–40 MB for ONNX Runtime. Identical results on both OSes. Fallback if `tract` lacks an op: a minimal ONNX Runtime build with only the needed ops. |
@@ -58,7 +58,7 @@ Release profile: `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `strip =
 | CLI | `clap` 4 | derive API |
 | Serialization | `serde`, `serde_json` | all stage types |
 | Hashing | `blake3` | content hashes, cache keys, model checksums |
-| HTTP (optional) | `reqwest` with `rustls` | `cloud` feature only |
+| HTTP | `ureq` 3 with `rustls` (app side: model downloads, picker client); `reqwest` only inside `cloud/` | one small sync client in the engine |
 | Secrets | `keyring` | OS keychain for BYOK keys and license grant |
 | Errors | `thiserror`, `anyhow` | per-module / binaries |
 | App | Tauri 2, TypeScript, Vite | Svelte or React, decide at M5 |

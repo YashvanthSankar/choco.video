@@ -167,14 +167,14 @@ The picker is the only generative step, and it is the product. It needs a large 
 
 | Tier | What | Download | OS | Quality | Default |
 |---|---|---|---|---|---|
-| hosted | choco cloud picker: our stateless service calls the Anthropic Messages API with transcript text only. `claude-haiku-5-5` scores candidate batches; `claude-opus-5-5` writes the episode summary and the final titles for the chosen clips. Authenticated by license key, fair-use capped. | none | both | best | yes |
+| hosted | choco cloud picker: our stateless service calls an OpenAI-compatible provider (OpenCode Zen by default) with transcript text only. A cheap model scores candidate batches; a stronger model writes the episode summary and final titles. Both chosen by eval. Authenticated by license key, fair-use capped. | none | both | best | yes |
 | apple | Apple on-device Foundation Models | none | macOS 26+ | adequate scoring, weaker titles | offline fallback on Mac, selectable |
-| byok | user's own Anthropic key, same prompts, called directly from the app | none | both | best | selectable |
+| byok | the user's own OpenAI-compatible endpoint: base URL, key and model (OpenCode, OpenRouter, Groq, DeepSeek, LM Studio, Ollama's server, anything that speaks `/chat/completions`). Same prompts, called directly from the app | none | both | depends on model | selectable |
 | local | 4B instruct GGUF at 4-bit via llama.cpp | ~2.5 GB once | both | good | opt-in, for fully offline on Windows |
 
 Rules that hold across tiers:
 - The engine sends **transcript text only**, never audio or video, to any model or server. Hard rule, stated in the UI next to the picker setting.
-- Scoring uses **structured output** (a JSON schema for `{score, reasons, title, hook}`) so results parse reliably on every tier: `output_config.format` on the Anthropic API, GBNF grammar on llama.cpp, strict parse plus one retry on the Apple tier.
+- Scoring uses **structured output** (a JSON schema for `{score, reasons, title, hook}`) so results parse reliably on every tier: `response_format` with `json_schema` where the provider supports it, `json_object` where it does not, GBNF grammar on llama.cpp, guided generation on the Apple tier. Every tier also strict-parses and retries once, because compatible providers differ in how well they honour schemas.
 - Candidates are scored in **batches with the full transcript as context**, not one at a time blind, so the model knows what the rest of the episode covers.
 - Prompt mode uses keyword search (BM25) over transcript sentences to shortlist, then the picker ranks. No embedding model to download in v1.
 - Every pick records which tier and model produced it, so quality is comparable on the golden set.
@@ -253,7 +253,7 @@ choco.video/
 | Windows hardware variance breaks encode or inference | CPU fallback for every stage. Compatibility matrix documented. Windows beta before Windows launch. |
 | Apple SpeechAnalyzer is worse than Whisper on some languages | Golden set compares both in M1. Per-language fallback to the Whisper download, offered in the UI. |
 | The hosted picker is a server we must run | Stateless, no media, a few hundred lines, rate-limited by license key. On outage the app falls back to the Apple tier on Mac or BYOK and says so, instead of failing silently. |
-| Hosted inference cost per user | Rough estimate ~35k input + ~6k output tokens per source hour. Opus for everything would be ≈ $0.26/hour, ≈ $13/month at the cap, which a one-time price cannot carry. So Haiku 5.5 scores and Opus 5.5 only summarizes and titles: ≈ $0.02–0.03/hour, ≈ $1.50/month worst case. Measured in M2; budget ≤ $0.03 per source hour. |
+| Hosted inference cost per user | Rough estimate ~35k input + ~6k output tokens per source hour. A frontier model for every call costs ≈ $0.26/hour, ≈ $13/month at the cap, which a one-time price cannot carry. So a cheap open-weight model on OpenCode Zen scores and a stronger one only summarizes and titles, targeting ≤ $0.03 per source hour. Measured in M2 with real token counts and the provider's prices. |
 | 18 GB RAM machines swap when the optional local picker model and a 4K decode run together | Local tier only: run picker and render sequentially, unload the model before render. Default tiers use no in-process LLM. |
 | Tauri webview feels less native than SwiftUI on Mac | Accept the trade for Windows. Match system appearance, use native menus and tray, keep the UI small. Cap and Handy are the proof it is good enough. |
 | Someone ships a polished cross-platform clipper first | Ship Mac v1 in 10 weeks. Engine repo public early for mindshare. |

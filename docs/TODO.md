@@ -31,16 +31,18 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [ ] Complete-thought boundaries: grow/trim to terminal punctuation + silence gap; test that no candidate starts or ends mid-sentence
 - [ ] Audio energy + pause features (RMS spikes, laughter-like bursts, long pauses) computed from the 16 kHz wav, fed into the shortlist prior
 - [ ] `highlights/search.rs` shortlist: quality prior, BM25 prompt mode, Jaccard dedupe. No embedding model.
-- [ ] `highlights/picker/` `Picker` trait; `Hosted` client; `Byok`; `AppleFoundation` shim; batch of 8 with episode context
+- [ ] `highlights/picker/openai_compat.rs`: one `/chat/completions` client (ureq) with `json_schema` → `json_object` fallback, strict parse + one retry, configured by `CHOCO_LLM_BASE_URL` / `CHOCO_LLM_API_KEY` / `CHOCO_LLM_MODEL`; works against OpenCode Zen
+- [ ] `highlights/picker/` `Picker` trait; `Hosted`, `Byok` (both on the shared client), `AppleFoundation` shim; batch of 8 with episode context
+- [ ] Pick the scoring and titling models on OpenCode Zen by golden-set precision@5 and measured cost per source hour (budget ≤ $0.03); record both in `AGENTS.md`
 - [ ] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hashing
-- [ ] `cloud/`: axum service with `/v1/score` (Haiku), `/v1/summarize` and `/v1/title` (Opus), `/v1/quota`; measure tokens and cost per source hour against the $0.03 budget; license-key auth against Lemon Squeezy; per-key usage counter; Anthropic call with structured output and server-side fallbacks; no transcript logging; Dockerfile; deployed to one small host; `cloud.yml`
+- [ ] `cloud/`: axum service with `/v1/score`, `/v1/summarize`, `/v1/title`, `/v1/quota`; license-key auth against Lemon Squeezy; per-key usage counter; OpenAI-compatible provider (OpenCode Zen) via config; no transcript logging; Dockerfile; deployed to one small host; `cloud.yml`
 - [ ] `rank.rs` NMS + diversity penalty + score floor; `--n` is a max, content decides the count
 - [ ] `choco highlights` with `--n`, `--prompt`, `--picker hosted|apple|byok|local`
 - [ ] Golden set: 10 fixtures, 5–8 human-picked ranges each, in `eval/golden.json`
 - [ ] `choco eval` runner, baseline numbers per tier recorded in `AGENTS.md` Benchmarks
 - [ ] Compare Apple speech vs whisper on the golden set per language; decide per-language fallback list
 - [ ] `LocalLlama` behind `local-llm` feature with GBNF grammar; pick the default 4B model (Qwen3-4B vs Gemma-3-4B class) by eval and speed; model is opt-in download only
-- [ ] BYOK key storage via `keyring`; Settings copy that states "transcript text only" next to every picker option
+- [ ] BYOK settings (base URL, key, model) with the key in the OS keychain via `keyring`; Settings copy that states "transcript text only" next to every picker option
 
 ## M3 Captions + render (weeks 5–6)
 

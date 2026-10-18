@@ -11,7 +11,7 @@ A small desktop app (~20 MB installer), Mac first then Windows, that turns long 
 1. **Mac first, Windows after the Mac app ships.** Do no Windows work (builds, CI, testing, Windows-only code) before M6. Still keep platform-specific code only in `engine/crates/choco-engine/src/backend/`.
 2. **No GPL anywhere in the engine or app.** FFmpeg is LGPL-only (`--disable-gpl`), dynamically linked. No libx264, no libx265. `cargo deny` enforces the allowlist; do not edit `deny.toml` to make a failure go away. Never copy code from SupoClip, ViralCutter, HotClip, or any GPL/AGPL project.
 3. **No Python, no Node at runtime.** The shipped app is Rust + a webview. Dev scripts may use anything.
-4. **Video and audio never leave the machine.** Only transcript text may be sent anywhere, and only to the picker (our `cloud/` service or the user's own Anthropic key). The cloud service never logs transcripts. Never add telemetry, analytics, or other network calls without an explicit opt-in setting and a line in this file.
+4. **Video and audio never leave the machine.** Only transcript text may be sent anywhere, and only to the picker: our `cloud/` service, or the user's own OpenAI-compatible endpoint. The cloud service never logs transcripts. Never add telemetry, analytics, or other network calls without an explicit opt-in setting and a line in this file.
 4b. **Small by default.** Installer ≤ 25 MB, installed app ≤ 50 MB without models, enforced in CI. Nothing heavy ships in the installer; models are runtime downloads and the default path on a current Mac downloads nothing. Prefer pure-Rust crates (`tract`, `cosmic-text`) over C runtimes when output is identical. A dependency over 2 MB compiled needs a Decisions entry. Never trade output quality for size; trade where the model runs.
 5. **Stages are pure functions over serde types.** No globals, no stage reading another stage's cache. `pipeline/` owns caching and orchestration.
 6. **The optional local picker and the renderer never run concurrently.** Unload the model before rendering. The default tiers have no in-process LLM. Target machine has 16–18 GB.
@@ -22,7 +22,7 @@ A small desktop app (~20 MB installer), Mac first then Windows, that turns long 
 
 Rust 2024 workspace in `engine/`. Apple SpeechAnalyzer (macOS 26+) or `whisper-rs` for transcription, `tract` + YuNet for faces, minimal LGPL `ffmpeg-next` for decode/encode/mux, `wgpu` (Metal + DX12 only) for compositing, `cosmic-text` + `swash` for captions, BM25 for prompt search, `clap` CLI, `cbindgen` FFI, optional `llama-cpp-2` behind `local-llm`. App in `app/` is Tauri 2 with a small TypeScript UI. `cloud/` is an `axum` service for the hosted picker. Payments and license keys via Lemon Squeezy. Details and rationale: `docs/STACK.md`, `docs/TECH.md`.
 
-Picker ladder: hosted (default, our service: `claude-haiku-5-5` scores candidate batches, `claude-opus-5-5` writes the episode summary and the final titles for the chosen clips only; license-key auth, 50 source hours/month fair use), Apple Foundation Models (macOS 26+, offline), BYOK (user's own key), local 4B GGUF (opt-in ~2.5 GB download). Structured JSON output on every tier. Transcript text only, always.
+Picker ladder: hosted (default; our `cloud/` service calls an OpenAI-compatible provider, OpenCode Zen first, via one client configured by `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`; license-key auth; 50 source hours/month fair use), Apple Foundation Models (macOS 26+, offline), BYOK (the user's own OpenAI-compatible base URL, key and model), local 4B GGUF (opt-in ~2.5 GB download). No Anthropic SDK or Anthropic-specific API anywhere in the product. Structured JSON on every tier. Transcript text only, always.
 
 ## Dev machine
 
@@ -77,11 +77,12 @@ cd ../app && npm install && npm run tauri dev
 | 2026-10-18 | Adopt parity features from chopify, Klipzy, AutoClip, OpenClip Studio (complete-thought clips, multi-aspect, SRT/VTT, poster+meta, loudnorm, audio-energy prior); skip SFX, AI chat, B-roll | Cheap, expected, removes objections. See `docs/COMPETITORS.md §5–6`. |
 | 2026-10-18 | Never read SupoClip, ViralCutter, HotClip source for implementation | Copyleft. Feature lists only. |
 | 2026-10-18 | Small-app principle: ~20 MB installer, no bundled models, zero download on current Macs | User requirement. "All local" would mean multi-GB downloads for worse picks. |
-| 2026-10-18 | Picker default is hosted (our `cloud/` service on Claude), included in the one-time price with a 50 h/month fair-use cap; Apple on-device, BYOK and an opt-in local 4B model are the fallbacks | Best quality with zero download; cents per source hour; keeps the "no credits" promise; offline paths still exist. |
+| 2026-10-18 | Picker default is hosted (our `cloud/` service), included in the one-time price with a 50 h/month fair-use cap; Apple on-device, BYOK and an opt-in local 4B model are the fallbacks | Best quality with zero download; cents per source hour; keeps the "no credits" promise; offline paths still exist. |
 | 2026-10-18 | Transcription via Apple SpeechAnalyzer on macOS 26+, whisper.cpp quantized turbo elsewhere | Zero download on Mac; same `Transcript` type either way; golden set decides per-language fallbacks. |
 | 2026-10-18 | `tract` instead of ONNX Runtime for YuNet; minimal FFmpeg allowlist build; `wgpu` Metal+DX12 only; no CUDA; arm64-only Mac; OS software encoders as fallback, no openh264 | Each is a size cut with identical output. openh264 also carries patent exposure. |
 | 2026-10-18 | BM25 keyword search for prompt mode in v1, no embedding model | Avoids a model download; semantic search becomes an opt-in later. |
-| 2026-10-18 | Hosted picker: Haiku 5.5 scores batches; Opus 5.5 only for the episode summary and final titles of chosen clips | Rough estimate per source hour: Opus-for-everything ≈ $0.26 (≈ $13/month at the cap, more than a one-time license can carry); Haiku scoring + Opus titles ≈ $0.02–0.03. Eval must confirm Haiku picks hold up. |
+| 2026-10-18 | ~~Hosted picker on Anthropic (Haiku scores, Opus titles)~~ superseded below | Kept for history: the cost reasoning still applies. A frontier model for every call would cost ≈ $0.26 per source hour, too much for a one-time price. Score with a cheap model, title with a strong one. |
+| 2026-10-18 | Picker providers are OpenAI-compatible only: OpenCode Zen (`https://opencode.ai/zen/v1`) for the hosted service, any compatible endpoint for BYOK. One `/chat/completions` client, configured by `CHOCO_LLM_BASE_URL`, `CHOCO_LLM_API_KEY`, `CHOCO_LLM_MODEL`. Cheap model scores batches, stronger model writes the summary and final titles; both picked by golden-set eval within a ≤ $0.03 per source hour budget | User decision: no Anthropic. OpenAI-compatible is the common denominator across OpenCode, OpenRouter, Groq, DeepSeek, local servers. |
 | 2026-10-18 | Mac only until the Mac app ships; all Windows work (CI job, FFmpeg, backend, testing) moves to M6 | User decision: finish Mac first. Platform code stays behind `backend/` so the port remains a backend-and-shell job. |
 | 2026-10-18 | Marketing says "no credits", never "unlimited" | There is a 50 h/month fair-use cap. |
 
@@ -100,8 +101,8 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | — | Picker on 300 candidates, hosted tier, wall time and tokens | not measured | M2 target |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
 | — | Render 60 s clip 1080x1920, VideoToolbox | not measured | M3 target |
-| — | Golden set precision@5, hosted picker (Haiku scoring) | not measured | M2 baseline, the default tier |
-| — | Golden set precision@5, Haiku vs Opus scoring | not measured | M2; Opus scoring only if it beats Haiku by a margin worth its cost |
+| — | Golden set precision@5, hosted picker (scoring model) | not measured | M2 baseline, the default tier |
+| — | Golden set precision@5 and cost per source hour, candidate scoring models on OpenCode Zen | not measured | M2; pick the cheapest model within 2 points of the best |
 | — | Golden set precision@5, apple and local tiers | not measured | M2 |
 | — | Hosted cost per source hour, measured tokens × price | not measured | M2; budget ≤ $0.03 |
 
