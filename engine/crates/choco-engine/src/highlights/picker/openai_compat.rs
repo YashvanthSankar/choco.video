@@ -20,11 +20,15 @@ pub struct Recommended {
     pub note: &'static str,
 }
 
+/// Measured on the five-podcast golden set (5.2 h of source, not yet human-reviewed) at
+/// OpenCode Zen list prices. MiniMax is cheapest and best: it writes short JSON, while the
+/// others spend 5-7x the output tokens reasoning. GLM was not measured (summaries timed out
+/// before the fix, then the test key hit its budget).
 pub const OPENCODE_RECOMMENDED: &[Recommended] = &[
-    Recommended { id: "minimax-m3", label: "MiniMax M3", cents_per_source_hour: 2.0, precision_at_5: 0.40, note: "Fastest and cheapest; recommended" },
-    Recommended { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", cents_per_source_hour: 6.0, precision_at_5: 0.32, note: "Strong picks, slower, about 3x the cost" },
-    Recommended { id: "glm-5.3-flash", label: "GLM 5.3 Flash", cents_per_source_hour: 3.0, precision_at_5: 0.0, note: "Reasoning model; slow summaries" },
-    Recommended { id: "qwen3.8-flash", label: "Qwen 3.8 Flash", cents_per_source_hour: 2.5, precision_at_5: 0.0, note: "Cheap; slowest of the four" },
+    Recommended { id: "minimax-m3", label: "MiniMax M3", cents_per_source_hour: 2.0, precision_at_5: 0.44, note: "Cheapest and most accurate; recommended" },
+    Recommended { id: "qwen3.8-flash", label: "Qwen 3.8 Flash", cents_per_source_hour: 2.5, precision_at_5: 0.28, note: "Cheap but weaker picks and slow" },
+    Recommended { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", cents_per_source_hour: 6.0, precision_at_5: 0.32, note: "About 3x the cost for weaker picks" },
+    Recommended { id: "glm-5.3-flash", label: "GLM 5.3 Flash", cents_per_source_hour: 3.0, precision_at_5: 0.0, note: "Not measured yet" },
 ];
 
 #[derive(Debug, Clone)]
