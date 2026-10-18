@@ -23,7 +23,7 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [x] `fixtures/generate.sh` (synthetic, macOS `say` voices with known text: speech, rotated phone clip, silent, two voices, audio-only, VP9/Opus MKV) and `fixtures/fetch.sh` + `sources.tsv` (5 CC BY 3.0 long-form recordings from Wikimedia Commons, 48–72 min, sha1-verified)
 - [~] CI `engine.yml` on `macos-15` + cargo-deny: release build, test, clippy, size report → written; runs on the first push. `cargo deny check` passes locally. Windows job removed until M6
 - [x] Size budget check script (`scripts/size-check.sh`), 25 MB installer / 50 MB installed → engine part measures 11.3 MB installed, 4.9 MB compressed; wired into `app.yml` at M5
-- [ ] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5; record wall time, peak memory and word-timing agreement in `AGENTS.md` Benchmarks
+- [x] Transcribe a 60-minute podcast on the M3 Pro with Apple speech and with whisper turbo-q5 → 72-min CC BY podcast: Apple 112 s (42x), ~30 MB; whisper 267 s (17x), 1.7 GB, loses ~11% of words to hallucination loops. Ground-truth timing: Apple 103 ms median error, whisper 256 ms (captions fix in M3)
 
 ## Next: M2 Picker (weeks 3–4)
 
@@ -91,6 +91,7 @@ Nothing here starts before the Mac app ships. Groundwork already prepared: `back
 
 - [ ] Re-add the `windows-latest` CI job (engine build with `--no-default-features --features choco-engine/whisper`, pinned FFmpeg, tests, clippy)
 - [ ] Minimal LGPL FFmpeg build for Windows (same allowlist) replacing the general BtbN build
+- [ ] Whisper loop recovery: detect a collapsed loop and re-decode that window with temperature fallback or VAD (whisper.cpp Silero VAD), so no speech is lost. Measured need: ~11% of words lost on a 72-min podcast. Also benefits Macs older than macOS 26
 
 - [ ] `backend/windows.rs`: NVIDIA, AMD, Intel all on Vulkan for whisper; CPU-only path
 - [ ] whisper.cpp Vulkan build verified on at least one machine per vendor; local-llm Vulkan verified on one

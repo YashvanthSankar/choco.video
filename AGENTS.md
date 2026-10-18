@@ -92,7 +92,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | Date | What | Result | Notes |
 |---|---|---|---|
 | 2026-10-18 | Transcribe 72 min real podcast (danaylov, VP9/Opus), Apple SpeechAnalyzer, release | 112 s total (audio 9 s, speech 103 s, 42x realtime), ~30 MB peak in-process, 11,415 words, steady ~160 wpm | M3 Pro 18 GB; speech model runs in the OS service, not counted |
-| — | Transcribe 60 min podcast, whisper turbo-q5, Metal | not measured | M1 target |
+| 2026-10-18 | Transcribe 72 min real podcast, whisper turbo-q5 on Metal, release | 267 s total (speech 257 s, 17x realtime), 1.7 GB peak; 10,156 words after loop cleanup vs Apple's 11,415; 85% of words agree in order; word starts differ by median 320 ms | Whisper loses ~11% of speech under loops; fine as the fallback for macOS < 26, needs loop recovery before M6 |
 | 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 7.5 MB | LGPL 2.1; avcodec 4.5 MB is most of it |
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
