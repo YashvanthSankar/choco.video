@@ -24,7 +24,7 @@ jobs:
       - name: Toolchain
         run: rustup show active-toolchain || rustup toolchain install
       - name: Build tools
-        run: brew install nasm pkg-config
+        run: brew install nasm pkg-config meson ninja
       - name: Cache minimal FFmpeg
         id: ffcache
         uses: actions/cache@v4
