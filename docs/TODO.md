@@ -44,6 +44,7 @@ Rules: one milestone in progress at a time. A box is checked only when the thing
 
 ## M3 Captions + render (weeks 5–6)
 
+- [ ] Word timing accuracy to ≤ 50 ms median against `fixtures/media/aligned.words.json` (`fixtures/timing.py`). Measured at M1: Apple 103 ms median, 100 ms early; whisper 256 ms, 232 ms early. Try whisper DTW timestamps first, then per-engine offset calibration; re-measure on a second voice and a real recording
 - [ ] `captions/` chunker with font-measured line breaks
 - [ ] `CaptionStyle` JSON + four built-in styles + bundled OFL fonts
 - [ ] Atlas rasterization with `cosmic-text` + `swash`, active-word variants

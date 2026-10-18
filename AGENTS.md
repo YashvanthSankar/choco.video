@@ -95,6 +95,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 7.5 MB | LGPL 2.1; avcodec 4.5 MB is most of it |
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
+| 2026-10-18 | Word-start error vs synthesized ground truth (62 words, `fixtures/timing.py`) | Apple: median 103 ms, bias −100 ms, 49% within 100 ms. Whisper turbo-q5 token times: median 256 ms, bias −232 ms, 11% within 100 ms | Both early. Captions need ≤ 50 ms; fix in M3 (DTW, offset calibration) |
 | — | Picker on 300 candidates, hosted tier, wall time and tokens | not measured | M2 target |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
 | — | Render 60 s clip 1080x1920, VideoToolbox | not measured | M3 target |
@@ -109,6 +110,8 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 - If the CoreML whisper encoder is ever enabled as an optional speed-up, it compiles on first load and can take minutes. Same rule.
 - `ffmpeg-next` build needs `pkg-config` and the FFmpeg dev libs on the link path. On Windows this is the usual source of CI failures; the pinned prebuilt in `scripts/ffmpeg/` is the fix, not ad-hoc downloads.
 - whisper.cpp word timestamps drift on long silences. The sentence re-split and clamp pass in `transcribe/` exists for this; do not remove it.
+- Both speech engines stamp words early (Apple ~100 ms, whisper token times ~230 ms). Do not drive caption highlights from raw times until M3's timing fix lands; measure with `fixtures/timing.py`.
+- AVSpeechSynthesizer word-marker offsets restart at each internal synthesis chunk (an empty buffer marks it). `fixtures/say_aligned.swift` rebases them; keep that if you touch it.
 - Phone footage carries a rotation tag. Probe must apply it or faces will be detected sideways.
 - `wgpu` readback is the slow path. Prefer handing textures to the encoder when the backend supports it.
 
