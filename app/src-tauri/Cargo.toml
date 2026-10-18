@@ -1,0 +1,41 @@
+[package]
+name = "choco-app"
+version = "0.1.0"
+description = "choco.video: turn long videos into vertical clips on your Mac"
+authors = ["choco.video contributors"]
+license = "MIT"
+edition = "2024"
+rust-version = "1.91"
+
+[lib]
+name = "choco_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+choco-engine = { path = "../../engine/crates/choco-engine" }
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keyring = "4"
+
+# Size first (see docs/STACK.md), but keep the engine's hot paths fast.
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "z"
+panic = "abort"
+strip = true
+
+[profile.release.package.choco-engine]
+opt-level = 3
+
+[profile.release.package.whisper-rs-sys]
+opt-level = 3
+
+[profile.dev.package.whisper-rs-sys]
+opt-level = 3

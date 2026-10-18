@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window: core events, file and folder pickers, reveal in Finder, open links.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "opener:allow-reveal-item-in-dir",
+    "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://opencode.ai/*" }, { "url": "https://github.com/*" }]
+    }
+  ]
+}

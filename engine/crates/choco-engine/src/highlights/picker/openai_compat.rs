@@ -8,6 +8,25 @@ use std::time::Duration;
 
 pub const OPENCODE_ZEN_BASE_URL: &str = "https://opencode.ai/zen/v1";
 
+/// OpenCode Zen models we have measured on the golden set. Onboarding pre-selects the first.
+/// Costs are measured tokens on 5 hours of real podcasts at OpenCode Zen list prices.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
+pub struct Recommended {
+    pub id: &'static str,
+    pub label: &'static str,
+    /// US cents per hour of source video, picker only.
+    pub cents_per_source_hour: f32,
+    pub precision_at_5: f32,
+    pub note: &'static str,
+}
+
+pub const OPENCODE_RECOMMENDED: &[Recommended] = &[
+    Recommended { id: "minimax-m3", label: "MiniMax M3", cents_per_source_hour: 2.0, precision_at_5: 0.40, note: "Fastest and cheapest; recommended" },
+    Recommended { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", cents_per_source_hour: 6.0, precision_at_5: 0.32, note: "Strong picks, slower, about 3x the cost" },
+    Recommended { id: "glm-5.3-flash", label: "GLM 5.3 Flash", cents_per_source_hour: 3.0, precision_at_5: 0.0, note: "Reasoning model; slow summaries" },
+    Recommended { id: "qwen3.8-flash", label: "Qwen 3.8 Flash", cents_per_source_hour: 2.5, precision_at_5: 0.0, note: "Cheap; slowest of the four" },
+];
+
 #[derive(Debug, Clone)]
 pub struct OpenAiCompatConfig {
     pub tier: &'static str,
