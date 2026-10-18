@@ -153,6 +153,108 @@
           "why": "Freezing her eggs raised her standards for a guy."
         }
       ]
+    },
+    {
+      "id": "fox",
+      "media": "fixtures/media/fox.webm",
+      "transcript": "fixtures/media/fox.transcript.json",
+      "license": "CC BY 3.0",
+      "attribution": "That UFO Podcast (Wikimedia Commons)",
+      "drafted_by": "editor agent (Claude), 2026-10-18",
+      "reviewed_by_human": false,
+      "clips": [
+        {
+          "start_ms": 364320,
+          "end_ms": 440640,
+          "why": "Three girls meet a red-eyed creature at 10 feet; one freezes and seems to communicate."
+        },
+        {
+          "start_ms": 818160,
+          "end_ms": 886800,
+          "why": "Lead neurosurgeon denies it, falls ill, then decides to reveal everything."
+        },
+        {
+          "start_ms": 971640,
+          "end_ms": 1030920,
+          "why": "'My own father told me I was nuts'; he stakes his reputation on it."
+        },
+        {
+          "start_ms": 2541900,
+          "end_ms": 2608380,
+          "why": "Skeptic to alien message: 'Neanderthals with nuclear weapons'."
+        },
+        {
+          "start_ms": 1795740,
+          "end_ms": 1844280,
+          "why": "Only ten people on the planet have the big picture."
+        },
+        {
+          "start_ms": 1656720,
+          "end_ms": 1732260,
+          "why": "Surgeon showed the video, died, the drive vanished, the military warned off the next source."
+        },
+        {
+          "start_ms": 2666400,
+          "end_ms": 2717220,
+          "why": "Asks the general what he'd tell his grandchildren; the general all but admits it."
+        },
+        {
+          "start_ms": 733800,
+          "end_ms": 785340,
+          "why": "Officer's scratch, an infection resistant to every antibiotic, then death."
+        }
+      ]
+    },
+    {
+      "id": "nolan",
+      "media": "fixtures/media/nolan.webm",
+      "transcript": "fixtures/media/nolan.transcript.json",
+      "license": "CC BY 3.0",
+      "attribution": "That UFO Podcast (Wikimedia Commons)",
+      "drafted_by": "editor agent (Claude), 2026-10-18",
+      "reviewed_by_human": false,
+      "clips": [
+        {
+          "start_ms": 2746560,
+          "end_ms": 2833320,
+          "why": "On Branson's island: bribed with martinis to share UFO secrets."
+        },
+        {
+          "start_ms": 3270180,
+          "end_ms": 3343920,
+          "why": "Thin greys walking in Earth gravity suggests they were engineered; chimpanzee comparison."
+        },
+        {
+          "start_ms": 2282280,
+          "end_ms": 2366220,
+          "why": "'Strange doesn't mean alien'; Avi Loeb vs astronomers on 3I/ATLAS."
+        },
+        {
+          "start_ms": 1791240,
+          "end_ms": 1866360,
+          "why": "$100M to protect whistleblowers; his own case cost him $100,000."
+        },
+        {
+          "start_ms": 818580,
+          "end_ms": 897960,
+          "why": "Skywatcher results won't be definitive; the radar maker won't explain its files."
+        },
+        {
+          "start_ms": 259200,
+          "end_ms": 317580,
+          "why": "After 14 years he still isn't sure what's real; science is questions."
+        },
+        {
+          "start_ms": 1530780,
+          "end_ms": 1613520,
+          "why": "'Science is just what we don't understand yet.'"
+        },
+        {
+          "start_ms": 1895400,
+          "end_ms": 1939140,
+          "why": "Grift accusations: 'a fly bashing against a window. I don't care.'"
+        }
+      ]
     }
   ]
 }

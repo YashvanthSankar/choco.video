@@ -47,5 +47,29 @@ pub fn transcribe(audio_wav: &Path, engine: SpeechEngine, opts: &TranscribeOptio
         #[cfg(not(feature = "whisper"))]
         e @ SpeechEngine::Whisper { .. } => return Err(TranscribeError::Unavailable(e)),
     };
-    Ok(cleanup::clean(raw))
+    let mut t = cleanup::clean(raw);
+    calibrate(&mut t, engine);
+    Ok(t)
+}
+
+/// Measured systematic bias of each engine's word start times against synthesized ground truth
+/// (`fixtures/say_aligned.swift`, three voices). Both engines stamp words early; captions are
+/// driven by these times, so shift them by the median bias.
+pub fn timing_offset_ms(engine: SpeechEngine) -> u64 {
+    match engine {
+        SpeechEngine::AppleSpeech => 100,
+        SpeechEngine::Whisper { .. } => 260,
+    }
+}
+
+fn calibrate(t: &mut Transcript, engine: SpeechEngine) {
+    let off = timing_offset_ms(engine);
+    for s in &mut t.segments {
+        s.start_ms += off;
+        s.end_ms += off;
+        for w in &mut s.words {
+            w.start_ms += off;
+            w.end_ms += off;
+        }
+    }
 }

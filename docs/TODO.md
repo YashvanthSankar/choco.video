@@ -33,13 +33,13 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [x] `highlights/search.rs` shortlist: quality prior (pace, hook words, questions, numbers, length, weak openers, audio), BM25 prompt mode with synonym and inflection expansion, near-duplicate removal. No embedding model
 - [~] `highlights/picker/openai_compat.rs`: one `/chat/completions` client (ureq), `json_schema` → `json_object` fallback remembered per client, 429/5xx backoff, refusal handling, `<think>` and code-fence stripping → 3 tests against a local mock server; **not yet run against OpenCode Zen (needs a key)**
 - [~] `highlights/picker/` `Llm` trait with shared batching, map-reduce summary for small contexts, strict parse + key repair + one retry, re-ask for skipped ids → fake-model end-to-end test passes; Apple tier: 48/60 scored, 0 declined after the guardrail fix; provider tier running against OpenCode Zen
-- [~] Pick the scoring and summary models on OpenCode Zen by golden-set precision@5 and measured cost per source hour (budget ≤ $0.03) → all 7 candidates accept strict JSON schemas; 72-min podcast, 0 failed batches each: GLM 5.3 Flash 248 s ≈ 2.3¢/h, Qwen 3.8 Flash 550 s ≈ 1.9¢/h, DeepSeek V4.1 Flash 109 s ≈ 4.5¢/h (over budget); MiniMax M3 to rerun; quality ranking waits for the eval
+- [~] Pick the scoring and summary models on OpenCode Zen by golden-set precision@5 and measured cost per source hour (budget ≤ $0.03) → all candidates accept strict JSON schemas; 72-min podcast, 0 failed batches each: MiniMax M3 56 s ≈ 1.5¢/h, GLM 5.3 Flash 248 s ≈ 2.3¢/h, Qwen 3.8 Flash 550 s ≈ 1.9¢/h, DeepSeek V4.1 Flash 109 s ≈ 4.5¢/h (over budget). Quality ranking: eval running
 - [x] Prompt v1 in `highlights/picker/prompts/score_v1.md` and `summarize_v1.md`; provenance hash (blake3, 16 hex) on every candidate
 - [x] ~~`cloud/` hosted service~~ dropped: no backend (decision 2026-10-18). Provider tier calls the user's endpoint directly
 - [x] `rank.rs` overlap suppression (> 40% of the shorter clip), same-content suppression, score floor 55, `--n` is a max
 - [x] `choco highlights` with `--n`, `--prompt`, `--picker auto|apple|provider`, `--min-score`, `--transcript` reuse, `-o` JSON with a diagnostic report and token usage
 - [~] Apple on-device tier on the real podcast → 10 sensible clips in ~5 min, but Apple's default guardrails declined 5–7 of 15 batches as "sensitive content" (false positives on ethics/war talk). Fix in progress: retry declined batches under the permissive content-transformation guardrails. Calibration is loose (a clip with "weak hook, low energy" reasons scored 68); revisit with the eval
-- [~] Golden set → 5 real CC BY fixtures (48–72 min each); 3 drafted (8 clips each) by separate editor agents from transcripts only, validated against segment boundaries, reviewer notes and alternates in `eval/REVIEW.md`; 2 drafting. **Needs human review** before numbers count; `choco eval` prints them as provisional until then
+- [~] Golden set → 5 real CC BY fixtures (48–72 min; VP8, VP9, AV1), 40 clips drafted by separate editor agents from transcripts only, validated against segment boundaries and for overlaps; notes, ASR errors and alternates in `eval/REVIEW.md`. **Needs human review** before numbers count; `choco eval` prints them as provisional until then
 - [~] `choco eval` runner (precision@5, recall@10, IoU; saved results or live runs; token usage and source duration recorded) → built and tested; baseline per model pending the last two golden fixtures
 - [ ] Compare Apple speech vs whisper on the golden set per language; decide per-language fallback list
 - [ ] `LocalLlama` behind `local-llm` feature with GBNF grammar; pick the default 4B model (Qwen3-4B vs Gemma-3-4B class) by eval and speed; model is opt-in download only
@@ -49,7 +49,7 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 
 ## M3 Captions + render (weeks 5–6)
 
-- [ ] Word timing accuracy to ≤ 50 ms median against `fixtures/media/aligned.words.json` (`fixtures/timing.py`). Measured at M1: Apple 103 ms median, 100 ms early; whisper 256 ms, 232 ms early. Try whisper DTW timestamps first, then per-engine offset calibration; re-measure on a second voice and a real recording
+- [~] Word timing accuracy → per-engine bias correction shipped (Apple +100 ms, whisper +260 ms, from medians on two synthesized voices; bias on a held-out third voice now −16 to +40 ms). Remaining per-word scatter: median 52–95 ms, 53–67% within 100 ms; **≤ 50 ms target not met**. Tried snapping to energy onsets: mixed (helped 2 clips, hurt 1), not shipped. Next: whisper DTW timestamps; measure caption readability, not just onsets
 - [ ] `captions/` chunker with font-measured line breaks
 - [ ] `CaptionStyle` JSON + four built-in styles + bundled OFL fonts
 - [ ] Atlas rasterization with `cosmic-text` + `swash`, active-word variants
