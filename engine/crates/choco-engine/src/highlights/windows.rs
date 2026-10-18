@@ -53,7 +53,8 @@ pub(crate) fn ends_thought(text: &str) -> bool {
     matches!(t.chars().last(), Some('.' | '!' | '?' | '…' | '。' | '！' | '？'))
 }
 
-const FILLERS: &[&str] = &["um", "uh", "erm", "hmm", "mm", "like", "yeah", "okay", "ok", "you", "know", "i", "mean", "so"];
+/// Disfluencies only. Pronouns and "mean"/"know" are real words ("I mean it.") and stay out.
+const FILLERS: &[&str] = &["um", "uh", "erm", "hmm", "mm", "like", "yeah", "okay", "ok", "so", "right", "well"];
 
 /// True when the first three seconds are nothing but filler words.
 fn filler_opening(segs: &[Segment], start_ms: u64) -> bool {
@@ -76,11 +77,15 @@ pub fn windows(t: &Transcript, opts: &WindowOptions) -> Vec<Window> {
     };
     let starts = |i: usize| i == 0 || closes(i - 1);
 
+    let targets: Vec<u64> = if opts.targets_ms.iter().any(|&t| t >= opts.min_ms && t <= opts.max_ms) {
+        opts.targets_ms.iter().copied().filter(|&t| t >= opts.min_ms && t <= opts.max_ms).collect()
+    } else {
+        vec![opts.min_ms]
+    };
     let mut out = Vec::new();
     for i in (0..n).filter(|&i| starts(i)) {
         let start = segs[i].start_ms;
         let mut emitted_targets = 0usize;
-        let mut last_emitted_end = None;
         for j in i..n {
             let end = segs[j].end_ms;
             let dur = end.saturating_sub(start);
@@ -91,14 +96,13 @@ pub fn windows(t: &Transcript, opts: &WindowOptions) -> Vec<Window> {
                 continue;
             }
             // Emit once per target length we have reached and not yet covered.
-            let reached = opts.targets_ms.iter().filter(|&&t| dur >= t).count();
-            if reached > emitted_targets && last_emitted_end != Some(j) {
+            let reached = targets.iter().filter(|&&t| dur >= t).count();
+            if reached > emitted_targets {
                 emitted_targets = reached;
-                last_emitted_end = Some(j);
                 if let Some(w) = build(segs, i, j, opts) {
                     out.push(w);
                 }
-                if emitted_targets == opts.targets_ms.len() {
+                if emitted_targets == targets.len() {
                     break;
                 }
             }

@@ -116,18 +116,23 @@ fn expand(q: &[String]) -> Vec<String> {
         &["ai", "artificial", "intelligence", "model", "models", "machine"],
         &["start", "started", "beginning", "began", "founded"],
     ];
-    let mut out: Vec<String> = q.iter().filter(|t| !STOP.contains(&t.as_str())).cloned().collect();
-    for t in q {
+    let content: Vec<String> = q.iter().filter(|t| !STOP.contains(&t.as_str())).cloned().collect();
+    let mut out: Vec<String> = content.clone();
+    for t in &content {
         for g in GROUPS {
             if g.contains(&t.as_str()) {
                 out.extend(g.iter().map(|s| s.to_string()));
             }
         }
-        // Light stemming: plural and -ing.
-        if let Some(s) = t.strip_suffix('s') {
+        // Light stemming: plural and -ing, only for words long enough to be content.
+        if t.len() >= 4
+            && let Some(s) = t.strip_suffix('s')
+        {
             out.push(s.to_string());
         }
-        if let Some(s) = t.strip_suffix("ing") {
+        if t.len() >= 6
+            && let Some(s) = t.strip_suffix("ing")
+        {
             out.push(s.to_string());
             out.push(format!("{s}e"));
         }
@@ -208,6 +213,15 @@ mod tests {
         let s = bm25(&ws, "pricing");
         assert!(s[1] > s[0] && s[1] > s[2], "{s:?}");
         assert_eq!(s[0], 0.0);
+    }
+
+    #[test]
+    fn stop_words_never_become_query_terms() {
+        let q = expand(&tokens("what is pricing"));
+        assert!(!q.iter().any(|t| t == "i" || t == "is" || t == "what"), "{q:?}");
+        assert!(q.iter().any(|t| t == "price"));
+        let ws = vec![win("a", 0, 30_000, "I think I will go, is it fine")];
+        assert_eq!(bm25(&ws, "what is pricing")[0], 0.0);
     }
 
     #[test]

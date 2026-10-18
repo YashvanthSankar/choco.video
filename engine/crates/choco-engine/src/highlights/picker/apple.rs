@@ -24,12 +24,20 @@ impl AppleLlm {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| PickerError::Transport(e.to_string()))?;
-        child.stdin.take().expect("piped").write_all(req.as_bytes()).map_err(|e| PickerError::Transport(e.to_string()))?;
+        // The helper may exit (and write stderr) before reading stdin; a broken pipe here is
+        // the helper's error, reported below, not a transport failure.
+        let _ = child.stdin.take().expect("piped").write_all(req.as_bytes());
+        // Drain stderr on its own thread so neither pipe can fill and block the helper.
+        let mut stderr = child.stderr.take().expect("piped");
+        let err_reader = std::thread::spawn(move || {
+            let mut err = String::new();
+            let _ = stderr.read_to_string(&mut err);
+            err
+        });
         let mut out = String::new();
-        let mut err = String::new();
         child.stdout.take().expect("piped").read_to_string(&mut out).map_err(|e| PickerError::Transport(e.to_string()))?;
-        child.stderr.take().expect("piped").read_to_string(&mut err).map_err(|e| PickerError::Transport(e.to_string()))?;
         let status = child.wait().map_err(|e| PickerError::Transport(e.to_string()))?;
+        let err = err_reader.join().unwrap_or_default();
         if status.success() {
             return Ok(out);
         }

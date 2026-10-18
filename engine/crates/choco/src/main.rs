@@ -326,7 +326,7 @@ fn main() -> Result<()> {
             let mut opts = HighlightOptions { prompt, ..Default::default() };
             opts.rank.max_clips = n;
             opts.rank.min_score = min_score;
-            let (cands, report) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &opts, &pr)?;
+            let (cands, report) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &opts, &pr, None)?;
             eprintln!(
                 "{} via {} · {} windows → {} shortlisted → {} scored ({} declined, {} failed batches) · {} model calls · {:.1}s",
                 llm.tier(), llm.model(picker::Role::Score), report.windows, report.shortlisted, report.scored,
@@ -374,10 +374,10 @@ fn main() -> Result<()> {
                     let opts = HighlightOptions { shortlist, shortlist_max_overlap_pct: overlap, ..Default::default() };
                     let ws = highlights::shortlist_only(&t, Some(&feats), &opts);
                     let found = f.clips.iter().filter(|g| ws.iter().any(|w| eval::hits((w.start_ms, w.end_ms), (g.start_ms, g.end_ms)))).count();
-                    total += found as f32 / f.clips.len() as f32;
+                    total += found as f32 / f.clips.len().max(1) as f32;
                     println!("{:<12} {:>8} {:>8}", f.id, f.clips.len(), found);
                 }
-                println!("shortlist recall (golden clips reachable by the model): {:.2}", total / set.fixtures.len() as f32);
+                println!("shortlist recall (golden clips reachable by the model): {:.2}", total / set.fixtures.len().max(1) as f32);
                 return Ok(());
             }
             let llm = if results.is_none() { Some(make_picker(pk)?) } else { None };
@@ -398,7 +398,7 @@ fn main() -> Result<()> {
                     ingest::extract_audio(&asset, &wav, &pr)?;
                     let feats = audio::analyze(&wav)?;
                     let before = llm.usage();
-                    let (c, _) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &HighlightOptions::default(), &pr)?;
+                    let (c, _) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &HighlightOptions::default(), &pr, None)?;
                     let after = llm.usage();
                     cost_tokens.score_input += after.score_input - before.score_input;
                     cost_tokens.score_output += after.score_output - before.score_output;

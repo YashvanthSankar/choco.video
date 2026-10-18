@@ -73,11 +73,17 @@ pub fn score_fixture(id: &str, picks: &[Candidate], golden: &[GoldenClip]) -> Fi
     let g: Vec<(u64, u64)> = golden.iter().map(|c| (c.start_ms, c.end_ms)).collect();
     let top5 = &p[..p.len().min(5)];
     let top10 = &p[..p.len().min(10)];
-    let precision_at_5 = if top5.is_empty() {
-        0.0
-    } else {
-        top5.iter().filter(|&&x| g.iter().any(|&y| hits(x, y))).count() as f32 / top5.len() as f32
-    };
+    // Precision@5 = distinct golden clips found by the top five picks, over five. Returning
+    // fewer picks is not rewarded, and two picks on the same golden clip count once.
+    let mut used = vec![false; g.len()];
+    let mut found = 0;
+    for &x in top5 {
+        if let Some(k) = (0..g.len()).find(|&k| !used[k] && hits(x, g[k])) {
+            used[k] = true;
+            found += 1;
+        }
+    }
+    let precision_at_5 = found as f32 / 5.0;
     let matched: Vec<f32> = g
         .iter()
         .filter_map(|&y| top10.iter().filter(|&&x| hits(x, y)).map(|&x| iou(x, y)).reduce(f32::max))
@@ -144,8 +150,13 @@ mod tests {
 
     #[test]
     fn fewer_than_five_picks_are_not_rewarded() {
-        // One perfect pick out of one is precision 1.0 over the picks actually made.
         let s = score_fixture("x", &[c(0, 30_000)], &[g(0, 30_000)]);
-        assert_eq!(s.precision_at_5, 1.0);
+        assert!((s.precision_at_5 - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn two_picks_on_one_golden_clip_count_once() {
+        let s = score_fixture("x", &[c(0, 30_000), c(45_000, 90_000)], &[g(0, 90_000)]);
+        assert!((s.precision_at_5 - 0.2).abs() < 1e-6);
     }
 }

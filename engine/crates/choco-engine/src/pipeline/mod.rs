@@ -61,8 +61,8 @@ pub fn run(file: &Path, opts: &RunOptions, llm: &dyn Llm, progress: ProgressFn, 
     let asset = ingest::probe(file)?;
     std::fs::create_dir_all(&opts.export.out_dir)?;
     let stem = file.file_stem().map(|s| export::slug(&s.to_string_lossy())).unwrap_or_else(|| "video".into());
-    let tmp = tempfile_dir()?;
-    let wav = tmp.join("audio.wav");
+    let tmp = TempDir::new()?;
+    let wav = tmp.path.join("audio.wav");
     ingest::extract_audio(&asset, &wav, progress)?;
     check(cancel)?;
     let feats = audio::analyze(&wav)?;
@@ -82,10 +82,10 @@ pub fn run(file: &Path, opts: &RunOptions, llm: &dyn Llm, progress: ProgressFn, 
         }
     };
     std::fs::write(&transcript_path, serde_json::to_string(&t)?)?;
-    let _ = std::fs::remove_dir_all(&tmp);
+    drop(tmp);
     check(cancel)?;
 
-    let (cands, report) = highlights::highlights(&t, Some(&feats), llm, &opts.highlights, progress)?;
+    let (cands, report) = highlights::highlights(&t, Some(&feats), llm, &opts.highlights, progress, Some(cancel))?;
     if cands.is_empty() {
         return Err(PipelineError::NoClips(opts.highlights.rank.min_score));
     }
@@ -104,9 +104,25 @@ pub fn run(file: &Path, opts: &RunOptions, llm: &dyn Llm, progress: ProgressFn, 
     Ok(result)
 }
 
-/// A private temporary directory without pulling the tempfile crate into the library.
-fn tempfile_dir() -> std::io::Result<PathBuf> {
-    let d = std::env::temp_dir().join(format!("choco-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)));
-    std::fs::create_dir_all(&d)?;
-    Ok(d)
+/// A private temporary directory, removed when dropped (also on error and cancel paths).
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new() -> std::io::Result<Self> {
+        let path = std::env::temp_dir().join(format!(
+            "choco-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&path)?;
+        Ok(Self { path })
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
 }

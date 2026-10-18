@@ -51,7 +51,7 @@ impl OpenAiCompatConfig {
             api_key,
             summarize_model: get("CHOCO_LLM_SUMMARY_MODEL").unwrap_or_else(|| score_model.clone()),
             score_model,
-            context_tokens: get("CHOCO_LLM_CONTEXT_TOKENS").and_then(|v| v.parse().ok()).unwrap_or(64_000),
+            context_tokens: get("CHOCO_LLM_CONTEXT_TOKENS").and_then(|v| v.parse().ok()).unwrap_or(64_000).max(4_096),
             // Reasoning models can think for minutes on a full-episode summary.
             timeout: Duration::from_secs(get("CHOCO_LLM_TIMEOUT_SECS").and_then(|v| v.parse().ok()).unwrap_or(420)),
         })
@@ -116,10 +116,18 @@ impl OpenAiCompat {
                 if let Some(r) = msg["refusal"].as_str().filter(|r| !r.is_empty()) {
                     return Err(PickerError::Declined(r.to_string()));
                 }
-                return msg["content"]
-                    .as_str()
-                    .map(str::to_string)
-                    .ok_or_else(|| PickerError::Transport(format!("no message content in: {}", text.chars().take(300).collect::<String>())));
+                // Content may be a string or an array of parts; some providers put text in
+                // `reasoning_content` only when they refuse to answer, which is a Declined.
+                let content = match &msg["content"] {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Array(parts) => Some(parts.iter().filter_map(|p| p["text"].as_str()).collect::<Vec<_>>().join("")),
+                    _ => None,
+                };
+                let content = content.filter(|c| !c.trim().is_empty()).ok_or_else(|| PickerError::Transport(format!("no message content in: {}", text.chars().take(300).collect::<String>())))?;
+                if v["choices"][0]["finish_reason"].as_str() == Some("length") {
+                    return Err(PickerError::Parse(format!("reply was cut off at the provider's output limit ({} chars)", content.len())));
+                }
+                return Ok(content);
             }
             if matches!(status, 429 | 500..=599) && attempt < 3 {
                 attempt += 1;

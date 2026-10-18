@@ -120,14 +120,19 @@ pub fn scores_schema() -> Value {
     })
 }
 
-/// Strip reasoning blocks and code fences, then take the outermost JSON object.
+/// Strip reasoning blocks and code fences, then take the outermost JSON object, or the outermost
+/// array when the reply is a bare array of scores.
 pub(crate) fn extract_json(raw: &str) -> &str {
     let mut s = raw;
     if let Some(end) = s.rfind("</think>") {
         s = &s[end + "</think>".len()..];
     }
-    match (s.find('{'), s.rfind('}')) {
-        (Some(a), Some(b)) if b > a => &s[a..=b],
+    let obj = s.find('{').map(|a| (a, s.rfind('}')));
+    let arr = s.find('[').map(|a| (a, s.rfind(']')));
+    match (obj, arr) {
+        (Some((a, Some(b))), Some((c, _))) if b > a && a <= c => &s[a..=b],
+        (_, Some((c, Some(d)))) if d > c => &s[c..=d],
+        (Some((a, Some(b))), _) if b > a => &s[a..=b],
         _ => s.trim(),
     }
 }
@@ -196,17 +201,31 @@ pub(crate) fn repair_keys(s: &str) -> String {
 pub fn parse_scores(raw: &str, expected_ids: &[String]) -> Result<Vec<ScoreOut>> {
     let repaired = repair_keys(extract_json(raw));
     let body = repaired.as_str();
-    let mut scores: Vec<ScoreOut> = match serde_json::from_str::<ScoresOut>(body) {
-        Ok(s) => s.scores,
-        Err(e) => match serde_json::from_str::<Vec<ScoreOut>>(raw.trim()) {
-            Ok(v) => v,
-            Err(_) => return Err(PickerError::Parse(format!("{e}; output began: {}", raw.chars().take(200).collect::<String>()))),
-        },
+    // Parse loosely first, then convert entries one by one so a single malformed entry
+    // (score as a string, missing field) drops that entry instead of the whole batch.
+    let value: Value = serde_json::from_str(body).map_err(|e| PickerError::Parse(format!("{e}; output began: {}", raw.chars().take(200).collect::<String>())))?;
+    let entries: Vec<Value> = match value {
+        Value::Object(mut m) => m.remove("scores").and_then(|v| v.as_array().cloned()).unwrap_or_default(),
+        Value::Array(a) => a,
+        _ => Vec::new(),
     };
+    let mut scores: Vec<ScoreOut> = entries
+        .into_iter()
+        .filter_map(|mut e| {
+            // Tolerate numeric strings and float ids.
+            if let Some(s) = e.get("score").and_then(|v| v.as_str()).and_then(|s| s.trim().parse::<f32>().ok()) {
+                e["score"] = Value::from(s);
+            }
+            if let Some(n) = e.get("id").and_then(|v| v.as_u64()) {
+                e["id"] = Value::from(n.to_string());
+            }
+            serde_json::from_value::<ScoreOut>(e).ok()
+        })
+        .collect();
     scores.retain(|s| expected_ids.contains(&s.id));
     for s in &mut scores {
         s.score = s.score.clamp(0.0, 100.0);
-        s.title = s.title.chars().take(80).collect();
+        s.title = trim_title(&s.title, 60);
         s.hashtags.retain(|h| h.starts_with('#') && h.len() > 1);
         s.hashtags.truncate(5);
     }
@@ -214,6 +233,19 @@ pub fn parse_scores(raw: &str, expected_ids: &[String]) -> Result<Vec<ScoreOut>>
         return Err(PickerError::Parse("no scores for the requested ids".into()));
     }
     Ok(scores)
+}
+
+/// Cut at a word boundary to at most `max` characters, no ellipsis.
+pub(crate) fn trim_title(t: &str, max: usize) -> String {
+    let t = t.trim();
+    if t.chars().count() <= max {
+        return t.to_string();
+    }
+    let cut: String = t.chars().take(max).collect();
+    match cut.rfind(' ') {
+        Some(i) if i > max / 2 => cut[..i].trim_end_matches([',', ':', ';', '-']).to_string(),
+        _ => cut,
+    }
 }
 
 pub fn estimate_tokens(s: &str) -> usize {
@@ -261,6 +293,16 @@ mod tests {
         let s = parse_scores(raw, &["w1".into()]).unwrap();
         assert_eq!(s[0].title, "Leadership — hypocrisy 🎯 नेतृत्व");
         assert_eq!(s[0].reasons, vec!["naïve – ok"]);
+    }
+
+    #[test]
+    fn bare_arrays_fences_and_bad_entries() {
+        let ids = vec!["c1".to_string(), "c2".to_string()];
+        let raw = "```json\n[{\"id\":\"c1\",\"score\":\"77\",\"reasons\":[],\"title\":\"t\",\"description\":\"d\",\"hashtags\":[]},{\"id\":\"c2\",\"score\":\"high\"}]\n```";
+        let s = parse_scores(raw, &ids).unwrap();
+        assert_eq!(s.len(), 1);
+        assert_eq!(s[0].score, 77.0);
+        assert_eq!(trim_title("A very long title that goes on and on and on past sixty characters for sure", 60), "A very long title that goes on and on and on past sixty");
     }
 
     #[test]

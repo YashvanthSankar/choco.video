@@ -5,6 +5,7 @@
 use crate::model::{Candidate, Progress, Transcript};
 use crate::ProgressFn;
 use picker::{Llm, PickerError, Role, ScoreOut, Usage};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub mod audio;
 pub mod picker;
@@ -64,8 +65,21 @@ pub enum HighlightError {
     NoWindows,
     #[error("highlights: prompt matched nothing in the transcript")]
     NoMatches,
+    #[error("highlights: the picker failed on every batch ({declined} declined, {failed} failed); last error: {last}")]
+    AllBatchesFailed { declined: usize, failed: usize, last: String },
+    #[error("highlights: cancelled")]
+    Cancelled,
     #[error(transparent)]
     Picker(#[from] PickerError),
+}
+
+/// Errors that mean the picker is misconfigured or unreachable: stop the job instead of
+/// retrying the same failure on every batch.
+fn is_fatal(e: &PickerError) -> bool {
+    matches!(
+        e,
+        PickerError::NotConfigured(_) | PickerError::Unavailable { .. } | PickerError::Http { status: 400..=404 | 422, .. }
+    )
 }
 
 fn fmt_ts(ms: u64) -> String {
@@ -117,7 +131,7 @@ fn batch_prompt(summary: &str, batch: &[&windows::Window], prompt: Option<&str>)
 }
 
 /// Score one batch: strict parse, one retry on bad output, one re-ask for ids the model skipped.
-fn score_batch(llm: &dyn Llm, summary: &str, batch: &[&windows::Window], prompt: Option<&str>, calls: &mut usize) -> Result<Vec<ScoreOut>, PickerError> {
+fn score_batch(llm: &dyn Llm, summary: &str, batch: &[&windows::Window], prompt: Option<&str>, calls: &mut usize, skipped: &mut Vec<String>) -> Result<Vec<ScoreOut>, PickerError> {
     let ids: Vec<String> = batch.iter().map(|w| w.id.clone()).collect();
     let user = batch_prompt(summary, batch, prompt);
     *calls += 1;
@@ -134,11 +148,10 @@ fn score_batch(llm: &dyn Llm, summary: &str, batch: &[&windows::Window], prompt:
     if !missing.is_empty() {
         let mids: Vec<String> = missing.iter().map(|w| w.id.clone()).collect();
         *calls += 1;
-        if let Ok(more) = llm
-            .scores_json(picker::SCORE_PROMPT, &batch_prompt(summary, &missing, prompt))
-            .and_then(|raw| picker::parse_scores(&raw, &mids))
-        {
-            scores.extend(more);
+        match llm.scores_json(picker::SCORE_PROMPT, &batch_prompt(summary, &missing, prompt)).and_then(|raw| picker::parse_scores(&raw, &mids)) {
+            Ok(more) => scores.extend(more),
+            Err(e) if is_fatal(&e) => return Err(e),
+            Err(e) => skipped.push(format!("re-ask for {} skipped ids failed: {e}", mids.len())),
         }
     }
     Ok(scores)
@@ -160,7 +173,9 @@ pub fn highlights(
     llm: &dyn Llm,
     opts: &HighlightOptions,
     progress: ProgressFn,
+    cancel: Option<&AtomicBool>,
 ) -> Result<(Vec<Candidate>, HighlightReport), HighlightError> {
+    let cancelled = || cancel.is_some_and(|c| c.load(Ordering::Relaxed));
     let mut report = HighlightReport::default();
     progress(Progress::new(STAGE, 0.0, "finding candidate clips"));
     let ws = windows::windows(t, &opts.windows);
@@ -169,16 +184,29 @@ pub fn highlights(
         return Err(HighlightError::NoWindows);
     }
 
-    let scores: Vec<f32> = match &opts.prompt {
+    // Prompt mode: only windows that actually match are candidates; the quality prior breaks
+    // ties. Otherwise the model would be paid to score 80 unrelated windows for a 3-clip answer.
+    let (ws, scores): (Vec<windows::Window>, Vec<f32>) = match &opts.prompt {
         Some(p) => {
             let b = search::bm25(&ws, p);
-            if b.iter().all(|&s| s <= 0.0) {
+            let kept: Vec<(windows::Window, f32)> = ws
+                .into_iter()
+                .zip(b)
+                .filter(|(_, s)| *s > 0.0)
+                .map(|(w, s)| {
+                    let prior = search::prior(&w, audio.map(|a| a.window(w.start_ms, w.end_ms)).as_ref());
+                    (w, s + 0.1 * prior)
+                })
+                .collect();
+            if kept.is_empty() {
                 return Err(HighlightError::NoMatches);
             }
-            // Relevance first, quality as a tie-breaker.
-            b.iter().zip(&ws).map(|(&s, w)| s + 0.1 * search::prior(w, audio.map(|a| a.window(w.start_ms, w.end_ms)).as_ref())).collect()
+            kept.into_iter().unzip()
         }
-        None => ws.iter().map(|w| search::prior(w, audio.map(|a| a.window(w.start_ms, w.end_ms)).as_ref())).collect(),
+        None => {
+            let s = ws.iter().map(|w| search::prior(w, audio.map(|a| a.window(w.start_ms, w.end_ms)).as_ref())).collect();
+            (ws, s)
+        }
     };
     let short = search::shortlist_with(&ws, &scores, opts.shortlist, opts.shortlist_max_overlap_pct as f32 / 100.0);
     report.shortlisted = short.len();
@@ -187,9 +215,17 @@ pub fn highlights(
     let mut calls = 0;
     // The summary is context, not a requirement: if it fails (slow reasoning model, outage),
     // score without it rather than failing the whole job. Auth and config errors still stop.
+    if cancelled() {
+        return Err(HighlightError::Cancelled);
+    }
     let summary = match summarize(llm, t, opts.summary_words, &mut calls) {
-        Ok(s) => s,
-        Err(e @ (PickerError::NotConfigured(_) | PickerError::Unavailable { .. } | PickerError::Http { status: 401 | 403, .. })) => return Err(e.into()),
+        Ok(s) => {
+            // The model does not always respect the word limit; the summary is pasted into
+            // every batch, so cap it.
+            let words: Vec<&str> = s.split_whitespace().collect();
+            if words.len() > opts.summary_words * 3 / 2 { words[..opts.summary_words * 3 / 2].join(" ") } else { s }
+        }
+        Err(e) if is_fatal(&e) => return Err(e.into()),
         Err(e) => {
             report.errors.push(format!("summary skipped: {e}"));
             String::from("(no summary available; judge each clip on its own)")
@@ -200,42 +236,54 @@ pub fn highlights(
     let picked: Vec<&windows::Window> = short.iter().map(|&i| &ws[i]).collect();
     let mut by_id: std::collections::HashMap<String, ScoreOut> = Default::default();
     let batches: Vec<&[&windows::Window]> = picked.chunks(llm.batch_size().max(1)).collect();
+    let mut consecutive_failures = 0usize;
+    let mut last_error = String::new();
+    let mut skipped: Vec<String> = Vec::new();
     for (bi, batch) in batches.iter().enumerate() {
+        if cancelled() {
+            return Err(HighlightError::Cancelled);
+        }
         progress(Progress::new(
             STAGE,
             0.1 + 0.85 * bi as f32 / batches.len() as f32,
             format!("scoring batch {}/{} with {}", bi + 1, batches.len(), llm.model(Role::Score)),
         ));
-        match score_batch(llm, &summary, batch, opts.prompt.as_deref(), &mut calls) {
-            Ok(s) => s.into_iter().for_each(|x| {
-                by_id.insert(x.id.clone(), x);
-            }),
+        match score_batch(llm, &summary, batch, opts.prompt.as_deref(), &mut calls, &mut skipped) {
+            Ok(s) => {
+                consecutive_failures = 0;
+                s.into_iter().for_each(|x| {
+                    by_id.insert(x.id.clone(), x);
+                })
+            }
             Err(PickerError::Declined(m)) => {
+                consecutive_failures = 0;
                 report.declined_batches += 1;
                 if report.errors.len() < 8 {
                     report.errors.push(format!("batch {}: declined: {m}", bi + 1));
                 }
             }
-            Err(e @ (PickerError::NotConfigured(_) | PickerError::Unavailable { .. } | PickerError::Http { status: 401 | 403, .. })) => {
-                return Err(e.into());
-            }
+            Err(e) if is_fatal(&e) => return Err(e.into()),
             Err(e) => {
                 report.failed_batches += 1;
+                consecutive_failures += 1;
+                last_error = e.to_string();
                 if report.errors.len() < 8 {
                     report.errors.push(format!("batch {}: {e}", bi + 1));
+                }
+                // Two failures in a row with nothing scored yet means the provider is not
+                // working for this job; stop before paying for every remaining batch.
+                if consecutive_failures >= 2 && by_id.is_empty() {
+                    break;
                 }
             }
         }
     }
+    report.errors.extend(skipped.into_iter().take(4));
     report.model_calls = calls;
     report.usage = llm.usage();
     report.scored = by_id.len();
     if by_id.is_empty() {
-        return Err(PickerError::Parse(format!(
-            "no batch produced scores ({} declined, {} failed)",
-            report.declined_batches, report.failed_batches
-        ))
-        .into());
+        return Err(HighlightError::AllBatchesFailed { declined: report.declined_batches, failed: report.failed_batches, last: last_error });
     }
 
     let prov = picker::provenance(llm);
@@ -320,7 +368,7 @@ mod tests {
         let ws = windows::windows(&t, &windows::WindowOptions::default());
         let texts = ws.iter().map(|w| (w.id.clone(), w.text.clone())).collect();
         let llm = FakeLlm { calls: Mutex::new(vec![]), texts };
-        let (cands, report) = highlights(&t, None, &llm, &HighlightOptions { shortlist: 40, ..Default::default() }, &|_| {}).unwrap();
+        let (cands, report) = highlights(&t, None, &llm, &HighlightOptions { shortlist: 40, ..Default::default() }, &|_| {}, None).unwrap();
         assert!(report.windows > 0 && report.shortlisted <= 40);
         assert!(!cands.is_empty());
         // Top clips contain the special sentences and never overlap each other much.
@@ -362,7 +410,7 @@ mod tests {
     fn a_failed_summary_does_not_fail_the_job() {
         let t = windows::tests::synthetic(40, 6_000, 16, 200);
         let llm = NoSummary(FakeLlm { calls: Mutex::new(vec![]), texts: Default::default() });
-        let (cands, report) = highlights(&t, None, &llm, &HighlightOptions { rank: rank::RankOptions { min_score: 0, ..Default::default() }, ..Default::default() }, &|_| {}).unwrap();
+        let (cands, report) = highlights(&t, None, &llm, &HighlightOptions { rank: rank::RankOptions { min_score: 0, ..Default::default() }, ..Default::default() }, &|_| {}, None).unwrap();
         assert!(!cands.is_empty());
         assert!(report.errors.iter().any(|e| e.starts_with("summary skipped")));
     }
@@ -372,6 +420,6 @@ mod tests {
         let t = windows::tests::synthetic(30, 6_000, 16, 200);
         let llm = FakeLlm { calls: Mutex::new(vec![]), texts: Default::default() };
         let opts = HighlightOptions { prompt: Some("zebras".into()), ..Default::default() };
-        assert!(matches!(highlights(&t, None, &llm, &opts, &|_| {}), Err(HighlightError::NoMatches)));
+        assert!(matches!(highlights(&t, None, &llm, &opts, &|_| {}, None), Err(HighlightError::NoMatches)));
     }
 }
