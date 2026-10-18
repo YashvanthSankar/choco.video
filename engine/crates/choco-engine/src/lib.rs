@@ -6,6 +6,7 @@
 pub mod backend;
 pub mod captions;
 pub mod eval;
+pub mod export;
 pub mod highlights;
 pub mod ingest;
 pub mod model;

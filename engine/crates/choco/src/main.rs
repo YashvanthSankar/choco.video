@@ -104,6 +104,35 @@ enum Cmd {
         #[arg(long)]
         poster: Option<PathBuf>,
     },
+    /// Whole pipeline: transcribe, pick the best clips, render and export them.
+    Run {
+        file: PathBuf,
+        /// Maximum clips; content decides the count.
+        #[arg(long, default_value_t = 10)]
+        n: usize,
+        /// Only clips about this, e.g. "pricing".
+        #[arg(long)]
+        prompt: Option<String>,
+        #[arg(long, value_enum, default_value_t = PickerArg::Auto)]
+        picker: PickerArg,
+        /// Caption style (clean, bold, karaoke, minimal) or "none".
+        #[arg(long, default_value = "bold")]
+        style: String,
+        /// shorts, square, portrait, landscape.
+        #[arg(long, default_value = "shorts")]
+        preset: String,
+        /// static or fit.
+        #[arg(long, default_value = "static")]
+        layout: String,
+        /// Reuse a transcript instead of transcribing.
+        #[arg(long)]
+        transcript: Option<PathBuf>,
+        #[arg(long, default_value_t = 55)]
+        min_score: u8,
+        /// Output folder.
+        #[arg(long, short, default_value = "clips")]
+        out: PathBuf,
+    },
     /// Write a PNG frame from the video.
     Thumbnail {
         file: PathBuf,
@@ -406,6 +435,72 @@ fn main() -> Result<()> {
                 r.duration_ms as f64 / r.wall_ms.max(1) as f64, if r.has_audio { "yes" } else { "no" }
             );
             eprintln!("wrote {}", out.display());
+        }
+        Cmd::Run { file, n, prompt, picker: pk, style, preset, layout, transcript, min_score, out } => {
+            use choco_engine::{captions, export};
+            let started = Instant::now();
+            if export::preset_size(&preset).is_none() {
+                bail!("unknown preset {preset} (use one of {:?})", export::PRESETS);
+            }
+            let style = if style == "none" { None } else { Some(captions::preset(&style).with_context(|| format!("unknown style {style}"))?) };
+            let layout = match layout.as_str() {
+                "static" => choco_engine::Layout::Static,
+                "fit" => choco_engine::Layout::Fit,
+                other => bail!("unknown layout {other}"),
+            };
+            let llm = make_picker(pk)?;
+            let pr = progress_printer(false);
+            let asset = ingest::probe(&file).with_context(|| format!("probing {}", file.display()))?;
+            std::fs::create_dir_all(&out)?;
+            let tmp = tempfile::tempdir()?;
+            let wav = tmp.path().join("audio.wav");
+            ingest::extract_audio(&asset, &wav, &pr)?;
+            let feats = audio::analyze(&wav)?;
+            let stem = file.file_stem().map(|s| export::slug(&s.to_string_lossy())).unwrap_or_else(|| "video".into());
+            let t: Transcript = match transcript {
+                Some(p) => serde_json::from_str(&std::fs::read_to_string(&p)?)?,
+                None => {
+                    let b = backend::detect();
+                    let opts = TranscribeOptions {
+                        language: None,
+                        whisper_model: b.recommended_models().whisper_model.unwrap_or_else(|| models_registry::WHISPER_DEFAULT.into()),
+                        models_dir: models_registry::default_dir(),
+                    };
+                    let t = transcribe::transcribe(&wav, b.speech_engines()[0], &opts, &pr)?;
+                    std::fs::write(out.join(format!("{stem}.transcript.json")), serde_json::to_string(&t)?)?;
+                    t
+                }
+            };
+            let mut hopts = HighlightOptions { prompt, ..Default::default() };
+            hopts.rank.max_clips = n;
+            hopts.rank.min_score = min_score;
+            let (cands, report) = highlights::highlights(&t, Some(&feats), llm.as_ref(), &hopts, &pr)?;
+            if cands.is_empty() {
+                bail!("no clip scored at least {min_score}; try --min-score lower or a different picker");
+            }
+            let eopts = export::ExportOptions { preset, style, layout, out_dir: out.clone(), ..Default::default() };
+            let mut raster = choco_engine::captions::Rasterizer::new();
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let mut job = export::Job { raster: &mut raster, progress: &pr, cancel: &cancel };
+            let mut exported = Vec::new();
+            for (i, c) in cands.iter().enumerate() {
+                eprintln!("[{}/{}] {} ({}s, score {})", i + 1, cands.len(), c.title, (c.end_ms - c.start_ms) / 1000, c.score);
+                exported.push(export::export_clip(&asset, &t, c, i + 1, &eopts, &mut job)?);
+            }
+            std::fs::write(
+                out.join(format!("{stem}.run.json")),
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "source": asset, "picker": report, "clips": exported,
+                }))?,
+            )?;
+            eprintln!("{} clips in {} · {:.0}s total", exported.len(), out.display(), started.elapsed().as_secs_f64());
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&exported)?);
+            } else {
+                for e in &exported {
+                    println!("{:>2}. [{:>3}] {}", e.rank, e.candidate.score, e.mp4.display());
+                }
+            }
         }
         Cmd::Thumbnail { file, at_ms, width, out } => {
             let a = ingest::probe(&file)?;

@@ -59,11 +59,11 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 - [x] Compose: crop rect per frame from an interpolated `CropPlan`, layouts static/single/split/fit (blurred background), caption sprites cached per word state
 - [x] Encode: `h264_videotoolbox` High, BT.709, `allow_sw` fallback; encoders drained on EAGAIN
 - [x] Mux: MP4 `+faststart`, audio interleaved by timestamp → verified moov before mdat
-- [ ] `export/` presets (9:16, 1:1, 4:5, 16:9), naming, sidecar JSON, PNG poster, SRT + VTT per clip (no watermark: open source, no trial)
+- [x] `export/` presets (shorts/tiktok/reels 9:16, square, portrait 4:5, landscape), `<source>-<rank>-<slug>` naming, sidecar JSON (title, description, hashtags, score, reasons, timecodes, picker, files), poster PNG, SRT + VTT
 - [x] Loudness normalization: single-pass `loudnorm` I=-14 TP=-1.5 → measured -14.5 LUFS, -4.5 dBFS peak on the test clip
-- [ ] `choco render` and `choco run` end to end with `Static` layout
+- [x] `choco render` and `choco run` end to end with `Static` (and `Fit`) layout → 72-min podcast to 3 finished clips in 149 s with DeepSeek V4.1 Flash; 2 of 3 picks match the editor agent's golden clips
 - [x] Tests: 10 render integration tests (H.264, VP9, AV1, rotated, no-audio, fit, past-the-end) + 3 snapshot tests on composed frames (luma fingerprints, tolerance 2/255)
-- [ ] Render benchmark: 60 s clip wall time on M3 Pro, recorded
+- [x] Render benchmark: 45–62 s clips from a VP9 640x360 source to 1080x1920 at 25 fps in 8.2–10.8 s (5.6–5.7x realtime) on M3 Pro
 
 ## M4 Reframe (weeks 7–8)
 

@@ -101,7 +101,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | 2026-10-18 | Word-start error vs synthesized ground truth (62 words, `fixtures/timing.py`) | Apple: median 103 ms, bias −100 ms, 49% within 100 ms. Whisper turbo-q5 token times: median 256 ms, bias −232 ms, 11% within 100 ms | Both early. Captions need ≤ 50 ms; fix in M3 (DTW, offset calibration) |
 | — | Picker on the 72-min podcast per OpenCode model: wall time, tokens, cost per source hour | in progress | M2 |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |
-| — | Render 60 s clip 1080x1920, VideoToolbox | not measured | M3 target |
+| 2026-10-18 | Render 62 s clip to 1080x1920 (VP9 640x360 source, bold captions, loudnorm), VideoToolbox H.264 | 10.8 s wall, 5.7x realtime; ~25 MB at 10 Mbps | CPU compositor, no GPU library |
 | — | Golden set precision@5, provider tier (recommended scoring model) | not measured | M2 baseline |
 | — | Golden set precision@5 and cost per source hour, candidate scoring models on OpenCode Zen | not measured | M2; pick the cheapest model within 2 points of the best |
 | — | Golden set precision@5, apple and local tiers | not measured | M2 |
