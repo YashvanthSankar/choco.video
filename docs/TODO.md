@@ -59,13 +59,17 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [x] Keychain-only key storage; key saved only after the model list succeeds; strict CSP; scoped asset protocol; capabilities limited to dialogs, reveal, and OpenCode/GitHub links; app `deny.toml` passes
 - [x] Release bundle: `scripts/build-app.sh` (Apple helper sidecar, six FFmpeg dylibs in `Contents/Frameworks`, no build-machine rpath in release) → `choco.video.app` 20 MB, DMG 9.9 MB, launches and stays up
 - [x] README, CONTRIBUTING (DCO), `llms.txt`; landing page in `site/` with a live canvas demo
+- [x] UI redesign (macOS-native, light/dark, stage list, results grid), reviewed screen by screen
+- [x] Release workflow (`release.yml`): tag → build → DMG on GitHub Releases, signing/notarization when the Apple secrets exist
+- [x] **v0.1.0 released** (ad-hoc signed, sealed bundle, 9.9 MB DMG): https://github.com/YashvanthSankar/choco.video/releases/tag/v0.1.0 — the repo is private, so only collaborators can download it until it is made public
 - [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`; then rerun `choco eval` per model and freeze `OPENCODE_RECOMMENDED`
-- [ ] Push to GitHub so CI runs; fix whatever the first run reports
+- [x] Pushed; first CI runs found two real gaps (the bundled face model was gitignored, fixtures never generated) and an unmaintained-crate advisory → fixed
 - [ ] Developer ID signing + notarization (needs your Apple Developer account); without it the DMG only runs after right-click → Open
 - [ ] Tauri updater with signed manifests and a release channel
-- [ ] App icon (the bundle still carries Tauri's placeholder icon)
+- [~] App icon: an interim icon ships in 0.1.0; the final logo is still being chosen (four directions rejected so far)
 - [ ] First-launch guidance when Apple Intelligence is off and no key is set (today the Apple option is disabled with a one-line reason)
-- [ ] Demo video and launch posts (Product Hunt, r/podcasting, r/NewTubers, creator Discords)
+- [x] 40 s launch video from real choco.video output (HyperFrames project in `videos/choco-launch`), in the site hero
+- [ ] Launch posts (Product Hunt, r/podcasting, r/NewTubers, creator Discords)
 
 ## M6 Windows (after the Mac launch)
 
@@ -88,6 +92,6 @@ Groundwork: `backend/windows.rs` placeholder; pinned Windows LGPL FFmpeg build a
 ## Needs you
 
 1. Watch the 40 golden clips (`eval/REVIEW.md`) and correct them. Every picker number depends on this.
-2. Push to GitHub and tell me, so CI gets its first run.
+2. Decide when to make the repository public: the release and the site's download link only work for collaborators until then.
 3. An Apple Developer account for signing, when you want a DMG others can open without the right-click dance.
 4. An app icon, or say the word and I draft one.
