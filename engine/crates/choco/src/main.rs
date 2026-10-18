@@ -79,6 +79,31 @@ enum Cmd {
         #[arg(long, default_value = "eval/results")]
         out_dir: PathBuf,
     },
+    /// Render one vertical clip with captions.
+    Render {
+        file: PathBuf,
+        #[arg(long)]
+        start_ms: u64,
+        #[arg(long)]
+        end_ms: u64,
+        /// Transcript JSON for captions (from `choco transcribe -o`). Omit for no captions.
+        #[arg(long)]
+        transcript: Option<PathBuf>,
+        /// Caption style: clean, bold, karaoke, minimal.
+        #[arg(long, default_value = "bold")]
+        style: String,
+        /// Output size preset: shorts (1080x1920), square (1080x1080), portrait (1080x1350), landscape (1920x1080).
+        #[arg(long, default_value = "shorts")]
+        preset: String,
+        /// static (centre crop) or fit (whole frame over a blurred background).
+        #[arg(long, default_value = "static")]
+        layout: String,
+        #[arg(long, short)]
+        out: PathBuf,
+        /// Also write a poster PNG of the middle frame here.
+        #[arg(long)]
+        poster: Option<PathBuf>,
+    },
     /// Write a PNG frame from the video.
     Thumbnail {
         file: PathBuf,
@@ -330,6 +355,57 @@ fn main() -> Result<()> {
                 "label": label, "score": total, "usage": cost_tokens, "source_ms": source_ms,
             }))?)?;
             eprintln!("wrote {}", path.display());
+        }
+        Cmd::Render { file, start_ms, end_ms, transcript, style, preset, layout, out, poster } => {
+            use choco_engine::{captions, render};
+            if end_ms <= start_ms {
+                bail!("--end-ms must be after --start-ms");
+            }
+            let size = match preset.as_str() {
+                "shorts" | "tiktok" | "reels" => (1080, 1920),
+                "square" => (1080, 1080),
+                "portrait" => (1080, 1350),
+                "landscape" => (1920, 1080),
+                other => bail!("unknown preset {other}"),
+            };
+            let asset = ingest::probe(&file)?;
+            let v = asset.video.as_ref().context("source has no video")?;
+            let mut plan = render::center_crop_plan((v.display_width, v.display_height), size, start_ms);
+            match layout.as_str() {
+                "static" => {}
+                "fit" => plan.layout = choco_engine::Layout::Fit,
+                other => bail!("unknown layout {other}"),
+            }
+            let mut raster = captions::Rasterizer::new();
+            let track = match &transcript {
+                Some(p) => {
+                    let t: Transcript = serde_json::from_str(&std::fs::read_to_string(p)?)?;
+                    let st = captions::preset(&style).with_context(|| format!("unknown style {style}"))?;
+                    Some(captions::chunk(&t, (start_ms, end_ms), &st, size, &mut raster, &captions::ChunkOptions::default()))
+                }
+                None => None,
+            };
+            let mid = (start_ms + end_ms) / 2;
+            let spec = render::RenderSpec {
+                start_ms,
+                end_ms,
+                size,
+                crop: &plan,
+                captions: track.as_ref(),
+                normalize_audio: true,
+                max_fps: 60,
+                video_bitrate: 10_000_000,
+                poster: poster.as_deref().map(|p| (mid, p)),
+            };
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let pr = progress_printer(false);
+            let r = render::render_clip(&asset, &spec, &out, &mut raster, &pr, &cancel)?;
+            eprintln!(
+                "{} frames at {}/{} fps, {:.1}s of video in {:.1}s ({:.1}x realtime), audio {}",
+                r.frames, r.fps.0, r.fps.1, r.duration_ms as f64 / 1000.0, r.wall_ms as f64 / 1000.0,
+                r.duration_ms as f64 / r.wall_ms.max(1) as f64, if r.has_audio { "yes" } else { "no" }
+            );
+            eprintln!("wrote {}", out.display());
         }
         Cmd::Thumbnail { file, at_ms, width, out } => {
             let a = ingest::probe(&file)?;

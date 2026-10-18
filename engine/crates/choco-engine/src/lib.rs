@@ -10,6 +10,7 @@ pub mod highlights;
 pub mod ingest;
 pub mod model;
 pub mod models_registry;
+pub mod render;
 pub mod transcribe;
 
 pub use model::*;
