@@ -26,6 +26,8 @@ pub enum PickerError {
     Parse(String),
     #[error("picker: the model declined this batch: {0}")]
     Declined(String),
+    #[error("picker: the request did not fit the model's context: {0}")]
+    ContextTooLong(String),
 }
 
 pub type Result<T> = std::result::Result<T, PickerError>;

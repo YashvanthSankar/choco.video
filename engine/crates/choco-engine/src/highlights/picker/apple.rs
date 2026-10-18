@@ -51,6 +51,10 @@ impl AppleLlm {
             .unwrap_or_else(|| err.trim().to_string());
         Err(if let Some(m) = msg.strip_prefix("declined: ").or_else(|| msg.contains("sensitive content").then_some(msg.as_str())) {
             PickerError::Declined(m.into())
+        } else if let Some(m) = msg.strip_prefix("context: ").or_else(|| msg.contains("exceeds the maximum allowed context").then_some(msg.as_str())) {
+            // Measured on a 14-minute video: a 4-candidate batch plus summary overran the
+            // 8,192-token window. The caller splits the batch and retries.
+            PickerError::ContextTooLong(m.into())
         } else if let Some(m) = msg.strip_prefix("unavailable: ") {
             PickerError::Unavailable { tier: "apple", msg: m.into() }
         } else {
@@ -70,7 +74,7 @@ impl Llm for AppleLlm {
         4_096
     }
     fn batch_size(&self) -> usize {
-        4
+        3
     }
     fn text(&self, _role: Role, system: &str, user: &str) -> Result<String> {
         let out = self.run("text", system, user)?;

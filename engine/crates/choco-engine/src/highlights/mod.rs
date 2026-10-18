@@ -131,7 +131,27 @@ fn batch_prompt(summary: &str, batch: &[&windows::Window], prompt: Option<&str>)
 }
 
 /// Score one batch: strict parse, one retry on bad output, one re-ask for ids the model skipped.
+/// Score a batch; when the model's context is too small for it, split and score the halves.
 fn score_batch(llm: &dyn Llm, summary: &str, batch: &[&windows::Window], prompt: Option<&str>, calls: &mut usize, skipped: &mut Vec<String>) -> Result<Vec<ScoreOut>, PickerError> {
+    match score_batch_once(llm, summary, batch, prompt, calls, skipped) {
+        Err(PickerError::ContextTooLong(m)) if batch.len() > 1 => {
+            let (a, b) = batch.split_at(batch.len() / 2);
+            let mut out = score_batch(llm, summary, a, prompt, calls, skipped)?;
+            out.extend(score_batch(llm, summary, b, prompt, calls, skipped)?);
+            skipped.push(format!("batch split in two: {m}"));
+            Ok(out)
+        }
+        Err(PickerError::ContextTooLong(m)) => {
+            // A single window does not fit: drop the episode summary for it.
+            let short = "(summary omitted: context limit)";
+            skipped.push(format!("window {} scored without the summary: {m}", batch[0].id));
+            score_batch_once(llm, short, batch, prompt, calls, skipped)
+        }
+        other => other,
+    }
+}
+
+fn score_batch_once(llm: &dyn Llm, summary: &str, batch: &[&windows::Window], prompt: Option<&str>, calls: &mut usize, skipped: &mut Vec<String>) -> Result<Vec<ScoreOut>, PickerError> {
     let ids: Vec<String> = batch.iter().map(|w| w.id.clone()).collect();
     let user = batch_prompt(summary, batch, prompt);
     *calls += 1;
@@ -383,6 +403,37 @@ mod tests {
         let text_calls = llm.calls.lock().unwrap().iter().filter(|c| c.starts_with("text:")).count();
         assert!(text_calls > 1, "expected map-reduce, got {text_calls} summary calls");
         // Skipped ids were re-asked: every shortlisted window ended up scored.
+        assert_eq!(report.scored, report.shortlisted);
+    }
+
+    /// Rejects any batch of more than one candidate as too long.
+    struct Tiny(FakeLlm);
+    impl Llm for Tiny {
+        fn tier(&self) -> &'static str {
+            "fake"
+        }
+        fn model(&self, r: Role) -> String {
+            self.0.model(r)
+        }
+        fn context_tokens(&self) -> usize {
+            100_000
+        }
+        fn text(&self, r: Role, s: &str, u: &str) -> Result<String, PickerError> {
+            self.0.text(r, s, u)
+        }
+        fn scores_json(&self, s: &str, u: &str) -> Result<String, PickerError> {
+            let n = u.lines().filter(|l| l.starts_with("[w")).count();
+            if n > 1 { Err(PickerError::ContextTooLong("too long".into())) } else { self.0.scores_json(s, u) }
+        }
+    }
+
+    #[test]
+    fn oversized_batches_are_split_until_they_fit() {
+        let t = windows::tests::synthetic(40, 6_000, 16, 200);
+        let llm = Tiny(FakeLlm { calls: Mutex::new(vec![]), texts: Default::default() });
+        let (cands, report) = highlights(&t, None, &llm, &HighlightOptions { rank: rank::RankOptions { min_score: 0, ..Default::default() }, ..Default::default() }, &|_| {}, None).unwrap();
+        assert!(!cands.is_empty());
+        assert_eq!(report.failed_batches, 0);
         assert_eq!(report.scored, report.shortlisted);
     }
 
