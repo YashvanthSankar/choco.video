@@ -68,14 +68,14 @@ Rules: one milestone in progress at a time. A box is checked only when it works 
 
 ## M4 Reframe (weeks 7–8)
 
-- [ ] `reframe/faces/` YuNet via `tract-onnx` on CPU; verify every op loads, else minimal ORT build as fallback; record binary size delta
-- [ ] Frame sampler at 5 fps, 640 px
-- [ ] IoU tracker with stable ids, scene-cut reset
-- [ ] Speaker heuristic from mouth landmarks + word density, hysteresis
-- [ ] Planner: `Single` with dead-zone and easing, `Split`, `Fit`, `Static` fallback
-- [ ] `CropPlan` keyframes consumed by the compositor with interpolation
-- [ ] Tracker tests on synthetic moving-face fixtures
-- [ ] Side-by-side review against Opus Clip output on three real fixtures; notes in `AGENTS.md`
+- [x] `reframe/faces.rs` YuNet (OpenCV Zoo, MIT, 233 KB, compiled in) via `tract-onnx` on CPU, letterboxed to its fixed 640x640 input → 22 ms per frame; every op loads, no ONNX Runtime needed
+- [x] Frame sampler at 5 fps (`render::sample_frames`, shared decode path, display orientation)
+- [x] IoU tracker with stable ids, scene-cut reset (luma histogram), short-track pruning → tested
+- [x] Speaker heuristic: mouth-region motion while words are spoken, 1 s sustained lead to switch → tested
+- [x] Planner: `Single` follow with 12% dead zone and 400 ms eased moves, per-shot following for edited multi-camera footage, `Split` when two people share the screen ≥ 70% (captions moved to the seam), `Static` when no face → 6 planner tests; verified by eye on 4 real recordings (single, split ×2, multi-camera)
+- [x] `CropPlan` keyframes consumed by the compositor with interpolation (Hold / Linear / EaseInOut)
+- [x] Tracker and planner tests on synthetic tracks (no face imagery needed)
+- [ ] Side-by-side review against Opus Clip output on three real fixtures (needs an Opus Clip account; human task)
 
 ## M5 Mac app + launch (weeks 9–10)
 

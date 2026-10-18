@@ -12,6 +12,7 @@ pub mod ingest;
 pub mod model;
 pub mod models_registry;
 pub mod pipeline;
+pub mod reframe;
 pub mod render;
 pub mod transcribe;
 

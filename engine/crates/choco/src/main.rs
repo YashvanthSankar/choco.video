@@ -104,8 +104,8 @@ enum Cmd {
         /// Output size preset: shorts (1080x1920), square (1080x1080), portrait (1080x1350), landscape (1920x1080).
         #[arg(long, default_value = "shorts")]
         preset: String,
-        /// static (centre crop) or fit (whole frame over a blurred background).
-        #[arg(long, default_value = "static")]
+        /// auto (face tracking), static (centre crop) or fit (whole frame over a blurred background).
+        #[arg(long, default_value = "auto")]
         layout: String,
         #[arg(long, short)]
         out: PathBuf,
@@ -130,8 +130,8 @@ enum Cmd {
         /// shorts, square, portrait, landscape.
         #[arg(long, default_value = "shorts")]
         preset: String,
-        /// static or fit.
-        #[arg(long, default_value = "static")]
+        /// auto (follow the speaker, split for two people), static (centre crop) or fit.
+        #[arg(long, default_value = "auto")]
         layout: String,
         /// Reuse a transcript instead of transcribing.
         #[arg(long)]
@@ -442,17 +442,31 @@ fn main() -> Result<()> {
             let asset = ingest::probe(&file)?;
             let v = asset.video.as_ref().context("source has no video")?;
             let mut plan = render::center_crop_plan((v.display_width, v.display_height), size, start_ms);
+            let transcript_v: Option<Transcript> = match &transcript {
+                Some(p) => Some(serde_json::from_str(&std::fs::read_to_string(p)?)?),
+                None => None,
+            };
             match layout.as_str() {
                 "static" => {}
                 "fit" => plan.layout = choco_engine::Layout::Fit,
+                "auto" => {
+                    let empty = Transcript { language: String::new(), engine: String::new(), segments: vec![] };
+                    let po = choco_engine::reframe::PlanOptions { target: size, ..Default::default() };
+                    let cancel = std::sync::atomic::AtomicBool::new(false);
+                    let (p, r) = choco_engine::reframe::auto_plan(&asset, transcript_v.as_ref().unwrap_or(&empty), start_ms, end_ms, &po, &cancel)?;
+                    eprintln!("reframe: {} · {} tracks, {} subjects, {} switches, {} moves", r.layout, r.tracks, r.subjects, r.switches, r.moves);
+                    plan = p;
+                }
                 other => bail!("unknown layout {other}"),
             }
             let mut raster = captions::Rasterizer::new();
-            let track = match &transcript {
-                Some(p) => {
-                    let t: Transcript = serde_json::from_str(&std::fs::read_to_string(p)?)?;
-                    let st = captions::preset(&style).with_context(|| format!("unknown style {style}"))?;
-                    Some(captions::chunk(&t, (start_ms, end_ms), &st, size, &mut raster, &captions::ChunkOptions::default()))
+            let track = match &transcript_v {
+                Some(t) => {
+                    let mut st = captions::preset(&style).with_context(|| format!("unknown style {style}"))?;
+                    if plan.layout == choco_engine::Layout::Split {
+                        st.position_pct = 46.0;
+                    }
+                    Some(captions::chunk(t, (start_ms, end_ms), &st, size, &mut raster, &captions::ChunkOptions::default()))
                 }
                 None => None,
             };
@@ -485,9 +499,10 @@ fn main() -> Result<()> {
                 bail!("unknown preset {preset} (use one of {:?})", export::PRESETS);
             }
             let style = if style == "none" { None } else { Some(captions::preset(&style).with_context(|| format!("unknown style {style}"))?) };
-            let layout = match layout.as_str() {
-                "static" => choco_engine::Layout::Static,
-                "fit" => choco_engine::Layout::Fit,
+            let (layout, auto_reframe) = match layout.as_str() {
+                "auto" => (choco_engine::Layout::Single, true),
+                "static" => (choco_engine::Layout::Static, false),
+                "fit" => (choco_engine::Layout::Fit, false),
                 other => bail!("unknown layout {other}"),
             };
             let llm = make_picker(pk)?;
@@ -500,7 +515,7 @@ fn main() -> Result<()> {
             };
             let opts = pipeline::RunOptions {
                 highlights: hopts,
-                export: export::ExportOptions { preset, style, layout, out_dir: out.clone(), ..Default::default() },
+                export: export::ExportOptions { preset, style, layout, auto_reframe, out_dir: out.clone(), ..Default::default() },
                 transcript,
                 language: None,
                 speech: None,

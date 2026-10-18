@@ -435,6 +435,67 @@ pub fn frame_at(asset: &MediaAsset, spec: &RenderSpec, t_ms: u64, raster: &mut R
     Ok(frame)
 }
 
+/// Decode `[start_ms, end_ms)` once, sequentially, and call `f(t_ms, frame)` with the
+/// normalised, rotated (display orientation) frame current at each sample time, `fps` per second.
+pub fn sample_frames(
+    asset: &MediaAsset,
+    start_ms: u64,
+    end_ms: u64,
+    fps: f64,
+    cancel: &AtomicBool,
+    mut f: impl FnMut(u64, &yuv::Frame) -> Result<(), RenderError>,
+) -> Result<usize, RenderError> {
+    crate::init();
+    let vinfo = asset.video.as_ref().ok_or(RenderError::NoVideo)?;
+    let mut ictx = ff::format::input(&asset.path)?;
+    let stream = ictx.stream(vinfo.index).ok_or(RenderError::NoVideo)?;
+    let (tb, base) = (stream.time_base(), audio::stream_start_secs(&stream));
+    let mut decoder = codec::context::Context::from_parameters(stream.parameters())?
+        .decoder()
+        .video()
+        .map_err(|_| RenderError::Unsupported(format!("video codec {}", vinfo.codec)))?;
+    let seek_to = ((start_ms as f64 / 1000.0 + base - 3.0).max(0.0) * ff::ffi::AV_TIME_BASE as f64) as i64;
+    let _ = ictx.seek(seek_to, ..seek_to);
+    let step = 1000.0 / fps.max(0.1);
+    let total = (((end_ms - start_ms) as f64) / step).floor() as usize;
+    let mut scalers = yuv::Scalers::default();
+    let mut decoded = ff::frame::Video::empty();
+    let mut current: Option<ff::frame::Video> = None;
+    let mut k = 0usize;
+    'read: for (st, packet) in ictx.packets() {
+        if st.index() != vinfo.index {
+            continue;
+        }
+        decoder.send_packet(&packet)?;
+        while decoder.receive_frame(&mut decoded).is_ok() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(RenderError::Cancelled);
+            }
+            let pts = decoded.timestamp().or(decoded.pts()).unwrap_or(0);
+            let t = (pts as f64 * f64::from(tb) - base) * 1000.0;
+            while k < total && (start_ms as f64 + k as f64 * step) < t {
+                if let Some(raw) = current.as_ref() {
+                    let fr = yuv::rotate(&scalers.normalise(raw)?, vinfo.rotation_deg);
+                    f(start_ms + (k as f64 * step) as u64, &fr)?;
+                }
+                k += 1;
+            }
+            current = Some(decoded.clone());
+            if k >= total {
+                break 'read;
+            }
+        }
+    }
+    if let Some(raw) = current.as_ref() {
+        let fr = yuv::rotate(&scalers.normalise(raw)?, vinfo.rotation_deg);
+        while k < total {
+            f(start_ms + (k as f64 * step) as u64, &fr)?;
+            k += 1;
+        }
+    }
+    Ok(k)
+}
+
 /// Downsampled luma fingerprint (`cols` x `rows` block means) for snapshot comparisons.
 pub fn luma_fingerprint(f: &yuv::Frame, cols: usize, rows: usize) -> Vec<u8> {
     let (w, h, s) = (f.width() as usize, f.height() as usize, f.stride(0));

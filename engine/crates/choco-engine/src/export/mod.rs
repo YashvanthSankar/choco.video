@@ -29,6 +29,8 @@ pub struct ExportOptions {
     /// None = no burned-in captions (sidecars are still written).
     pub style: Option<CaptionStyle>,
     pub layout: Layout,
+    /// Track faces and follow the speaker (or split for two people); `layout` is then ignored.
+    pub auto_reframe: bool,
     pub normalize_audio: bool,
     pub video_bitrate: usize,
     pub out_dir: PathBuf,
@@ -40,6 +42,7 @@ impl Default for ExportOptions {
             preset: "shorts".into(),
             style: captions::preset("bold"),
             layout: Layout::Static,
+            auto_reframe: true,
             normalize_audio: true,
             video_bitrate: 10_000_000,
             out_dir: PathBuf::from("."),
@@ -57,6 +60,8 @@ pub struct ExportedClip {
     pub vtt: PathBuf,
     pub json: PathBuf,
     pub render: RenderReport,
+    /// How the crop was decided, when auto-reframe ran.
+    pub reframe: Option<crate::reframe::PlanReport>,
 }
 
 #[derive(Serialize)]
@@ -114,6 +119,8 @@ pub enum ExportError {
     NoVideo,
     #[error(transparent)]
     Render(#[from] RenderError),
+    #[error(transparent)]
+    Reframe(#[from] crate::reframe::ReframeError),
     #[error("export: io: {0}")]
     Io(#[from] std::io::Error),
     #[error("export: json: {0}")]
@@ -137,11 +144,22 @@ pub fn export_clip(asset: &MediaAsset, transcript: &Transcript, cand: &Candidate
     let path = |ext: &str| opts.out_dir.join(format!("{stem}.{ext}"));
     let (mp4, poster, srt, vtt, json) = (path("mp4"), path("png"), path("srt"), path("vtt"), path("json"));
 
-    let mut plan = render::center_crop_plan((v.display_width, v.display_height), size, cand.start_ms);
-    plan.layout = opts.layout;
+    let (plan, reframe) = if opts.auto_reframe {
+        let po = crate::reframe::PlanOptions { target: size, ..Default::default() };
+        let (p, r) = crate::reframe::auto_plan(asset, transcript, cand.start_ms, cand.end_ms, &po, job.cancel)?;
+        (p, Some(r))
+    } else {
+        let mut p = render::center_crop_plan((v.display_width, v.display_height), size, cand.start_ms);
+        p.layout = opts.layout;
+        (p, None)
+    };
 
-    // Sidecar captions always exist; burned-in captions only when a style is chosen.
-    let sidecar_style = opts.style.clone().unwrap_or_else(|| captions::preset("clean").expect("built-in"));
+    // Sidecar captions always exist; burned-in captions only when a style is chosen. In a split
+    // the captions sit on the seam between the two people, not over the lower face.
+    let mut sidecar_style = opts.style.clone().unwrap_or_else(|| captions::preset("clean").expect("built-in"));
+    if plan.layout == Layout::Split {
+        sidecar_style.position_pct = 46.0;
+    }
     let track = captions::chunk(transcript, (cand.start_ms, cand.end_ms), &sidecar_style, size, raster, &ChunkOptions::default());
     std::fs::write(&srt, subtitles::srt(&track, cand.start_ms))?;
     std::fs::write(&vtt, subtitles::vtt(&track, cand.start_ms))?;
@@ -179,7 +197,7 @@ pub fn export_clip(asset: &MediaAsset, transcript: &Transcript, cand: &Candidate
         files: Files { video: &vn, poster: &pn, srt: &sn, vtt: &tn },
     };
     std::fs::write(&json, serde_json::to_string_pretty(&side)?)?;
-    Ok(ExportedClip { rank, candidate: cand.clone(), mp4, poster, srt, vtt, json, render: report })
+    Ok(ExportedClip { rank, candidate: cand.clone(), mp4, poster, srt, vtt, json, render: report, reframe })
 }
 
 #[cfg(test)]
