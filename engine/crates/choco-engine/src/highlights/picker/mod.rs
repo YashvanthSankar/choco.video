@@ -136,33 +136,35 @@ pub(crate) fn extract_json(raw: &str) -> &str {
 /// (`{score:72` or `,reasons":`). Only touches the schema's keys, never values.
 pub(crate) fn repair_keys(s: &str) -> String {
     const KEYS: &[&str] = &["scores", "id", "score", "reasons", "title", "description", "hashtags"];
+    // Work on bytes but copy them through untouched, so multi-byte UTF-8 (dashes, accents,
+    // Devanagari, emoji) survives. Only ASCII structure characters are ever inspected.
     let b = s.as_bytes();
-    let mut out = String::with_capacity(s.len() + 16);
+    let mut out: Vec<u8> = Vec::with_capacity(b.len() + 16);
     let mut i = 0;
     let mut in_str = false;
     while i < b.len() {
-        let c = b[i] as char;
+        let c = b[i];
         if in_str {
             out.push(c);
-            if c == '\\' && i + 1 < b.len() {
-                out.push(b[i + 1] as char);
+            if c == b'\\' && i + 1 < b.len() {
+                out.push(b[i + 1]);
                 i += 2;
                 continue;
             }
-            if c == '"' {
+            if c == b'"' {
                 in_str = false;
             }
             i += 1;
             continue;
         }
-        if c == '{' || c == ',' {
+        if c == b'{' || c == b',' {
             out.push(c);
             let mut j = i + 1;
-            while j < b.len() && (b[j] as char).is_whitespace() {
+            while j < b.len() && b[j].is_ascii_whitespace() {
                 j += 1;
             }
             let ident_start = j;
-            while j < b.len() && ((b[j] as char).is_ascii_alphanumeric() || b[j] == b'_') {
+            while j < b.len() && (b[j].is_ascii_alphanumeric() || b[j] == b'_') {
                 j += 1;
             }
             let ident = &s[ident_start..j];
@@ -171,22 +173,23 @@ pub(crate) fn repair_keys(s: &str) -> String {
                 k += 1; // half-quoted: reasons":
             }
             if KEYS.contains(&ident) && k < b.len() && b[k] == b':' && ident_start < b.len() && b[ident_start] != b'"' {
-                out.push('"');
-                out.push_str(ident);
-                out.push('"');
+                out.push(b'"');
+                out.extend_from_slice(ident.as_bytes());
+                out.push(b'"');
                 i = k;
                 continue;
             }
             i += 1;
             continue;
         }
-        if c == '"' {
+        if c == b'"' {
             in_str = true;
         }
         out.push(c);
         i += 1;
     }
-    out
+    // Only ASCII bytes were inserted and only at ASCII boundaries, so this cannot fail.
+    String::from_utf8(out).unwrap_or_else(|_| s.to_string())
 }
 
 /// Parse scores; accept a bare array too, clamp scores, drop unknown ids.
@@ -249,6 +252,15 @@ mod tests {
         assert_eq!(s[0].score, 72.0);
         assert_eq!(s[0].reasons, vec!["a, b: c"]);
         assert_eq!(s[0].title, "x:y");
+    }
+
+    #[test]
+    fn repair_keeps_unicode_intact() {
+        let raw = "{\"scores\":[{\"id\":\"w1\",score:80,\"reasons\":[\"naïve – ok\"],\"title\":\"Leadership — hypocrisy 🎯 नेतृत्व\",\"description\":\"d\",\"hashtags\":[\"#x\"]}]}";
+        assert_eq!(repair_keys("{\"t\":\"— é 🎯\"}"), "{\"t\":\"— é 🎯\"}");
+        let s = parse_scores(raw, &["w1".into()]).unwrap();
+        assert_eq!(s[0].title, "Leadership — hypocrisy 🎯 नेतृत्व");
+        assert_eq!(s[0].reasons, vec!["naïve – ok"]);
     }
 
     #[test]
