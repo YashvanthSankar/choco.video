@@ -33,7 +33,8 @@ impl OpenAiCompatConfig {
             summarize_model: get("CHOCO_LLM_SUMMARY_MODEL").unwrap_or_else(|| score_model.clone()),
             score_model,
             context_tokens: get("CHOCO_LLM_CONTEXT_TOKENS").and_then(|v| v.parse().ok()).unwrap_or(64_000),
-            timeout: Duration::from_secs(180),
+            // Reasoning models can think for minutes on a full-episode summary.
+            timeout: Duration::from_secs(get("CHOCO_LLM_TIMEOUT_SECS").and_then(|v| v.parse().ok()).unwrap_or(420)),
         })
     }
 }

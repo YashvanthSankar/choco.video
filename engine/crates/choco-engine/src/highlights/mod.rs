@@ -185,7 +185,16 @@ pub fn highlights(
 
     progress(Progress::new(STAGE, 0.05, format!("summarizing episode with {}", llm.model(Role::Summarize))));
     let mut calls = 0;
-    let summary = summarize(llm, t, opts.summary_words, &mut calls)?;
+    // The summary is context, not a requirement: if it fails (slow reasoning model, outage),
+    // score without it rather than failing the whole job. Auth and config errors still stop.
+    let summary = match summarize(llm, t, opts.summary_words, &mut calls) {
+        Ok(s) => s,
+        Err(e @ (PickerError::NotConfigured(_) | PickerError::Unavailable { .. } | PickerError::Http { status: 401 | 403, .. })) => return Err(e.into()),
+        Err(e) => {
+            report.errors.push(format!("summary skipped: {e}"));
+            String::from("(no summary available; judge each clip on its own)")
+        }
+    };
     report.summary = summary.clone();
 
     let picked: Vec<&windows::Window> = short.iter().map(|&i| &ws[i]).collect();
@@ -327,6 +336,35 @@ mod tests {
         assert!(text_calls > 1, "expected map-reduce, got {text_calls} summary calls");
         // Skipped ids were re-asked: every shortlisted window ended up scored.
         assert_eq!(report.scored, report.shortlisted);
+    }
+
+    /// Summaries always fail; scoring works.
+    struct NoSummary(FakeLlm);
+    impl Llm for NoSummary {
+        fn tier(&self) -> &'static str {
+            "fake"
+        }
+        fn model(&self, r: Role) -> String {
+            self.0.model(r)
+        }
+        fn context_tokens(&self) -> usize {
+            100_000
+        }
+        fn text(&self, _: Role, _: &str, _: &str) -> Result<String, PickerError> {
+            Err(PickerError::Transport("timeout: global".into()))
+        }
+        fn scores_json(&self, s: &str, u: &str) -> Result<String, PickerError> {
+            self.0.scores_json(s, u)
+        }
+    }
+
+    #[test]
+    fn a_failed_summary_does_not_fail_the_job() {
+        let t = windows::tests::synthetic(40, 6_000, 16, 200);
+        let llm = NoSummary(FakeLlm { calls: Mutex::new(vec![]), texts: Default::default() });
+        let (cands, report) = highlights(&t, None, &llm, &HighlightOptions { rank: rank::RankOptions { min_score: 0, ..Default::default() }, ..Default::default() }, &|_| {}).unwrap();
+        assert!(!cands.is_empty());
+        assert!(report.errors.iter().any(|e| e.starts_with("summary skipped")));
     }
 
     #[test]
