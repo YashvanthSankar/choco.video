@@ -31,6 +31,7 @@ cat > "$TAURI/tauri.release.conf.json" <<JSON
     "externalBin": ["binaries/choco-apple"],
     "macOS": {
       "minimumSystemVersion": "14.0",
+      "signingIdentity": "${APPLE_SIGNING_IDENTITY:--}",
       "frameworks": [
         "frameworks/libavcodec.62.dylib", "frameworks/libavformat.62.dylib", "frameworks/libavfilter.11.dylib",
         "frameworks/libavutil.60.dylib", "frameworks/libswresample.6.dylib", "frameworks/libswscale.9.dylib"
@@ -49,6 +50,9 @@ APP="$TAURI/target/release/bundle/macos/choco.video.app"
 DMG="$(ls "$TAURI"/target/release/bundle/dmg/*.dmg | head -1)"
 echo "== verify"
 otool -L "$APP/Contents/MacOS/choco-app" | grep -E "libav|libsw" | sed 's/^/  /'
+# The whole bundle must be sealed (ad-hoc when no Developer ID): an unsealed bundle is reported
+# as "damaged" by Gatekeeper once downloaded, instead of offering right-click > Open.
+codesign --verify --deep --strict "$APP" || { echo "bundle signature does not verify" >&2; exit 1; }
 if otool -l "$APP/Contents/MacOS/choco-app" | grep -A2 LC_RPATH | grep -q "$ROOT"; then
   echo "release binary carries a build-machine rpath" >&2; exit 1
 fi
