@@ -1,0 +1,3 @@
+# choco.video
+
+@AGENTS.md
