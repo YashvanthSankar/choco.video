@@ -16,7 +16,9 @@ pub fn clean(t: Transcript) -> Transcript {
         .filter(|w| !w.text.trim().is_empty())
         .collect();
     words.sort_by_key(|w| w.start_ms);
-    let words = drop_repeated_ngrams(words, 4, 3);
+    // Whisper loops whole sentences on real audio (measured: one 8-word sentence 174 times in a
+    // row on a 72-minute podcast). Catch periods up to 16 words.
+    let words = drop_repeated_ngrams(words, 16, 3);
     Transcript { language: t.language, engine: t.engine, segments: resegment(words) }
 }
 
@@ -136,6 +138,25 @@ mod tests {
         let out = drop_repeated_ngrams(v, 4, 3);
         let text: Vec<_> = out.iter().map(|w| w.text.as_str()).collect();
         assert_eq!(text, vec!["So", "thank", "you.", "Bye"]);
+    }
+
+    #[test]
+    fn drops_looping_sentence() {
+        let sentence = ["And", "so", "we", "have", "the", "ability", "to", "do", "stuff."];
+        let mut v = vec![w(0, 100, "Before")];
+        let mut t = 100;
+        for _ in 0..174 {
+            for word in sentence {
+                v.push(w(t, t + 10, word));
+                t += 10;
+            }
+        }
+        v.push(w(t, t + 100, "After"));
+        let out = drop_repeated_ngrams(v, 16, 3);
+        let text: Vec<_> = out.iter().map(|w| w.text.as_str()).collect();
+        assert_eq!(text.len(), 11, "{text:?}");
+        assert_eq!(text.first(), Some(&"Before"));
+        assert_eq!(text.last(), Some(&"After"));
     }
 
     #[test]

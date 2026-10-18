@@ -91,7 +91,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 
 | Date | What | Result | Notes |
 |---|---|---|---|
-| — | Transcribe 60 min podcast, Apple SpeechAnalyzer | not measured | M1 target |
+| 2026-10-18 | Transcribe 72 min real podcast (danaylov, VP9/Opus), Apple SpeechAnalyzer, release | 112 s total (audio 9 s, speech 103 s, 42x realtime), ~30 MB peak in-process, 11,415 words, steady ~160 wpm | M3 Pro 18 GB; speech model runs in the OS service, not counted |
 | — | Transcribe 60 min podcast, whisper turbo-q5, Metal | not measured | M1 target |
 | 2026-10-18 | Minimal FFmpeg 8.1.3 dylibs total size, Mac arm64 | 7.5 MB | LGPL 2.1; avcodec 4.5 MB is most of it |
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
@@ -111,6 +111,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 - If the CoreML whisper encoder is ever enabled as an optional speed-up, it compiles on first load and can take minutes. Same rule.
 - `ffmpeg-next` build needs `pkg-config` and the FFmpeg dev libs on the link path. On Windows this is the usual source of CI failures; the pinned prebuilt in `scripts/ffmpeg/` is the fix, not ad-hoc downloads.
 - whisper.cpp word timestamps drift on long silences. The sentence re-split and clamp pass in `transcribe/` exists for this; do not remove it.
+- whisper turbo-q5 falls into hallucination loops on real conversation (measured: one 8-word sentence 174 times in a row, real speech under it lost). `cleanup` collapses periods up to 16 words; the lost speech is not recovered. Apple speech had no such loops on the same file.
 - Both speech engines stamp words early (Apple ~100 ms, whisper token times ~230 ms). Do not drive caption highlights from raw times until M3's timing fix lands; measure with `fixtures/timing.py`.
 - AVSpeechSynthesizer word-marker offsets restart at each internal synthesis chunk (an empty buffer marks it). `fixtures/say_aligned.swift` rebases them; keep that if you touch it.
 - Phone footage carries a rotation tag. Probe must apply it or faces will be detected sideways.
