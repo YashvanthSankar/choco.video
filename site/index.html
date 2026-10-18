@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>choco.video</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Turn long videos into vertical clips on your Mac. Your video never leaves your machine. 20 MB, open source.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column, wide hero demo, then alternating bands; the boldness lives in the hero canvas and the display face. */
+:root {
+  --bg: #16100c; --bg-2: #211812; --ink: #f6ead9; --ink-2: #c9b7a3; --line: #3b2c22;
+  --accent: #f2a65a; --accent-ink: #1b120a; --caption: #ffe14d; --good: #86d99a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Helvetica Neue", sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg: #f7efe3; --bg-2: #efe3d2; --ink: #1b120a; --ink-2: #5d4a3a; --line: #dcc9b4; --accent: #b8611a; --accent-ink: #fff6ea; --caption: #a67c00; --good: #2f8a4a; color-scheme: light; } }
+:root[data-theme="light"] { --bg: #f7efe3; --bg-2: #efe3d2; --ink: #1b120a; --ink-2: #5d4a3a; --line: #dcc9b4; --accent: #b8611a; --accent-ink: #fff6ea; --caption: #a67c00; --good: #2f8a4a; color-scheme: light; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 var(--body); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 10; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); font-weight: 800; letter-spacing: -0.02em; line-height: 1.02; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(44px, 8vw, 96px); font-variation-settings: "opsz" 96; }
+h2 { font-size: clamp(30px, 4.5vw, 52px); }
+h3 { font-size: 22px; font-weight: 500; letter-spacing: 0; line-height: 1.2; }
+p { margin: 0; }
+.lead { font-size: clamp(18px, 2.1vw, 22px); color: var(--ink-2); max-width: 36ch; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: -0.02em; text-decoration: none; }
+.brand i { font-style: normal; color: var(--accent); }
+nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; font-weight: 500; }
+nav a:not(.brand) { text-decoration: none; color: var(--ink-2); }
+nav a:hover, nav a:focus-visible { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-decoration: none; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+.btn:focus-visible, nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 64px); align-items: center; padding-block: clamp(28px, 6vw, 80px) clamp(32px, 6vw, 72px); }
+.hero .copy { display: grid; gap: 26px; min-width: 0; }
+.hero .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.hero .fine { color: var(--ink-2); font-size: 14px; }
+.demo { position: relative; min-width: 0; }
+.demo canvas { width: 100%; height: auto; max-width: 100%; display: block; border-radius: 18px; background: #000; box-shadow: 0 30px 80px -30px rgba(0,0,0,.7); }
+.demo .tag { position: absolute; left: 14px; top: 14px; display: flex; gap: 8px; }
+.pill { font: 500 12px/1 var(--mono); padding: 7px 10px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; backdrop-filter: blur(6px); }
+.pill.live::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 7px; background: var(--good); margin-right: 7px; vertical-align: 0; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.stat { padding: 24px 20px 24px 0; border-right: 1px solid var(--line); min-width: 0; }
+.stat:not(:first-child) { padding-left: 20px; }
+.stat:last-child { border-right: 0; }
+.stat b { display: block; font: 800 clamp(30px, 4vw, 44px)/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat span { display: block; margin-top: 8px; color: var(--ink-2); font-size: 14px; }
+section { padding-block: clamp(56px, 8vw, 110px); }
+.band { background: var(--bg-2); }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: clamp(24px, 5vw, 72px); align-items: start; }
+.steps { display: grid; gap: 0; counter-reset: step; border-top: 1px solid var(--line); }
+.step { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 18px; align-items: baseline; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.step::before { counter-increment: step; content: counter(step, decimal-leading-zero); font: 500 14px var(--mono); color: var(--accent); }
+.step h3 { margin-bottom: 6px; }
+.step p { color: var(--ink-2); max-width: 52ch; }
+.step .where { font: 500 12px/1.4 var(--mono); color: var(--ink-2); text-align: right; white-space: nowrap; }
+.where em { font-style: normal; color: var(--good); }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { background: var(--bg); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.band .card { background: var(--bg); }
+.card .price { font: 800 28px/1 var(--display); letter-spacing: -0.02em; }
+.card .price small { font: 500 13px var(--mono); color: var(--ink-2); margin-left: 6px; }
+.card p { color: var(--ink-2); font-size: 15px; }
+.card.rec { border-color: var(--accent); }
+.rec .eyebrow { color: var(--accent); }
+.files { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.file { border: 1px dashed var(--line); border-radius: 12px; padding: 14px 16px; font: 500 13px/1.5 var(--mono); min-width: 0; overflow-wrap: anywhere; }
+.file b { display: block; font-family: var(--body); font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.privacy { display: grid; gap: 18px; }
+.privacy .big { font-family: var(--display); font-weight: 800; font-size: clamp(32px, 5vw, 64px); letter-spacing: -0.03em; line-height: 1; }
+.flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font: 500 13px var(--mono); color: var(--ink-2); }
+.flow .node { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--ink); background: var(--bg-2); }
+.flow .node.stay { border-color: var(--good); }
+.flow .arrow { opacity: .6; }
+footer { border-top: 1px solid var(--line); padding-block: 28px 40px; color: var(--ink-2); font-size: 14px; display: grid; gap: 12px; }
+footer .row { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+@media (max-width: 860px) {
+  .hero, .grid2 { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat:nth-child(2) { border-right: 0; }
+  .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .stat:nth-child(3) { padding-left: 0; }
+  .cards { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 48px minmax(0, 1fr); }
+  .step .where { grid-column: 2; text-align: left; white-space: normal; }
+  nav ul { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="#top">choco<i>.</i>video</a>
+  <ul>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#picker">Clip picker</a></li>
+    <li><a href="#privacy">Privacy</a></li>
+    <li><a href="https://github.com/YashvanthSankar/choco.video">GitHub</a></li>
+  </ul>
+  <a class="btn" href="https://github.com/YashvanthSankar/choco.video/releases">Download for Mac</a>
+</nav>
+
+<header class="hero" id="top">
+  <div class="copy">
+    <p class="eyebrow">Long video in. Vertical clips out. Nothing uploaded.</p>
+    <h1>Shorts, cut on your Mac.</h1>
+    <p class="lead">Drop in a podcast, talk or stream. choco.video finds the best moments, follows whoever is speaking, burns in captions and exports clips ready for TikTok, Reels and Shorts.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/YashvanthSankar/choco.video/releases">Download for Mac</a>
+      <a class="btn ghost" href="https://github.com/YashvanthSankar/choco.video">Read the source</a>
+    </div>
+    <p class="fine">macOS 14 or later on Apple Silicon. Free and open source, MIT. No account, no subscription.</p>
+  </div>
+  <div class="demo">
+    <canvas id="demo" width="1120" height="700" aria-label="Animated demo: a vertical crop follows a speaker across a widescreen frame while captions light up word by word."></canvas>
+    <div class="tag"><span class="pill live">following speaker</span><span class="pill">9:16 · bold captions</span></div>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat"><b class="mono">20 MB</b><span>installed, 10 MB download. No Python, no Ollama, no models in the box.</span></div>
+  <div class="stat"><b class="mono">42×</b><span>faster than realtime transcription with Apple's built-in speech engine.</span></div>
+  <div class="stat"><b class="mono">0 MB</b><span>to download on macOS 26 and later. Older Macs fetch one 550 MB speech model.</span></div>
+  <div class="stat"><b class="mono">4 min</b><span>from a 72-minute podcast to finished, captioned clips on an M3 Pro.</span></div>
+</div>
+</div>
+
+<section id="how">
+<div class="wrap grid2">
+  <div>
+    <p class="eyebrow">How it works</p>
+    <h2>Five stages. Four of them never touch the network.</h2>
+  </div>
+  <div class="steps">
+    <div class="step"><div><h3>Transcribe</h3><p>Word timestamps from Apple's on-device speech engine, or Whisper on older Macs.</p></div><div class="where"><em>on your Mac</em></div></div>
+    <div class="step"><div><h3>Pick the moments</h3><p>Every candidate clip starts and ends on a complete sentence. A language model scores hook, payoff and whether it stands alone.</p></div><div class="where">transcript text only<br><em>Apple on-device</em> or your provider</div></div>
+    <div class="step"><div><h3>Follow the speaker</h3><p>Face tracking with a 233 KB model keeps whoever is talking in the vertical frame. Two people on screen get a split.</p></div><div class="where"><em>on your Mac</em></div></div>
+    <div class="step"><div><h3>Caption</h3><p>Word-synced captions in four styles, drawn with bundled fonts so they look the same on every machine.</p></div><div class="where"><em>on your Mac</em></div></div>
+    <div class="step"><div><h3>Render and export</h3><p>Hardware H.264, loudness normalised to −14 LUFS, fast-start MP4, plus a poster, subtitles and a metadata file per clip.</p></div><div class="where"><em>on your Mac</em></div></div>
+  </div>
+</div>
+</section>
+
+<section class="band" id="picker">
+<div class="wrap">
+  <p class="eyebrow">Clip picker</p>
+  <h2 style="max-width:18ch">Choose where the judgment runs. You pay the provider, never us.</h2>
+  <p class="lead" style="margin:18px 0 32px">Costs are measured on five hours of real podcasts at OpenCode Zen list prices, for the picker only. Everything else is free because it runs on your Mac.</p>
+  <div class="cards">
+    <div class="card rec">
+      <p class="eyebrow">Recommended</p>
+      <h3>OpenCode Zen</h3>
+      <div class="price">~2¢<small>per hour of video</small></div>
+      <p>One key, many models. MiniMax M3 scores a 72-minute episode in under a minute. Paste the key once; it lives in your Keychain.</p>
+    </div>
+    <div class="card">
+      <p class="eyebrow">No key</p>
+      <h3>Apple on-device</h3>
+      <div class="price">Free<small>macOS 26+</small></div>
+      <p>Apple Intelligence picks the clips entirely offline. Slower, and picks are a little weaker than a hosted model.</p>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Your choice</p>
+      <h3>Any compatible endpoint</h3>
+      <div class="price">You decide<small>OpenAI-style API</small></div>
+      <p>OpenRouter, Groq, DeepSeek, LM Studio or Ollama's server. Paste a base URL and a key; choco lists the models.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<section id="output">
+<div class="wrap grid2">
+  <div>
+    <p class="eyebrow">What you get</p>
+    <h2>Every clip ships ready to post.</h2>
+    <p class="lead" style="margin-top:18px">Files are named by rank so a folder sorts itself. Re-render any clip with a different style, size or framing without re-transcribing.</p>
+  </div>
+  <div class="files">
+    <div class="file"><b>Video</b>danaylov-01-technology-is-the-how.mp4<br>1080×1920 H.264, −14 LUFS AAC</div>
+    <div class="file"><b>Poster</b>…-01-technology-is-the-how.png<br>middle frame, captions on</div>
+    <div class="file"><b>Subtitles</b>…-01-….srt and ….vtt<br>word-timed, clip-relative</div>
+    <div class="file"><b>Metadata</b>…-01-….json<br>title, caption, hashtags, score, reasons, timecodes</div>
+  </div>
+</div>
+</section>
+
+<section class="band" id="privacy">
+<div class="wrap privacy">
+  <p class="eyebrow">Privacy</p>
+  <p class="big">Your video never leaves your Mac.</p>
+  <p class="lead">The only thing that can go over the network is transcript text, and only to the clip picker you chose. There is no choco server. No account, no telemetry, nothing to leak.</p>
+  <div class="flow">
+    <span class="node stay">video file</span><span class="arrow">→</span>
+    <span class="node stay">speech to text</span><span class="arrow">→</span>
+    <span class="node">transcript text → your picker</span><span class="arrow">→</span>
+    <span class="node stay">face tracking</span><span class="arrow">→</span>
+    <span class="node stay">captions + render</span><span class="arrow">→</span>
+    <span class="node stay">clips on disk</span>
+  </div>
+</div>
+</section>
+
+<section id="open">
+<div class="wrap grid2">
+  <div>
+    <p class="eyebrow">Open source</p>
+    <h2>Read it, build it, change it.</h2>
+  </div>
+  <div class="privacy">
+    <p class="lead">The engine, the command-line tool and the app are MIT licensed in one repository. The video stack is LGPL FFmpeg, dav1d, whisper.cpp and the YuNet face detector; captions use the Inter and Montserrat typefaces.</p>
+    <div class="cta" style="display:flex;flex-wrap:wrap;gap:12px"><a class="btn" href="https://github.com/YashvanthSankar/choco.video">GitHub</a><a class="btn ghost" href="https://github.com/YashvanthSankar/choco.video/blob/main/docs/TODO.md">What works today</a></div>
+  </div>
+</div>
+</section>
+
+<div class="wrap">
+<footer>
+  <div class="row"><span>choco.video</span><span>MIT License</span><span>Made for people who post every week.</span></div>
+  <div class="row"><a href="https://github.com/YashvanthSankar/choco.video">GitHub</a><a href="https://github.com/YashvanthSankar/choco.video/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/YashvanthSankar/choco.video/blob/main/docs/PLAN.md">Plan</a></div>
+</footer>
+</div>
+
+<script>
+(() => {
+  const c = document.getElementById("demo");
+  const g = c.getContext("2d");
+  const W = c.width, H = c.height;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Two speakers in a 16:9 "studio"; the crop follows whoever is talking, with a dead zone and eased moves.
+  const words = ["CHARGE", "MORE", "THAN", "YOU", "THINK.", "NOBODY", "LEFT", "OVER", "PRICE."];
+  const turns = [[0, 4, 0], [5, 8, 1]]; // [firstWord, lastWord, speaker]
+  const wordMs = 420, cycle = words.length * wordMs + 1400;
+  const studio = { x: 0, y: 0, w: W, h: H };
+  const speakers = [{ x: 0.3, y: 0.52, r: 0.11, hue: 28 }, { x: 0.72, y: 0.5, r: 0.105, hue: 200 }];
+  let cropX = speakers[0].x, target = speakers[0].x, moveFrom = cropX, moveStart = 0, moving = false;
+  const ease = (t) => t * t * (3 - 2 * t);
+  function draw(now) {
+    const t = reduce ? 1200 : now % cycle;
+    const wi = Math.min(words.length - 1, Math.floor(t / wordMs));
+    const turn = turns.find((tr) => wi >= tr[0] && wi <= tr[1]) || turns[1];
+    const active = t < words.length * wordMs ? turn[2] : 1;
+    speakers.forEach((s, i) => { s.talk = i === active && t < words.length * wordMs; });
+    // camera: switch target on a speaker change, ease over 400 ms
+    const want = speakers[active].x + Math.sin(now / 900) * 0.012;
+    if (Math.abs(want - target) > 0.06) { target = want; moveFrom = cropX; moveStart = now; moving = true; }
+    if (moving) { const k = Math.min(1, (now - moveStart) / 420); cropX = moveFrom + (target - moveFrom) * ease(k); if (k >= 1) moving = false; }
+    // background studio
+    g.fillStyle = "#1a1512"; g.fillRect(0, 0, W, H);
+    const grad = g.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, "#2a211b"); grad.addColorStop(1, "#15100d");
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    g.fillStyle = "#0f0b09"; g.fillRect(0, H * 0.78, W, H * 0.22);
+    // speakers
+    speakers.forEach((s, i) => {
+      const cx = s.x * W, cy = s.y * H, r = s.r * H * (s.talk ? 1 + Math.sin(now / 120) * 0.012 : 1);
+      g.fillStyle = `hsl(${s.hue} 30% ${s.talk ? 62 : 48}%)`;
+      g.beginPath(); g.ellipse(cx, cy + r * 2.1, r * 2.0, r * 1.5, 0, Math.PI, 0); g.fill();
+      g.fillStyle = `hsl(${s.hue} 40% ${s.talk ? 78 : 64}%)`;
+      g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+      if (s.talk) { g.fillStyle = "#3a2017"; const o = 4 + Math.abs(Math.sin(now / 70)) * 10; g.beginPath(); g.ellipse(cx, cy + r * 0.5, r * 0.32, o, 0, 0, Math.PI * 2); g.fill(); }
+    });
+    // dim outside the crop
+    const cw = H * 9 / 16, cx0 = Math.max(0, Math.min(W - cw, cropX * W - cw / 2));
+    g.fillStyle = "rgba(0,0,0,.62)";
+    g.fillRect(0, 0, cx0, H); g.fillRect(cx0 + cw, 0, W - cx0 - cw, H);
+    g.strokeStyle = "#f2a65a"; g.lineWidth = 3; g.strokeRect(cx0 + 1.5, 1.5, cw - 3, H - 3);
+    // captions inside the crop
+    const line = words.slice(Math.max(0, wi - (wi % 3)), Math.max(0, wi - (wi % 3)) + 3);
+    if (t < words.length * wordMs) {
+      g.font = `800 ${H * 0.068}px "Bricolage Grotesque", "Avenir Next", sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+      const widths = line.map((w) => g.measureText(w).width), gap = H * 0.02;
+      let x = cx0 + cw / 2 - (widths.reduce((a, b) => a + b, 0) + gap * (line.length - 1)) / 2;
+      const y = H * 0.76;
+      line.forEach((w, i) => {
+        const on = Math.max(0, wi - (wi % 3)) + i === wi;
+        g.lineWidth = H * 0.016; g.strokeStyle = "#000"; g.strokeText(w, x + widths[i] / 2, y);
+        g.fillStyle = on ? "#ffe14d" : "#fff"; g.fillText(w, x + widths[i] / 2, y);
+        x += widths[i] + gap;
+      });
+    }
+    if (!reduce) requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
