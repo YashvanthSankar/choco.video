@@ -34,7 +34,7 @@ env:
 
 jobs:
   mac:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +49,12 @@ jobs:
           [[ "$TAG" == "v$CONF" ]] || { echo "::error::tag $TAG does not match app version $CONF in tauri.conf.json"; exit 1; }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$CONF" >> "$GITHUB_OUTPUT"
+
+      - name: Select Xcode 26 (Foundation Models and SpeechAnalyzer SDKs)
+        run: |
+          ls /Applications | grep -i xcode
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)/Contents/Developer"
+          xcodebuild -version
 
       - name: Rust toolchain
         working-directory: engine
