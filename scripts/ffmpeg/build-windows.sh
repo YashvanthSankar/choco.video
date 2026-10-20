@@ -102,9 +102,10 @@ HWACCELS=(h264_d3d11va h264_d3d11va2 hevc_d3d11va hevc_d3d11va2 vp9_d3d11va vp9_
 for flag in 'CONFIG_GPL 0' 'CONFIG_NONFREE 0' 'HAVE_W32THREADS 1' 'CONFIG_H264_MF_ENCODER 1' \
             'CONFIG_H264_NVENC_ENCODER 1' 'CONFIG_H264_AMF_ENCODER 1' 'CONFIG_LIBDAV1D 1' \
             'CONFIG_H264_D3D11VA_HWACCEL 1' 'CONFIG_AV1_D3D11VA_HWACCEL 1'; do
-  grep -q "^#define $flag\$" config.h || {
+  # Since FFmpeg 6, per-component switches (encoders, hwaccels) live in config_components.h.
+  cat config.h config_components.h 2>/dev/null | grep -q "^#define $flag\$" || {
     echo "configure: expected $flag" >&2
-    echo "--- config.h (MF, MEDIAFOUNDATION, NVENC, AMF, D3D11)"; grep -E "MEDIAFOUNDATION|_MF_|NVENC|AMF|D3D11VA|LIBDAV1D" config.h || true
+    echo "--- config.h (MF, MEDIAFOUNDATION, NVENC, AMF, D3D11)"; grep -E "MEDIAFOUNDATION|_MF_|NVENC|AMF|D3D11VA|LIBDAV1D" config.h config_components.h || true
     echo "--- config.log around mediafoundation"; grep -n -B2 -A14 -i "mediafoundation\|mfapi\|mftransform\|codecapi" ffbuild/config.log | tail -80 || true
     exit 1; }
 done
