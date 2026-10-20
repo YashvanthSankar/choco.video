@@ -1,5 +1,11 @@
 # Point ffmpeg-sys-next at the vendored minimal LGPL build (scripts/ffmpeg/build-mac.sh).
 [env]
+# whisper-rs-sys forwards CMAKE_* variables to whisper.cpp's cmake build. whisper.cpp declares CMake
+# 3.5, which leaves CMP0091 unset, so CMAKE_MSVC_RUNTIME_LIBRARY needs the policy default too;
+# without both, whisper.cpp builds with /MD against our +crt-static Rust and the link fails on
+# __imp_fread and friends. Only MSVC reads them; other toolchains ignore them.
+CMAKE_POLICY_DEFAULT_CMP0091 = "NEW"
+CMAKE_MSVC_RUNTIME_LIBRARY = "MultiThreaded"
 PKG_CONFIG_PATH = { value = "../vendor/ffmpeg/8.1.3-macos-arm64/lib/pkgconfig", relative = true }
 CHOCO_FFMPEG_LIB_DIR = { value = "../vendor/ffmpeg/8.1.3-macos-arm64/lib", relative = true }
 
