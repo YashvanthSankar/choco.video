@@ -88,7 +88,19 @@ pub fn transcribe(audio_wav: &Path, engine: SpeechEngine, opts: &TranscribeOptio
 fn refine_onsets(t: &mut Transcript, audio_wav: &Path) {
     let Ok(audio) = crate::ingest::read_wav_f32(audio_wav) else { return };
     const HOP: usize = 80; // 5 ms frames at 16 kHz
+    // Two 5 ms frame series: broadband RMS and the RMS of the first difference, which weights
+    // the high band where consonant onsets live. An onset must rise in both.
     let frames: Vec<f32> = audio.chunks(HOP).map(|c| (c.iter().map(|x| x * x).sum::<f32>() / c.len().max(1) as f32).sqrt()).collect();
+    let hp: Vec<f32> = audio
+        .chunks(HOP)
+        .enumerate()
+        .map(|(k, c)| {
+            let prev = if k == 0 { 0.0 } else { audio[k * HOP - 1] };
+            let mut last = prev;
+            let e = c.iter().map(|&x| { let d = x - last; last = x; d * d }).sum::<f32>() / c.len().max(1) as f32;
+            e.sqrt()
+        })
+        .collect();
     if frames.len() < 40 {
         return;
     }
@@ -112,9 +124,14 @@ fn refine_onsets(t: &mut Transcript, audio_wav: &Path) {
             for i in lo..hi {
                 let before = (frames[i.saturating_sub(4)..i].iter().sum::<f32>() / 4.0).max(1e-5);
                 let after = frames[i..(i + 4).min(frames.len())].iter().sum::<f32>() / 4.0;
-                let rise = after / before;
-                if after > noise * 3.0 && rise > 2.5 && best.is_none_or(|b| rise > b.1) {
-                    best = Some((i, rise));
+                let hb = (hp[i.saturating_sub(4)..i].iter().sum::<f32>() / 4.0).max(1e-6);
+                let ha = hp[i..(i + 4).min(hp.len())].iter().sum::<f32>() / 4.0;
+                let rise = (after / before) * (ha / hb).sqrt();
+                // Prefer the earliest strong rise: the onset is where the rise starts, not peaks.
+                let dist = (i as i64 - center).unsigned_abs() as f32;
+                let score = rise / (1.0 + dist / 40.0);
+                if after > noise * 3.0 && rise > 2.5 && best.is_none_or(|b| score > b.1) {
+                    best = Some((i, score));
                 }
             }
             if let Some((i, _)) = best {

@@ -44,7 +44,7 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [x] Render: constant-frame-rate from VFR sources, any codec normalised to 8-bit 4:2:0, display rotation, interpolated `CropPlan` (static / single / split / fit with blurred background), caption sprites blended in YUV, `h264_videotoolbox` High with `allow_sw`, AAC at 48 kHz with `loudnorm` −14 LUFS (measured −14.5), MP4 `+faststart` → 10 integration tests + 3 snapshot tests; 45–62 s clips render at 5–6x realtime
 - [x] Export: size presets (9:16, 1:1, 4:5, 16:9), `<source>-<rank>-<slug>` naming, poster PNG, SRT, VTT, metadata JSON (title, description, hashtags, score, reasons, timecodes, picker provenance); re-export a clip with another style/size/framing without re-transcribing
 - [x] `choco render` and `choco run`; engine `pipeline` module shared by CLI and app (temp files cleaned on every path, cancellation between stages, batches and clips)
-- [~] Word timing: bias correction, whisper DTW token times (−200 ms) and audio-onset snapping within ±90 ms → median 45 / 72 / 60 ms (Apple) and 54 / 66 / 64 ms (whisper) on three voices, from 52–95 ms; p90 down from ~250 to ~165 ms for whisper. The ≤ 50 ms target is met on one voice of three. Next: a forced-alignment pass on the 16 kHz audio around each DTW time
+- [~] Word timing: bias correction, whisper DTW token times (−200 ms) and audio-onset snapping within ±90 ms → median 41 / 71 / 54 ms (Apple) and 54 / 66 / 67 ms (whisper) on three voices, from 52–95 ms; p90 down from ~250 to ~165 ms for whisper. The ≤ 50 ms target is met on one voice of three. Next: a forced-alignment pass on the 16 kHz audio around each DTW time
 
 ## Done: M4 Reframe
 
