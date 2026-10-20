@@ -93,7 +93,7 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 
 - [x] Mac job uploads the synthetic fixtures (`engine/fixtures/media`) as an artifact; the Windows job downloads them (`generate.sh` needs macOS `say`) → both OSes test the same bytes
 - [x] `windows-latest` job on the interim BtbN LGPL build (mirrored to a prerelease, sha256-pinned) → first run green: release build 7m24s, 71 unit + 7 media + 10 render tests pass with `CHOCO_ENCODERS=h264_mf` (GPU MFT absent, the software MFT renders), clippy clean. All three render snapshots match the Mac references, so cross-OS determinism of the compositor and captions is measured, not assumed. Original plan:: toolchain from `rust-toolchain.toml` (add `x86_64-pc-windows-msvc` to `targets`), `FFMPEG_DIR` + `LIBCLANG_PATH`, FFmpeg `bin/` on `PATH`, `cargo build --release --all`, `cargo test --all`, `cargo clippy --all --all-targets -- -D warnings` → green on the stub backend; first Windows feedback loop without a Windows machine
-- [ ] Switch the job to the minimal prebuilt (below), fetched by URL and checked against the sha256 in `scripts/ffmpeg/VERSIONS`
+- [x] Switch the job to the minimal prebuilt, fetched by URL and checked against the sha256 in `scripts/ffmpeg/VERSIONS-windows`
 - [ ] Vulkan SDK (LunarG, pinned version) installed in the job; build, test and clippy with `--features choco-engine/vulkan`. The runner has no GPU, so the suite also proves the CPU fallback
 - [ ] `cargo deny check` already resolves every target; confirm the Windows-only crates (`windows-native-keyring-store`, `windows`, `webview2-com`, …) pass licenses and bans → no `deny.toml` change
 - [ ] Import check (`dumpbin /dependents`) on `choco.exe`, the app exe and every FFmpeg DLL → fails on `vcruntime140*.dll`, `msvcp140.dll`, `api-ms-win-crt-*`, `libgcc*`, `libwinpthread*`, or a `vulkan-1.dll` that is not delay-loaded
@@ -102,13 +102,13 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 
 ### Minimal LGPL FFmpeg for Windows x64
 
-- [ ] Toolchain: MSVC (`--toolchain=msvc`) driven from MSYS2 bash, static CRT (`-MT`) → Decisions entry in `AGENTS.md`
-- [ ] `scripts/ffmpeg/build-windows.sh`, a mirror of `build-mac.sh`: FFmpeg 8.1.3 tarball checked against `VERSIONS`; `--disable-everything` with the same demuxer, decoder, parser, bsf, muxer and filter lists; encoders `h264_mf h264_nvenc h264_amf h264_qsv aac pcm_s16le pcm_f32le`; hwaccels `h264/hevc/vp9/av1_d3d11va` and `_d3d11va2`; `--enable-w32threads --enable-d3d11va --enable-mediafoundation --enable-ffnvcodec --enable-nvenc --enable-amf --enable-libvpl --enable-libdav1d`
-- [ ] dav1d 1.5.4 static (meson, `-Db_vscrt=mt`) from the same VideoLAN-checksummed tarball → `tests/media.rs` `av1_opus_webm` passes
-- [ ] Third-party inputs pinned with sha256 in the script: nv-codec-headers n11.1.5.3 (MIT; oldest line FFmpeg 8.1 accepts, NVIDIA driver ≥ 471.41), AMF headers (MIT), libvpl dispatcher built static (MIT)
-- [ ] Gates after configure: `CONFIG_GPL 0`, `CONFIG_NONFREE 0`, `HAVE_W32THREADS 1`, every allowlisted encoder and hwaccel `1`; the script aborts otherwise (`--disable-autodetect` silently drops anything not named)
-- [ ] `ffmpeg-windows.yml` (manual dispatch) builds on `windows-latest` and publishes `ffmpeg-8.1.3-win64-lgpl-minimal.zip` (`bin/*.dll`, `lib/*.lib`, `include/`, license texts) as a release asset; URL and sha256 recorded in `scripts/ffmpeg/README.md` and `VERSIONS`; the interim 166 MB BtbN entry is deleted
-- [ ] Size → six DLLs total ≤ 12 MB (Mac: 8.3 MB); recorded in the README table and in Benchmarks
+- [x] Toolchain: MSVC (`--toolchain=msvc`) driven from MSYS2 bash, static CRT (`-MT`) → Decisions entry in `AGENTS.md`
+- [x] `scripts/ffmpeg/build-windows.sh`, a mirror of `build-mac.sh` (QSV/libvpl deferred until the compositor emits NV12, issue #7): FFmpeg 8.1.3 tarball checked against `VERSIONS`; `--disable-everything` with the same demuxer, decoder, parser, bsf, muxer and filter lists; encoders `h264_mf h264_nvenc h264_amf h264_qsv aac pcm_s16le pcm_f32le`; hwaccels `h264/hevc/vp9/av1_d3d11va` and `_d3d11va2`; `--enable-w32threads --enable-d3d11va --enable-mediafoundation --enable-ffnvcodec --enable-nvenc --enable-amf --enable-libvpl --enable-libdav1d`
+- [x] dav1d 1.5.4 static (meson, `-Db_vscrt=mt`; Meson names it `libdav1d.a`, copied to `dav1d.lib` for link.exe) from the same VideoLAN-checksummed tarball → `tests/media.rs` `av1_opus_webm` passes
+- [~] Third-party inputs: FFmpeg and dav1d sha256-checked; nv-codec-headers n13.0.19.0 and AMF v1.4.36 printed for pinning, not yet enforced. Original: nv-codec-headers n11.1.5.3 (MIT; oldest line FFmpeg 8.1 accepts, NVIDIA driver ≥ 471.41), AMF headers (MIT), libvpl dispatcher built static (MIT)
+- [x] Gates after configure (encoders and hwaccels are read from `config_components.h` since FFmpeg 6): `CONFIG_GPL 0`, `CONFIG_NONFREE 0`, `HAVE_W32THREADS 1`, every allowlisted encoder and hwaccel `1`; the script aborts otherwise (`--disable-autodetect` silently drops anything not named)
+- [x] `ffmpeg-windows.yml` (manual dispatch) builds on `windows-latest` and publishes `ffmpeg-8.1.3-win64-lgpl-minimal.zip` (`bin/*.dll`, `lib/*.lib`, `include/`, license texts) as a release asset; URL and sha256 recorded in `scripts/ffmpeg/README.md` and `VERSIONS`; the interim 166 MB BtbN entry is deleted
+- [x] Size → six DLLs total 11.8 MB, zip 5.1 MB, LGPL 2.1 confirmed (budget ≤ 12 MB; Mac: 8.3 MB); recorded in the README table and in Benchmarks
 - [ ] Not built: DXVA2 and D3D12VA (D3D11VA covers every Windows 11 driver), `hevc_*` encoders (output is H.264 only), `aac_at` (Apple only; the native `aac` encoder is what render uses on both OSes)
 
 ### Backend (`backend/windows.rs`)

@@ -59,7 +59,7 @@ jobs:
           retention-days: 3
 
   windows:
-    # M6 step 2: build, test and lint on Windows against an interim LGPL FFmpeg (never shipped).
+    # Build, test and lint on Windows against our minimal LGPL FFmpeg (scripts/ffmpeg/VERSIONS-windows).
     runs-on: windows-latest
     needs: macos            # the fixtures need macOS `say`; both OSes test the same bytes
     defaults:
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: rustup show active-toolchain || rustup toolchain install
-      - name: Interim LGPL FFmpeg (pinned, sha256-checked)
+      - name: Minimal LGPL FFmpeg (ours, pinned, sha256-checked)
         working-directory: .
         run: ./scripts/ffmpeg/fetch-windows.sh
       - name: FFmpeg DLLs on PATH for tests
