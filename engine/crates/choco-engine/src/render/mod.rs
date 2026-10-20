@@ -26,6 +26,14 @@ pub enum RenderError {
     Unsupported(String),
     #[error("render: source has no video stream")]
     NoVideo,
+    /// The encoder opened but failed while encoding; `render_clip` retries with the next one.
+    #[error("render: encoder {encoder} failed mid-clip: {error}")]
+    Encoder {
+        encoder: &'static str,
+        /// Position in `encoders::platform_candidates()`.
+        index: usize,
+        error: ff::Error,
+    },
     #[error("render: cancelled")]
     Cancelled,
     #[error("render: io: {0}")]
@@ -233,6 +241,46 @@ pub fn render_clip(
     progress: ProgressFn,
     cancel: &AtomicBool,
 ) -> Result<RenderReport, RenderError> {
+    // A hardware encoder can open and still fail mid-clip (driver reset, GPU memory). Render the
+    // clip once more, starting from the next candidate; if that fails too, say what each did.
+    match render_from(asset, spec, out_path, raster, progress, cancel, 0) {
+        Err(RenderError::Encoder {
+            encoder,
+            index,
+            error,
+        }) => {
+            let first = format!("{encoder} failed mid-clip: {error}");
+            progress(Progress::new(
+                STAGE,
+                0.0,
+                format!("{first}; rendering again with the next encoder"),
+            ));
+            render_from(asset, spec, out_path, raster, progress, cancel, index + 1).map_err(|e| {
+                match e {
+                    RenderError::Encoder { encoder, error, .. } => RenderError::Unsupported(
+                        format!("{first}; {encoder} failed mid-clip too: {error}"),
+                    ),
+                    RenderError::Unsupported(m) => {
+                        RenderError::Unsupported(format!("{first}; then {m}"))
+                    }
+                    other => other,
+                }
+            })
+        }
+        other => other,
+    }
+}
+
+/// One render attempt using encoder candidates from position `from` on.
+fn render_from(
+    asset: &MediaAsset,
+    spec: &RenderSpec,
+    out_path: &Path,
+    raster: &mut Rasterizer,
+    progress: ProgressFn,
+    cancel: &AtomicBool,
+    from: usize,
+) -> Result<RenderReport, RenderError> {
     crate::init();
     let started = Instant::now();
     let vinfo = asset.video.as_ref().ok_or(RenderError::NoVideo)?;
@@ -250,7 +298,11 @@ pub fn render_clip(
     // Video encoder: the first of this machine's candidates that opens (encoders::platform_candidates).
     let mut tried: Vec<String> = Vec::new();
     let mut opened = None;
-    for cand in encoders::platform_candidates() {
+    for (index, cand) in encoders::platform_candidates()
+        .iter()
+        .enumerate()
+        .skip(from)
+    {
         let Some(vcodec) = ff::encoder::find_by_name(cand.name) else {
             tried.push(format!("{}: not in this FFmpeg build", cand.name));
             continue;
@@ -275,13 +327,13 @@ pub fn render_clip(
         }
         match venc.open_with(opts) {
             Ok(v) => {
-                opened = Some((vcodec, v, cand.name));
+                opened = Some((vcodec, v, cand.name, index));
                 break;
             }
             Err(e) => tried.push(format!("{}: {e}", cand.name)),
         }
     }
-    let (vcodec, mut venc, encoder_name) = opened.ok_or_else(|| {
+    let (vcodec, mut venc, encoder_name, encoder_index) = opened.ok_or_else(|| {
         RenderError::Unsupported(format!(
             "no H.264 encoder opened ({}){}",
             if !tried.is_empty() {
@@ -368,6 +420,9 @@ pub fn render_clip(
         .poster
         .map(|(t, _)| ((t.saturating_sub(spec.start_ms)) as f64 / frame_ms) as u64);
 
+    // Test hook (tests/encoder_retry.rs): the first encoder fails at frame 5.
+    let fail_at =
+        (from == 0 && std::env::var_os("CHOCO_TEST_FAIL_FIRST_ENCODER").is_some()).then_some(5);
     let mut emit = |src: &yuv::Frame,
                     n: &mut u64,
                     venc: &mut ff::encoder::Video,
@@ -400,6 +455,14 @@ pub fn render_clip(
             e.write_header()?.write_image_data(&rgb)?;
         }
         frame.set_pts(Some(*n as i64));
+        let enc_err = |error: ff::Error| RenderError::Encoder {
+            encoder: encoder_name,
+            index: encoder_index,
+            error,
+        };
+        if fail_at == Some(*n) {
+            return Err(enc_err(ff::Error::External));
+        }
         let write_ready = |venc: &mut ff::encoder::Video,
                            octx: &mut ff::format::context::Output,
                            audio_packets: &mut Vec<Packet>|
@@ -418,12 +481,12 @@ pub fn render_clip(
         loop {
             match venc.send_frame(&frame) {
                 Err(ff::Error::Other { errno }) if errno == ff::util::error::EAGAIN => {
-                    write_ready(venc, octx, audio_packets)?
+                    write_ready(venc, octx, audio_packets).map_err(enc_err)?
                 }
-                other => break other?,
+                other => break other.map_err(enc_err)?,
             }
         }
-        write_ready(venc, octx, audio_packets)?;
+        write_ready(venc, octx, audio_packets).map_err(enc_err)?;
         *n += 1;
         Ok(())
     };
@@ -500,7 +563,11 @@ pub fn render_clip(
             }
         }
     }
-    venc.send_eof()?;
+    venc.send_eof().map_err(|error| RenderError::Encoder {
+        encoder: encoder_name,
+        index: encoder_index,
+        error,
+    })?;
     let mut pkt = Packet::empty();
     while venc.receive_packet(&mut pkt).is_ok() {
         let t_secs = pkt.pts().unwrap_or(0) as f64 * f64::from(enc_tb);
