@@ -40,11 +40,17 @@ jobs:
           echo "sha=$(sha256sum "$Z" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "### FFmpeg minimal: $(du -h "$Z" | cut -f1), sha256 $(sha256sum "$Z" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
           du -ch 8.1.3-windows-x64-minimal/bin/*.dll | tail -1 >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the zip as a run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-8.1.3-win64-lgpl-minimal
+          path: vendor/ffmpeg/ffmpeg-8.1.3-win64-lgpl-minimal.zip
       - name: Publish prerelease asset
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "ffmpeg-win64-8.1.3-minimal"
-          gh release view $tag 2>$null; if ($LASTEXITCODE -ne 0) { gh release create $tag --prerelease --title "Minimal LGPL FFmpeg 8.1.3 for Windows x64" --notes "Built by .github/workflows/ffmpeg-windows.yml from scripts/ffmpeg/build-windows.sh. LGPL 2.1, shared, static CRT. SHA-256 in scripts/ffmpeg/VERSIONS-windows." --target $env:GITHUB_SHA }
-          gh release upload $tag vendor/ffmpeg/ffmpeg-8.1.3-win64-lgpl-minimal.zip --clobber
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ffmpeg-win64-8.1.3-minimal
+          name: Minimal LGPL FFmpeg 8.1.3 for Windows x64
+          prerelease: true
+          make_latest: false
+          body: "Built by .github/workflows/ffmpeg-windows.yml from scripts/ffmpeg/build-windows.sh. LGPL 2.1, shared, static CRT. SHA-256: ${{ steps.pkg.outputs.sha }}"
+          files: vendor/ffmpeg/ffmpeg-8.1.3-win64-lgpl-minimal.zip
