@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+@font-face { font-family: GS; src: url("assets/fonts/GeneralSans-500.woff2"); font-weight: 500; }
+@font-face { font-family: GS; src: url("assets/fonts/GeneralSans-600.woff2"); font-weight: 600; }
+@font-face { font-family: GS; src: url("assets/fonts/GeneralSans-700.woff2"); font-weight: 700; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+#root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #f4f4f2; font-family: GS, "Helvetica Neue", Arial, sans-serif; color: #2a1712; }
+.clip { position: absolute; inset: 0; }
+.h { position: absolute; font-weight: 700; letter-spacing: -0.035em; line-height: 0.92; }
+.h .w { display: inline-block; }
+.sub { position: absolute; font-weight: 500; font-size: 30px; line-height: 1.35; color: #6b5a50; }
+.num { font-variant-numeric: tabular-nums; }
+/* s1: the long video */
+#s1-frame { position: absolute; left: 120px; top: 300px; width: 1680px; height: 560px; border-radius: 20px; background: #2a1712; overflow: hidden; }
+#s1-wave { position: absolute; left: 60px; right: 60px; top: 50%; height: 240px; display: flex; align-items: center; gap: 6px; transform: translateY(-50%); }
+#s1-wave i { flex: 1; border-radius: 3px; background: #f4f4f2; opacity: .22; transform-origin: 50% 50%; }
+#s1-tl { position: absolute; left: 120px; top: 900px; width: 1680px; height: 14px; border-radius: 7px; background: #d8cfc6; transform-origin: 0 50%; }
+#s1-t0, #s1-t1 { position: absolute; top: 930px; font-weight: 600; font-size: 24px; color: #6b5a50; }
+#s1-t0 { left: 120px; } #s1-t1 { right: 120px; }
+/* s2: reading every moment */
+#s2-tl { position: absolute; left: 120px; top: 560px; width: 1680px; height: 14px; border-radius: 7px; background: #d8cfc6; }
+#s2-ticks { position: absolute; left: 120px; top: 470px; width: 1680px; height: 90px; }
+#s2-ticks i { position: absolute; bottom: 0; width: 3px; border-radius: 2px; background: #2a1712; transform-origin: 50% 100%; }
+.pick { position: absolute; top: 540px; height: 54px; border-radius: 10px; background: #ffd84a; display: grid; place-items: center; font-weight: 700; font-size: 26px; color: #2a1712; transform-origin: 50% 100%; }
+#s2-count { position: absolute; left: 120px; top: 640px; font-weight: 700; font-size: 120px; letter-spacing: -0.04em; line-height: 1; }
+#s2-label { position: absolute; left: 124px; top: 770px; font-weight: 500; font-size: 30px; color: #6b5a50; }
+/* s3: the slab lifts out */
+#s3-wide { position: absolute; left: 120px; top: 220px; width: 1120px; height: 630px; border-radius: 20px; background: #2a1712; }
+#s3-face { position: absolute; left: 40%; top: 30%; width: 150px; height: 190px; border-radius: 50% 50% 46% 46%; background: #d7a582; }
+#s3-body { position: absolute; left: 32%; top: 62%; width: 340px; height: 300px; border-radius: 170px 170px 0 0; background: #2f4a5e; }
+#s3-crop { position: absolute; left: 480px; top: 220px; width: 354px; height: 630px; border-radius: 20px; border: 6px solid #ffd84a; }
+#s3-slab { position: absolute; left: 1300px; top: 140px; width: 440px; height: 782px; border-radius: 24px; background: #ffd84a; overflow: hidden; }
+#s3-slab .inner { position: absolute; inset: 24px; border-radius: 16px; background: #2a1712; overflow: hidden; }
+#s3-slab .face { position: absolute; left: 50%; top: 24%; width: 150px; height: 190px; margin-left: -75px; border-radius: 50% 50% 46% 46%; background: #d7a582; }
+#s3-slab .body { position: absolute; left: 50%; bottom: 0; width: 360px; height: 300px; margin-left: -180px; border-radius: 180px 180px 0 0; background: #2f4a5e; }
+#s3-cap { position: absolute; left: 0; right: 0; bottom: 110px; text-align: center; font-weight: 700; font-size: 54px; line-height: 1.05; color: #fff; text-transform: uppercase; letter-spacing: 0; text-shadow: 0 3px 0 #000, 3px 0 0 #000, -3px 0 0 #000, 0 -3px 0 #000; }
+#s3-cap .w { display: inline-block; }
+#s3-cap .on { color: #ffd84a; }
+/* s4: four slabs */
+#s4-row { position: absolute; left: 120px; top: 330px; width: 1680px; display: flex; gap: 32px; }
+.card { position: relative; width: 396px; height: 560px; border-radius: 24px; overflow: hidden; background: #2a1712; transform-origin: 50% 100%; }
+.card.y { background: #ffd84a; } .card.c { background: #d8cfc6; } .card.s { background: #e7e5e2; }
+.card .score { position: absolute; left: 24px; top: 24px; font-weight: 700; font-size: 40px; letter-spacing: -0.03em; }
+.card .t { position: absolute; left: 24px; right: 24px; bottom: 28px; font-weight: 600; font-size: 28px; line-height: 1.15; }
+.card.d .score, .card.d .t { color: #f4f4f2; }
+.card .len { position: absolute; right: 24px; top: 30px; font-weight: 500; font-size: 22px; opacity: .7; }
+.card.d .len { color: #f4f4f2; }
+/* s5: stats */
+.stat { position: absolute; top: 420px; width: 560px; }
+.stat b { display: block; font-weight: 700; font-size: 170px; letter-spacing: -0.05em; line-height: 0.9; white-space: nowrap; }
+.stat b .n { font-size: 170px; font-weight: 700; }
+.stat b small { font-size: 56px; font-weight: 600; letter-spacing: -0.02em; margin-left: 8px; }
+.stat > span { display: block; margin-top: 22px; font-weight: 500; font-size: 30px; color: #6b5a50; max-width: 18ch; }
+/* s6: end card */
+#s6 { background: #2a1712; }
+#s6-blocks { position: absolute; left: 120px; top: 250px; width: 1680px; height: 420px; display: flex; gap: 10px; align-items: flex-end; }
+#s6-blocks span { flex: 1; display: grid; place-items: center; border-radius: 22px; font-weight: 700; font-size: 220px; letter-spacing: -0.05em; color: #2a1712; transform-origin: 50% 100%; }
+#s6-blocks span:nth-child(3n+1) { background: #ffd84a; } #s6-blocks span:nth-child(3n+2) { background: #f4f4f2; } #s6-blocks span:nth-child(3n) { background: #d8cfc6; }
+#s6-line { position: absolute; left: 120px; top: 740px; font-weight: 600; font-size: 54px; letter-spacing: -0.02em; color: #f4f4f2; }
+#s6-pill { position: absolute; left: 120px; top: 850px; height: 92px; padding: 0 44px; border-radius: 46px; background: #ffd84a; color: #2a1712; font-weight: 700; font-size: 36px; display: grid; place-items: center; }
+#s6-free { position: absolute; right: 120px; top: 760px; width: 560px; text-align: right; font-weight: 500; font-size: 28px; line-height: 1.4; color: #cdbfb3; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="30" data-width="1920" data-height="1080">
+
+  <div id="s1" class="clip" data-start="0" data-duration="5" data-track-index="0">
+    <div class="h" id="s1-h" style="left:120px;top:110px;font-size:120px"><span class="w">Long</span> <span class="w">videos</span> <span class="w">in.</span></div>
+    <div id="s1-frame"><div id="s1-wave"></div></div>
+    <div id="s1-tl"></div><div id="s1-t0" class="num">0:00</div><div id="s1-t1" class="num">47:52</div>
+  </div>
+
+  <div id="s2" class="clip" data-start="5" data-duration="6" data-track-index="0">
+    <div class="h" id="s2-h" style="left:120px;top:110px;font-size:120px"><span class="w">It</span> <span class="w">reads</span> <span class="w">every</span> <span class="w">moment.</span></div>
+    <div id="s2-ticks"></div><div id="s2-tl"></div>
+    <div class="pick" id="p1" style="left:276px;width:70px">1</div><div class="pick" id="p2" style="left:220px;width:88px">2</div><div class="pick" id="p3" style="left:1095px;width:80px">3</div><div class="pick" id="p4" style="left:1480px;width:82px">4</div>
+    <div id="s2-count" class="num">0</div><div id="s2-label">moments considered</div>
+  </div>
+
+  <div id="s3" class="clip" data-start="11" data-duration="7" data-track-index="0">
+    <div class="h" id="s3-h" style="left:120px;top:90px;font-size:96px"><span class="w">Clips</span> <span class="w">out,</span> <span class="w">on</span> <span class="w">the</span> <span class="w">speaker.</span></div>
+    <div id="s3-wide"><div id="s3-face"></div><div id="s3-body"></div></div>
+    <div id="s3-crop"></div>
+    <div id="s3-slab"><div class="inner"><div class="face"></div><div class="body"></div><div id="s3-cap"><span class="w">THE</span> <span class="w">BEST</span> <span class="w">IDEAS</span></div></div></div>
+  </div>
+
+  <div id="s4" class="clip" data-start="18" data-duration="6" data-track-index="0">
+    <div class="h" id="s4-h" style="left:120px;top:110px;font-size:110px"><span class="w">Four</span> <span class="w">clips.</span> <span class="w">Four</span> <span class="w">minutes.</span></div>
+    <div id="s4-row">
+      <div class="card d"><div class="score num">82</div><div class="len num">0:31</div><div class="t">Art imitates life, but you need a life</div></div>
+      <div class="card y"><div class="score num">78</div><div class="len num">0:49</div><div class="t">Workaholism killed my creativity</div></div>
+      <div class="card c"><div class="score num">74</div><div class="len num">0:44</div><div class="t">My eggs are on ice in Redondo Beach</div></div>
+      <div class="card s"><div class="score num">78</div><div class="len num">0:45</div><div class="t">Stop calling it a geriatric pregnancy</div></div>
+    </div>
+  </div>
+
+  <div id="s5" class="clip" data-start="24" data-duration="4" data-track-index="0">
+    <div class="h" id="s5-h" style="left:120px;top:110px;font-size:110px"><span class="w">Nothing</span> <span class="w">leaves</span> <span class="w">your</span> <span class="w">Mac.</span></div>
+    <div class="stat" id="st1" style="left:120px"><b class="num"><span class="n">0</span><small>MB</small></b><span>installed, no models in the box</span></div>
+    <div class="stat" id="st2" style="left:700px"><b class="num">~<span class="n">0</span><small>¢</small></b><span>per hour of video to pick clips</span></div>
+    <div class="stat" id="st3" style="left:1280px"><b class="num"><span class="n">0</span><small>bytes</small></b><span>of video uploaded, ever</span></div>
+  </div>
+
+  <div id="s6" class="clip" data-start="28" data-duration="2" data-track-index="0">
+    <div id="s6-blocks"><span style="height:72%">c</span><span style="height:100%">h</span><span style="height:64%">o</span><span style="height:84%">c</span><span style="height:70%">o</span></div>
+    <div id="s6-line">choco.video</div>
+    <div id="s6-free">Free and open source for Mac.<br>Apple Silicon, macOS 14 or later.</div>
+    <div id="s6-pill">Download for macOS</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  window.__timelines = window.__timelines || {};
+  const tl = gsap.timeline({ paused: true });
+  const E = "power3.out";
+  const words = (sel, at, step = 0.09) => tl.fromTo(sel + " .w", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: E, stagger: step }, at);
+  // deterministic pseudo-random
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  // Scene 1 (0–5): the long video
+  const wave = document.getElementById("s1-wave");
+  for (let i = 0; i < 160; i++) { const b = document.createElement("i"); b.style.height = (20 + rnd() * 80 * (0.5 + 0.5 * Math.abs(Math.sin(i / 9)))) + "%"; wave.appendChild(b); }
+  words("#s1-h", 0.1);
+  tl.fromTo("#s1-frame", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, ease: E }, 0.6);
+  tl.fromTo("#s1-wave i", { scaleY: 0.05 }, { scaleY: 1, duration: 0.5, ease: E, stagger: { each: 0.006, from: "start" } }, 1.1);
+  tl.fromTo("#s1-tl", { scaleX: 0 }, { scaleX: 1, duration: 1.6, ease: E }, 1.8);
+  tl.fromTo(["#s1-t0", "#s1-t1"], { opacity: 0 }, { opacity: 1, duration: 0.4 }, 3.0);
+
+  // Scene 2 (5–11): ticks rain, counter, four picks
+  const ticks = document.getElementById("s2-ticks");
+  for (let i = 0; i < 220; i++) { const t = document.createElement("i"); t.style.left = (i / 219) * 1680 + "px"; t.style.height = (20 + rnd() * 60) + "px"; ticks.appendChild(t); }
+  words("#s2-h", 5.1);
+  tl.set("#s2-tl", { opacity: 1 }, 5);
+  tl.fromTo("#s2-ticks i", { scaleY: 0, opacity: 0 }, { scaleY: 1, opacity: 1, duration: 0.35, ease: E, stagger: { each: 0.008, from: "random" } }, 5.9);
+  const cnt = { v: 0 }; const cEl = document.getElementById("s2-count");
+  tl.fromTo("#s2-count", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 6.0);
+  tl.fromTo("#s2-label", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 6.0);
+  tl.to(cnt, { v: 3976, duration: 2.2, ease: "power2.out", onUpdate: () => (cEl.textContent = Math.round(cnt.v).toLocaleString("en-US")) }, 6.0);
+  tl.to("#s2-ticks i", { opacity: 0.12, duration: 0.5 }, 8.6);
+  tl.call(() => { document.getElementById("s2-label").textContent = "picked, with reasons"; }, null, 9.0);
+  tl.to(cnt, { v: 4, duration: 0.5, ease: "power2.inOut", onUpdate: () => (cEl.textContent = Math.round(cnt.v).toLocaleString("en-US")) }, 9.0);
+  tl.fromTo([".pick"], { scaleY: 0, opacity: 0 }, { scaleY: 1, opacity: 1, duration: 0.45, ease: "back.out(1.6)", stagger: 0.14 }, 9.0);
+
+  // Scene 3 (11–18): the crop box finds the speaker, the slab lifts out
+  words("#s3-h", 11.1);
+  tl.fromTo("#s3-wide", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.8, ease: E }, 11.5);
+  tl.fromTo("#s3-crop", { opacity: 0, x: 220, scale: 1.1 }, { opacity: 1, x: 0, scale: 1, duration: 1.0, ease: E }, 12.4);
+  tl.fromTo("#s3-slab", { opacity: 0, x: -300, scale: 0.86 }, { opacity: 1, x: 0, scale: 1, duration: 1.1, ease: E }, 13.6);
+  tl.fromTo("#s3-cap .w", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: E, stagger: 0.12 }, 14.6);
+  [0, 1, 2].forEach((i, k) => { tl.call(() => document.querySelectorAll("#s3-cap .w").forEach((w, j) => w.classList.toggle("on", j === i)), null, 15.2 + k * 0.6); });
+  tl.call(() => document.querySelectorAll("#s3-cap .w").forEach((w, j) => w.classList.toggle("on", j === 2)), null, 17.4);
+
+  // Scene 4 (18–24): four cards assemble
+  words("#s4-h", 18.1);
+  tl.fromTo(".card", { opacity: 0, y: 160, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: E, stagger: 0.22 }, 18.9);
+  tl.fromTo(".card .score, .card .len, .card .t", { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.05 }, 19.9);
+
+  // Scene 5 (24–28): three counters
+  words("#s5-h", 24.1);
+  const stats = [["#st1 .n", 20, 0], ["#st2 .n", 2, 0], ["#st3 .n", 0, 0]];
+  stats.forEach(([sel, to], k) => {
+    const o = { v: 0 }, el = document.querySelector(sel);
+    tl.fromTo(sel.replace(" .n", ""), { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 24.8 + k * 0.35);
+    tl.to(o, { v: to, duration: 1.2, ease: "power2.out", onUpdate: () => (el.textContent = Math.round(o.v)) }, 24.9 + k * 0.35);
+  });
+
+  // Scene 6 (28–30): the name, built from blocks
+  tl.fromTo("#s6-blocks span", { scaleY: 0, opacity: 0 }, { scaleY: 1, opacity: 1, duration: 0.6, ease: "back.out(1.4)", stagger: 0.08 }, 28.05);
+  tl.fromTo(["#s6-line", "#s6-free"], { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: E, stagger: 0.1 }, 28.7);
+  tl.fromTo("#s6-pill", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 29.1);
+  tl.set({}, {}, 30);
+  window.__timelines["main"] = tl;
+})();
+</script>
+</body>
+</html>

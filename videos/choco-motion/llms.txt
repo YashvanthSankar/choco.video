@@ -1,0 +1,10 @@
+# choco.video
+
+> Open-source macOS app (Tauri + Svelte) and Rust engine that turn long videos into ranked, captioned, speaker-centred vertical clips. Video stays on the machine; only transcript text goes to the user's chosen clip picker (Apple on-device, or any OpenAI-compatible provider such as OpenCode Zen). MIT.
+
+- [README](README.md): what it does, install, picker models, repository map
+- [Contributing](CONTRIBUTING.md): rules, setup, checks before a PR
+- [Agent memory](AGENTS.md): non-negotiables, decisions log, benchmarks, known traps
+- [Plan](docs/PLAN.md), [stack](docs/STACK.md), [technical spec](docs/TECH.md), [TODO with measurements](docs/TODO.md), [competitors](docs/COMPETITORS.md)
+- [Engine CLI](engine/crates/choco/src/main.rs): `choco run|highlights|render|transcribe|eval|doctor|provider|models`
+- [Website](site/index.html), deployed at https://chocovideo.vercel.app

@@ -6,7 +6,7 @@ members = ["crates/choco-engine", "crates/choco", "crates/choco-ffi"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/choco-video/engine"
+repository = "https://github.com/YashvanthSankar/choco.video"
 rust-version = "1.91"
 
 [workspace.dependencies]

@@ -1,0 +1,25 @@
+name: Bug report
+description: Something in the app, the CLI or the engine does not work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: What you did, what you expected, what you got. Paste the exact error text. }
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes: { label: choco.video version, placeholder: "0.1.0 (Settings → About, or `choco --version`)" }
+    validations: { required: true }
+  - type: input
+    id: mac
+    attributes: { label: Mac and macOS, placeholder: "M3 Pro, macOS 26.1" }
+    validations: { required: true }
+  - type: dropdown
+    id: picker
+    attributes: { label: Clip picker, options: [Apple on device, OpenCode Zen, Another OpenAI-compatible endpoint, Not relevant] }
+  - type: textarea
+    id: media
+    attributes: { label: The source file, description: "Format, length, codec (`choco probe file.mp4 --json` prints it). Never upload the video itself unless it is yours and public." }
+  - type: textarea
+    id: doctor
+    attributes: { label: "`choco doctor` output", render: text }
