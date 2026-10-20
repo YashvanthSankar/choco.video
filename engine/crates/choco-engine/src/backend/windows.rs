@@ -42,7 +42,7 @@ impl Backend for WindowsBackend {
 
 /// Hardware adapters from DXGI, without Microsoft's software adapter.
 fn dxgi_adapters() -> Vec<Gpu> {
-    use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
+    use ::windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE, IDXGIFactory1};
     let mut out = Vec::new();
     // SAFETY: plain COM calls; every interface is released when it drops.
     let Ok(factory) = (unsafe { CreateDXGIFactory1::<IDXGIFactory1>() }) else { return out };
@@ -62,8 +62,8 @@ fn dxgi_adapters() -> Vec<Gpu> {
 
 /// "10.0.26100". RtlGetVersion, because GetVersionEx reports 6.2 to apps without a manifest.
 fn os_build() -> Option<String> {
-    use windows::Wdk::System::SystemServices::RtlGetVersion;
-    use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
+    use ::windows::Wdk::System::SystemServices::RtlGetVersion;
+    use ::windows::Win32::System::SystemInformation::OSVERSIONINFOW;
     let mut v = OSVERSIONINFOW { dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32, ..Default::default() };
     // SAFETY: v is a properly sized, initialised OSVERSIONINFOW.
     unsafe { RtlGetVersion(&mut v) }.ok().ok()?;
@@ -71,7 +71,7 @@ fn os_build() -> Option<String> {
 }
 
 fn total_memory() -> Option<u64> {
-    use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+    use ::windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
     let mut m = MEMORYSTATUSEX { dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32, ..Default::default() };
     // SAFETY: m is a properly sized MEMORYSTATUSEX.
     unsafe { GlobalMemoryStatusEx(&mut m) }.ok()?;
