@@ -88,7 +88,7 @@ Any OpenAI-compatible endpoint works: OpenRouter, Groq, DeepSeek, or LM Studio a
 | `scripts/` | Minimal LGPL FFmpeg build, app bundling, size check | MIT |
 | `docs/` | Plan, stack, technical spec, TODO with measurements, competitor notes | |
 | `videos/` | The launch film, built with HyperFrames | |
-| `brand/` | Logo explorations (the final mark is not chosen yet) | |
+| `brand/` | The app icon source (frosted glass 9:16 clip) | |
 
 `AGENTS.md` is the project's working memory: non-negotiables, decisions and their reasons, measured benchmarks and known traps. Read it before changing anything substantial.
 

@@ -1,4 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="choco.video logo">
-<path fill="#3B2925" fill-rule="evenodd" d="M5 2h22a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Zm9 5a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3V10a3 3 0 0 0-3-3Z"/>
-<path d="m15 12 5 4-5 4Z" fill="#C8795B"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+ <defs>
+  <linearGradient id="g" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="#fffaf2"/><stop offset="1" stop-color="#f3e7d8"/></linearGradient>
+  <filter id="bg" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="46"/></filter>
+  <filter id="fr" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="150"/><feColorMatrix type="saturate" values="1.25"/></filter>
+  <filter id="sh" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="30"/></filter>
+  <linearGradient id="spec" x1="0" y1="0" x2=".2" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".22" stop-color="#fff" stop-opacity=".25"/><stop offset=".7" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity=".35"/></linearGradient>
+  <linearGradient id="top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".32"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="glow" cx=".5" cy=".0" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  <clipPath id="t"><path d="M285 100h454c102.2 0 185 82.8 185 185v454c0 102.2-82.8 185-185 185H285c-102.2 0-185-82.8-185-185V285c0-102.2 82.8-185 185-185Z"/></clipPath>
+  <clipPath id="c"><path d="M414 200h196a72 72 0 0 1 72 72v460a72 72 0 0 1 -72 72h-196a72 72 0 0 1 -72 -72v-460a72 72 0 0 1 72 -72Z"/></clipPath>
+ </defs>
+ <g clip-path="url(#t)">
+  <rect x="100" y="100" width="824" height="824" fill="url(#g)"/>
+  <g filter="url(#bg)"><circle cx="300" cy="300" r="280" fill="#ff7a2a"/><circle cx="730" cy="760" r="330" fill="#ffd84a"/></g>
+  <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+  <path d="M424 240h176a72 72 0 0 1 72 72v460a72 72 0 0 1 -72 72h-176a72 72 0 0 1 -72 -72v-460a72 72 0 0 1 72 -72Z" fill="#000" opacity="0.18" filter="url(#sh)"/>
+  <g clip-path="url(#c)">
+   <rect x="100" y="100" width="824" height="824" fill="url(#g)"/>
+   <g filter="url(#fr)"><circle cx="300" cy="300" r="280" fill="#ff7a2a"/><circle cx="730" cy="760" r="330" fill="#ffd84a"/></g>
+   <rect x="342" y="200" width="340" height="604" fill="rgba(255,255,255,.34)"/>
+   <rect x="342" y="200" width="340" height="604" fill="url(#top)"/>
+  </g>
+  <path d="M414 200h196a72 72 0 0 1 72 72v460a72 72 0 0 1 -72 72h-196a72 72 0 0 1 -72 -72v-460a72 72 0 0 1 72 -72Z" fill="none" stroke="url(#spec)" stroke-width="3.5"/>
+  <rect x="414.0" y="608" width="196" height="40" rx="20" fill="#ffd84a"/>
+  <rect x="460.0" y="666" width="104" height="26" rx="13" fill="#fff" opacity="0.85"/>
+ </g>
+ <path d="M285 100h454c102.2 0 185 82.8 185 185v454c0 102.2-82.8 185-185 185H285c-102.2 0-185-82.8-185-185V285c0-102.2 82.8-185 185-185Z" fill="none" stroke="#fff" stroke-opacity="0.6" stroke-width="2"/>
 </svg>
