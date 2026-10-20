@@ -5,7 +5,9 @@
 use std::ffi::{CStr, CString, c_char};
 
 fn to_c(s: String) -> *mut c_char {
-    CString::new(s).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
+    CString::new(s)
+        .map(CString::into_raw)
+        .unwrap_or(std::ptr::null_mut())
 }
 
 fn err_json(msg: impl std::fmt::Display) -> *mut c_char {

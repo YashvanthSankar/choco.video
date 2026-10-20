@@ -62,7 +62,11 @@ mod tests {
     use super::*;
 
     fn g(name: &str, vendor: Vendor, dedicated: u64) -> Gpu {
-        Gpu { name: name.into(), vendor, dedicated }
+        Gpu {
+            name: name.into(),
+            vendor,
+            dedicated,
+        }
     }
 
     #[test]
@@ -70,22 +74,42 @@ mod tests {
         assert_eq!(vendor_from_pci(0x10DE), Some(Vendor::Nvidia));
         assert_eq!(vendor_from_pci(0x1002), Some(Vendor::Amd));
         assert_eq!(vendor_from_pci(0x8086), Some(Vendor::Intel));
-        assert_eq!(vendor_from_pci(0x1414), None, "Microsoft Basic Render Driver is skipped");
+        assert_eq!(
+            vendor_from_pci(0x1414),
+            None,
+            "Microsoft Basic Render Driver is skipped"
+        );
         assert_eq!(vendor_from_pci(0x5143), Some(Vendor::Other));
     }
 
     #[test]
     fn hybrid_laptop_encodes_on_the_discrete_gpu_first() {
-        let mut gpus = vec![g("Intel Iris Xe", Vendor::Intel, 0), g("RTX 4060 Laptop", Vendor::Nvidia, 8 << 30)];
+        let mut gpus = vec![
+            g("Intel Iris Xe", Vendor::Intel, 0),
+            g("RTX 4060 Laptop", Vendor::Nvidia, 8 << 30),
+        ];
         sort_gpus(&mut gpus);
         assert_eq!(gpus[0].vendor, Vendor::Nvidia);
-        assert_eq!(encoder_order(&gpus), vec![HwCodec::Nvenc, HwCodec::MediaFoundation]);
+        assert_eq!(
+            encoder_order(&gpus),
+            vec![HwCodec::Nvenc, HwCodec::MediaFoundation]
+        );
     }
 
     #[test]
     fn amd_desktop_and_no_gpu() {
-        assert_eq!(encoder_order(&[g("RX 7800 XT", Vendor::Amd, 16 << 30)]), vec![HwCodec::Amf, HwCodec::MediaFoundation]);
-        assert_eq!(encoder_order(&[]), vec![HwCodec::MediaFoundation], "a VM or CI runner still has the software MFT");
-        assert_eq!(encoder_order(&[g("Iris", Vendor::Intel, 0)]), vec![HwCodec::MediaFoundation]);
+        assert_eq!(
+            encoder_order(&[g("RX 7800 XT", Vendor::Amd, 16 << 30)]),
+            vec![HwCodec::Amf, HwCodec::MediaFoundation]
+        );
+        assert_eq!(
+            encoder_order(&[]),
+            vec![HwCodec::MediaFoundation],
+            "a VM or CI runner still has the software MFT"
+        );
+        assert_eq!(
+            encoder_order(&[g("Iris", Vendor::Intel, 0)]),
+            vec![HwCodec::MediaFoundation]
+        );
     }
 }
