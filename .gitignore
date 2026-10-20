@@ -19,3 +19,6 @@ videos/*/.media/
 videos/*/assets/*.mp4
 videos/*/.hyperframes/artifacts/
 .taste-skill/
+videos/*/.hyperframes/frame-packets/
+videos/*/.hyperframes/*.json
+videos/*/.hyperframes/history-id
