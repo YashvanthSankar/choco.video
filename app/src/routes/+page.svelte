@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { platform } from "$lib/platform.svelte";
+  import { platform, words } from "$lib/platform.svelte";
   import { onMount } from "svelte";
   import { api, onJobDone, onJobError, onJobProgress, type JobRequest, type ProgressEvent, type RunResult, type Settings, type Status } from "$lib/api";
   import Onboarding from "$lib/components/Onboarding.svelte";
@@ -73,7 +73,7 @@
   }
 </script>
 
-<header class="bar drag" data-tauri-drag-region>
+<header class="bar drag" class:win={!words.isMac} data-tauri-drag-region>
   <span class="brand" data-tauri-drag-region><span class="word">choco<span class="dot">.</span>video</span></span>
   {#if status && view !== "onboarding" && view !== "loading"}
     <nav class="nodrag">
@@ -103,6 +103,8 @@
 
 <style>
   .bar { position: sticky; top: 0; height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px 0 84px; background: var(--bg); z-index: 10; }
+  /* Windows keeps its native title bar, so no room is held for the macOS window buttons. */
+  .bar.win { padding-left: 22px; }
   .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 15px; letter-spacing: -.03em; user-select: none; }
   .dot { color: var(--data); }
   nav { display: flex; gap: 4px; }

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "choco.video",
+        "width": 1180,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 640,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "assetProtocol": { "enable": true, "scope": ["$HOME/**"] }
+    }
+  },
+  "bundle": {
+    "targets": ["nsis"],
+    "shortDescription": "Turn long videos into vertical clips on your PC",
+    "resources": {
+      "windows/ffmpeg/avcodec-62.dll": "avcodec-62.dll",
+      "windows/ffmpeg/avformat-62.dll": "avformat-62.dll",
+      "windows/ffmpeg/avfilter-11.dll": "avfilter-11.dll",
+      "windows/ffmpeg/avutil-60.dll": "avutil-60.dll",
+      "windows/ffmpeg/swresample-6.dll": "swresample-6.dll",
+      "windows/ffmpeg/swscale-9.dll": "swscale-9.dll"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "digestAlgorithm": "sha256",
+      "allowDowngrades": false,
+      "nsis": {
+        "installMode": "currentUser",
+        "compression": "lzma",
+        "installerIcon": "icons/icon.ico",
+        "startMenuFolder": "choco.video",
+        "displayLanguageSelector": false,
+        "languages": ["English"],
+        "installerHooks": "windows/hooks.nsh"
+      }
+    }
+  }
+}

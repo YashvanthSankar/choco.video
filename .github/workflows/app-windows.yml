@@ -1,0 +1,42 @@
+# Windows installer: build the Tauri app against our minimal FFmpeg, check imports and size,
+# install it silently, launch it, uninstall it, and keep the unsigned setup.exe as an artifact.
+name: app-windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [app/**, engine/crates/**, scripts/build-app-windows.sh, scripts/check-imports.sh, scripts/ffmpeg/**, .github/workflows/app-windows.yml]
+
+concurrency:
+  group: app-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      GGML_NATIVE: "OFF"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: Build, check, install, launch, uninstall
+        run: ./scripts/build-app-windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: choco.video-windows-x64-setup-unsigned
+          path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error

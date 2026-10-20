@@ -183,6 +183,7 @@ fn start_job(app: AppHandle, jobs: State<'_, Arc<Jobs>>, req: JobRequest) -> Res
     }
     let stem = file.file_stem().map(|x| export::slug(&x.to_string_lossy())).unwrap_or_else(|| "video".into());
     let out = PathBuf::from(&req.output_dir).join(&stem);
+    allow_media(&app, &file, &out);
     let mut hopts = HighlightOptions { prompt: req.prompt.filter(|p| !p.trim().is_empty()), ..Default::default() };
     hopts.rank.max_clips = req.max_clips.clamp(1, 30);
     hopts.rank.min_score = req.min_score;
@@ -251,10 +252,25 @@ async fn reexport_clip(summary_path: String, rank: usize, style: String, preset:
     .map_err(|e| e.to_string())?
 }
 
+/// The webview plays the source and the clips through the asset protocol. Its static scope is the
+/// home folder (plus `/Volumes` on macOS); a source on another drive (`D:\`, a USB stick) or an
+/// output folder outside home is allowed here, file by file and folder by folder, as the user
+/// picks them, instead of a static `**`.
+fn allow_media(app: &AppHandle, source: &std::path::Path, out_dir: &std::path::Path) {
+    let scope = app.asset_protocol_scope();
+    let _ = scope.allow_file(source);
+    let _ = scope.allow_directory(out_dir, true);
+}
+
 /// Load a previous run summary (for reopening results).
 #[tauri::command]
-fn load_run(summary_path: String) -> Result<serde_json::Value, String> {
-    serde_json::from_str(&std::fs::read_to_string(&summary_path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+fn load_run(app: AppHandle, summary_path: String) -> Result<serde_json::Value, String> {
+    let path = PathBuf::from(&summary_path);
+    let run: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    if let Some(source) = run["source"]["path"].as_str() {
+        allow_media(&app, std::path::Path::new(source), path.parent().unwrap_or(&path));
+    }
+    Ok(run)
 }
 
 /// Download the speech model this Mac needs, with `model-progress` events.

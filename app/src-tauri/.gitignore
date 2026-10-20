@@ -8,3 +8,4 @@
 binaries/
 frameworks/
 tauri.release.conf.json
+windows/ffmpeg/

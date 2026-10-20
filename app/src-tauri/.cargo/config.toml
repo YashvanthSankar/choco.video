@@ -4,3 +4,9 @@ CHOCO_FFMPEG_LIB_DIR = { value = "../../vendor/ffmpeg/8.1.3-macos-arm64/lib", re
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-arg=-mmacosx-version-min=14.0"]
+
+# Static C runtime on Windows, for the app and the whisper.cpp it builds with cmake (no VC++
+# redistributable; scripts/check-imports.sh verifies). Tauri's staticVCRuntime alone only changes
+# link flags, which cmake never sees.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

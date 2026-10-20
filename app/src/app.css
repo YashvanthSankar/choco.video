@@ -30,7 +30,7 @@
   /* legacy names used by components */
   --accent: var(--text); --accent-ink: var(--invert-ink); --chocolate: #3b2420; --ink: #100c0a; --cream: #f2f2f0; --caramel: var(--data);
   color-scheme: dark;
-  font-family: "General Sans", -apple-system, "SF Pro Text", system-ui, sans-serif;
+  font-family: "General Sans", -apple-system, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.45;
   color: var(--text);
