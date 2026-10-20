@@ -1,0 +1,3 @@
+# Interim Windows FFmpeg for CI (LGPL shared, unmodified BtbN build mirrored to this repo).
+# Replaced by our minimal build at M6 step 3. Format: url sha256
+https://github.com/YashvanthSankar/choco.video/releases/download/ffmpeg-interim-win64-8.1.3/ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-shared-8.1.zip eb9346bdb3312d51ce5bfcf78041fd17e3db91f9fff9446d0d758406b85d2a51
