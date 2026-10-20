@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::Duration;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 fn werr(e: impl std::fmt::Display) -> TranscribeError {
     TranscribeError::Whisper(e.to_string())
@@ -29,6 +29,12 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
     progress(Progress::new(STAGE, 0.0, format!("loading {}", opts.whisper_model)));
     let mut cparams = WhisperContextParameters::default();
     cparams.use_gpu(device != Device::Cpu);
+    // Dynamic-time-warping token timestamps from the cross-attention heads: far tighter word
+    // onsets than the default energy heuristic (measured in fixtures/timing.py). Needs the
+    // preset that matches the model; unknown models keep the heuristic times.
+    if let Some(preset) = dtw_preset(&opts.whisper_model) {
+        cparams.dtw_parameters(DtwParameters { mode: DtwMode::ModelPreset { model_preset: preset }, ..Default::default() });
+    }
     let ctx = WhisperContext::new_with_params(&model_path, cparams).map_err(werr)?;
     let mut state = ctx.create_state().map_err(werr)?;
 
@@ -84,7 +90,10 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
                 continue; // special token
             }
             let data = tok.token_data();
-            let (t0, t1) = ((data.t0.max(0) as u64) * 10, (data.t1.max(0) as u64) * 10);
+            let (mut t0, t1) = ((data.t0.max(0) as u64) * 10, (data.t1.max(0) as u64) * 10);
+            if data.t_dtw >= 0 {
+                t0 = data.t_dtw as u64 * 10;
+            }
             let starts_word = text.starts_with(' ') || words.is_empty();
             let piece = text.trim();
             if piece.is_empty() {
@@ -111,4 +120,34 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
     }
     progress(Progress::new(STAGE, 1.0, "transcribed"));
     Ok(Transcript { language, engine: format!("whisper:{}", manifest.id.trim_start_matches("whisper-")), segments })
+}
+
+/// The whisper.cpp DTW alignment-head preset for a registry model id, if it is a standard model.
+fn dtw_preset(model_id: &str) -> Option<DtwModelPreset> {
+    let id = model_id.to_lowercase();
+    Some(if id.contains("large-v3-turbo") {
+        DtwModelPreset::LargeV3Turbo
+    } else if id.contains("large-v3") {
+        DtwModelPreset::LargeV3
+    } else if id.contains("large-v2") {
+        DtwModelPreset::LargeV2
+    } else if id.contains("medium.en") {
+        DtwModelPreset::MediumEn
+    } else if id.contains("medium") {
+        DtwModelPreset::Medium
+    } else if id.contains("small.en") {
+        DtwModelPreset::SmallEn
+    } else if id.contains("small") {
+        DtwModelPreset::Small
+    } else if id.contains("base.en") {
+        DtwModelPreset::BaseEn
+    } else if id.contains("base") {
+        DtwModelPreset::Base
+    } else if id.contains("tiny.en") {
+        DtwModelPreset::TinyEn
+    } else if id.contains("tiny") {
+        DtwModelPreset::Tiny
+    } else {
+        return None;
+    })
 }

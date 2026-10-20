@@ -99,6 +99,7 @@ Record wall time, peak memory, hardware, model, and commit. Update when they cha
 | 2026-10-18 | Engine footprint (CLI 3.2 MB incl. whisper.cpp+Metal, Apple helper 0.17 MB, FFmpeg 7.5 MB) | 11.3 MB installed, 4.9 MB zip -9 | engine part only; app at M5 |
 | — | Installer size, Mac DMG | not measured | ≤ 25 MB, M5 |
 | 2026-10-18 | Word-start error vs synthesized ground truth (62 words, `fixtures/timing.py`) | Apple: median 103 ms, bias −100 ms, 49% within 100 ms. Whisper turbo-q5 token times: median 256 ms, bias −232 ms, 11% within 100 ms | Both early. Captions need ≤ 50 ms; fix in M3 (DTW, offset calibration) |
+| 2026-10-20 | Word-start error after bias correction, whisper DTW token times (−200 ms) and audio-onset snapping (±90 ms window), three voices (`aligned`, `aligned2`, `aligned3`) | Apple: median 45 / 72 / 60 ms, p90 151–224 ms, 36–51% within 50 ms. Whisper DTW: median 54 / 66 / 64 ms, p90 165–204 ms, 39–47% within 50 ms | Was 52–95 ms median before onset snapping. DTW alone did not move the median (71–85 ms) but cut p90 from ~250 to ~165 ms. The ≤ 50 ms target is met on one voice of three; the remaining error is scatter, not bias |
 | 2026-10-18 | Shortlist ceiling: golden clips reachable by the model | 60 @ 85% overlap: 0.47 · 60 @ 10%: 0.80 · 80 @ 20%: 0.93 (default) · 90 @ 10%: 1.00 | The heuristic prior was the bottleneck, not the model |
 | — | Picker on the 72-min podcast per OpenCode model: wall time, tokens, cost per source hour | in progress | M2 |
 | — | Picker on 300 candidates, local 4B Q4 | not measured | M2, opt-in tier |

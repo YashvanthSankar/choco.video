@@ -93,6 +93,15 @@ func transcribe(path: String, localeId: String) async throws -> TranscriptOut {
     guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: localeId)) else {
         fail("locale \(localeId) is not supported by Apple speech")
     }
+    // The OS keeps at most five locales' assets reserved per user, and reservations persist across
+    // processes. A sixth language fails with "Too many allocated locales"; release the others first
+    // (their assets re-download on demand, usually from cache).
+    let reserved = await AssetInventory.reservedLocales
+    if reserved.count >= 5, !reserved.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) {
+        for old in reserved where old.identifier(.bcp47) != locale.identifier(.bcp47) {
+            await AssetInventory.release(reservedLocale: old)
+        }
+    }
     let transcriber = SpeechTranscriber(
         locale: locale,
         transcriptionOptions: [],
