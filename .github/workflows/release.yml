@@ -6,7 +6,7 @@ name: release
 # is a permanent "download the latest" link (the website's hero button uses it).
 #
 # Signing and notarization are optional. Without the secrets below the app is ad-hoc signed and
-# users must right-click > Open on first launch; the release notes say so. With them:
+# macOS blocks the first launch (System Settings > Privacy & Security > Open Anyway); the release notes say so. With them:
 #   APPLE_CERTIFICATE           base64 of the Developer ID Application .p12
 #   APPLE_CERTIFICATE_PASSWORD  password of that .p12
 #   APPLE_SIGNING_IDENTITY      e.g. "Developer ID Application: Name (TEAMID)"
@@ -148,7 +148,7 @@ jobs:
             echo "SHA-256: \`${{ steps.assets.outputs.sha }}\`"
             echo
             if [[ "${{ steps.sign.outputs.signed }}" != "true" ]]; then
-              echo "> This build is not notarized yet. On first launch, right-click choco.video in Applications and choose **Open**, then confirm."
+              echo "> **Not notarized yet.** macOS blocks the first launch. Open **System Settings › Privacy & Security** and click **Open Anyway** next to choco.video, or run once: \`xattr -dr com.apple.quarantine /Applications/choco.video.app\`. (Right-click › Open no longer works on macOS 15 and later.)"
               echo
             fi
             echo "Your video never leaves your Mac. The only network use is transcript text sent to the clip picker you choose."

@@ -37,6 +37,12 @@ cat > "$TAURI/tauri.release.conf.json" <<JSON
       "minimumSystemVersion": "14.0",
       "signingIdentity": "${APPLE_SIGNING_IDENTITY:--}",
       "hardenedRuntime": ${HARDENED},
+      "dmg": {
+        "background": "dmg/background.tiff",
+        "windowSize": { "width": 660, "height": 420 },
+        "appPosition": { "x": 170, "y": 210 },
+        "applicationFolderPosition": { "x": 490, "y": 210 }
+      },
       "frameworks": [
         "frameworks/libavcodec.62.dylib", "frameworks/libavformat.62.dylib", "frameworks/libavfilter.11.dylib",
         "frameworks/libavutil.60.dylib", "frameworks/libswresample.6.dylib", "frameworks/libswscale.9.dylib"

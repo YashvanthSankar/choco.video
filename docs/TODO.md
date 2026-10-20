@@ -64,7 +64,7 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [x] **v0.1.1 released**: https://github.com/YashvanthSankar/choco.video/releases/tag/v0.1.1 (10 MB DMG, verified to launch from a fresh download once opened via right-click → Open). v0.1.0 is marked superseded: hardened runtime refused its own FFmpeg dylibs, so it died at launch. The build script now launches the app and fails if it exits. The repo is still private, so the website's download link returns 404 until it is made public
 - [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`; then rerun `choco eval` per model and freeze `OPENCODE_RECOMMENDED`
 - [x] Pushed; first CI runs found two real gaps (the bundled face model was gitignored, fixtures never generated) and an unmaintained-crate advisory → fixed
-- [ ] Developer ID signing + notarization (needs your Apple Developer account); without it the DMG only runs after right-click → Open
+- [ ] Developer ID signing + notarization (needs your Apple Developer account); without it macOS blocks the first launch and users must click Open Anyway in System Settings › Privacy & Security (right-click › Open stopped working in macOS 15)
 - [ ] Tauri updater with signed manifests and a release channel
 - [~] App icon: an interim icon ships in 0.1.0; the final logo is still being chosen (four directions rejected so far)
 - [ ] First-launch guidance when Apple Intelligence is off and no key is set (today the Apple option is disabled with a one-line reason)
@@ -231,7 +231,7 @@ Each row records: encoder that opened, whisper device and verdict, 72-min transc
 
 1. Watch the 40 golden clips (`eval/REVIEW.md`) and correct them. Every picker number depends on this.
 2. Decide when to make the repository public: the release and the site's download link only work for collaborators until then.
-3. An Apple Developer account for signing, when you want a DMG others can open without the right-click dance.
+3. An Apple Developer account for signing, so a downloaded DMG opens without the Privacy & Security detour.
 4. An app icon, or say the word and I draft one.
 5. M6: a Windows 11 x64 machine (or remote access to one) with a GPU, ideally one NVIDIA desktop and one Intel laptop. CI covers build and tests; encoders, Vulkan, the installer and the UI need real hardware from step 5 of the M6 order on.
 6. M6: code signing. An Azure account for Trusted Signing (identity validation, about $10/month) or an application to SignPath Foundation, plus the GitHub secrets either one needs. Without it the beta shows "Windows protected your PC".
