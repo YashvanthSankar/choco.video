@@ -5,7 +5,21 @@ Usage: python compose.py out.wav"""
 import sys, wave
 import numpy as np
 
-SR, DUR, BPM = 48000, 30.0, 112
+import argparse
+ap = argparse.ArgumentParser()
+ap.add_argument("out")
+# Section times in seconds; the defaults are the 30 s landscape film.
+ap.add_argument("--dur", type=float, default=30.0)
+ap.add_argument("--arp", type=float, default=3.4)     # plucks enter
+ap.add_argument("--kick", type=float, default=4.3)    # half-time kick enters
+ap.add_argument("--full", type=float, default=9.0)    # four-on-the-floor, hats, bass
+ap.add_argument("--lift", type=float, default=16.4)   # octave-up arp, open hats
+ap.add_argument("--pull", type=float, default=23.2)   # pull back under statements
+ap.add_argument("--end", type=float, default=27.4)    # final chord
+ap.add_argument("--swell", type=float, default=3.0)   # pad fade-in length
+args = ap.parse_args()
+SR, DUR, BPM = 48000, args.dur, 112
+A3, K4, F9, L16, P23, E27 = args.arp, args.kick, args.full, args.lift, args.pull, args.end
 BEAT = 60 / BPM
 N = int(SR * DUR)
 t_all = np.arange(N) / SR
@@ -43,10 +57,10 @@ bars = int(DUR / bar) + 1
 # Pad: detuned additive saws, slow attack; swells in over the intro.
 for b in range(bars):
     t0 = b * bar
-    if t0 >= 27.4 and b * bar < 27.4:  # never
+    if t0 >= E27 and b * bar < E27:  # never
         pass
-    ch = chords[b % 4] if t0 < 27.4 else [48, 55, 60, 64, 67, 72]
-    hold = bar + (2.6 if t0 >= 27.0 else 0.0)
+    ch = chords[b % 4] if t0 < E27 else [48, 55, 60, 64, 67, 72]
+    hold = bar + (2.6 if t0 >= E27 - 0.4 else 0.0)
     n = int((hold + 1.2) * SR); tt = np.arange(n) / SR
     sig = np.zeros(n)
     for m in ch:
@@ -55,19 +69,19 @@ for b in range(bars):
             for h in range(1, 9):
                 sig += np.sin(2 * np.pi * f * h * tt + rng.uniform(0, 6.28)) / (h * 1.6)
     sig *= env(n, 0.5, 0.4, 0.8, 1.0, hold) / (len(ch) * 3)
-    gain = 0.16 * (min(1.0, (t0 + 0.6) / 3.0) if t0 < 3.4 else 1.0)
-    if 23.2 <= t0 < 27.4: gain *= 0.75
+    gain = 0.16 * (min(1.0, (t0 + 0.6) / args.swell) if t0 < A3 else 1.0)
+    if P23 <= t0 < E27: gain *= 0.75
     add(sig, t0, gain, gain * 0.92)
 
-# Pluck arpeggio from 3.4 s; up an octave and denser from 16.4 s.
+# Pluck arpeggio from A3 s; up an octave and denser from L16 s.
 step = BEAT / 2
-for k in range(int((27.4 - 3.4) / step)):
-    t0 = 3.4 + k * step
+for k in range(int((E27 - A3) / step)):
+    t0 = A3 + k * step
     b = int(t0 / bar)
     ch = chords[b % 4]
     pattern = [0, 2, 3, 1, 4, 2, 3, 1]
-    m = ch[pattern[k % 8] % len(ch)] + (12 if t0 >= 16.4 else 0)
-    if 23.2 <= t0 and k % 2: continue
+    m = ch[pattern[k % 8] % len(ch)] + (12 if t0 >= L16 else 0)
+    if P23 <= t0 and k % 2: continue
     n = int(0.6 * SR); tt = np.arange(n) / SR
     f = hz(m + 12)
     sig = (np.sin(2 * np.pi * f * tt) + 0.35 * np.sin(4 * np.pi * f * tt) + 0.12 * np.sin(6 * np.pi * f * tt)) * np.exp(-tt / 0.16)
@@ -75,23 +89,23 @@ for k in range(int((27.4 - 3.4) / step)):
     g = 0.075 * (0.85 if t0 < 9 else 1.0)
     add(sig, t0, g * (1 - pan), g * (1 + pan))
 
-# Bass: root on each beat from 9 s, eighths from 16.4 s.
-for k in range(int((27.4 - 9.0) / BEAT * 2)):
-    t0 = 9.0 + k * BEAT / 2
-    if t0 >= 27.4: break
-    if t0 < 16.4 and k % 2: continue
-    if 23.2 <= t0 and k % 2: continue
+# Bass: root on each beat from 9 s, eighths from L16 s.
+for k in range(int((E27 - F9) / BEAT * 2)):
+    t0 = F9 + k * BEAT / 2
+    if t0 >= E27: break
+    if t0 < L16 and k % 2: continue
+    if P23 <= t0 and k % 2: continue
     root = chords[int(t0 / bar) % 4][0] - 12
     n = int(0.4 * SR); tt = np.arange(n) / SR
     sig = np.tanh(1.6 * np.sin(2 * np.pi * hz(root) * tt)) * np.exp(-tt / 0.22)
     add(sig, t0, 0.12, 0.12)
 
-# Drums: soft kick on 1 and 3 from 4.3 s, four-on-the-floor 9–23.2 s; hats off-beat from 9 s.
+# Drums: soft kick on 1 and 3 from K4 s, four-on-the-floor 9–P23 s; hats off-beat from 9 s.
 kicks, k = [], 0
-t = 4.3
-while t < 27.4:
-    if t < 9.0 or t >= 23.2:
-        if int(round((t - 4.3) / BEAT)) % 2 == 0: kicks.append(t)
+t = K4
+while t < E27:
+    if t < F9 or t >= P23:
+        if int(round((t - K4) / BEAT)) % 2 == 0: kicks.append(t)
     else:
         kicks.append(t)
     t += BEAT
@@ -104,10 +118,10 @@ for t0 in kicks:
     add(sig, t0, 0.32, 0.32)
     i = int(t0 * SR); j = min(N, i + int(0.3 * SR))
     duck[i:j] = np.minimum(duck[i:j], 0.55 + 0.45 * np.linspace(0, 1, j - i))
-t = 9.0 + BEAT / 2
-while t < 23.2:
+t = F9 + BEAT / 2
+while t < P23:
     n = int(0.08 * SR); noise = rng.normal(0, 1, n)
-    hat = np.diff(noise, prepend=0) * np.exp(-np.arange(n) / SR / (0.05 if t >= 16.4 else 0.025))
+    hat = np.diff(noise, prepend=0) * np.exp(-np.arange(n) / SR / (0.05 if t >= L16 else 0.025))
     add(hat, t, 0.035, 0.045)
     t += BEAT
 
@@ -128,11 +142,11 @@ L = L + 0.35 * conv(L, irL); R = R + 0.35 * conv(R, irR)
 # Fade in, fade out, soft clip, normalise to -1 dBFS peak.
 fade = np.ones(N)
 fi = int(0.05 * SR); fade[:fi] = np.linspace(0, 1, fi)
-fo_start = int(28.6 * SR); fade[fo_start:] = np.linspace(1, 0, N - fo_start) ** 1.5
+fo_start = int((DUR - 1.4) * SR); fade[fo_start:] = np.linspace(1, 0, N - fo_start) ** 1.5
 L = np.tanh(1.3 * L * fade); R = np.tanh(1.3 * R * fade)
 peak = max(np.max(np.abs(L)), np.max(np.abs(R)))
 L, R = L / peak * 0.89, R / peak * 0.89
 pcm = (np.stack([L, R], axis=1) * 32767).astype(np.int16)
-with wave.open(sys.argv[1], "wb") as w:
+with wave.open(args.out, "wb") as w:
     w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR); w.writeframes(pcm.tobytes())
-print("wrote", sys.argv[1], f"{DUR:.1f}s")
+print("wrote", args.out, f"{DUR:.1f}s")

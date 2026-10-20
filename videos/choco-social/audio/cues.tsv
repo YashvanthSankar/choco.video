@@ -1,0 +1,20 @@
+# sfx	target_s	peak_s	volume	moment
+sfx_003	0.10	0.12	0.45	hook word 1
+sfx_003	0.29	0.12	0.45	hook word 2
+sfx_003	0.48	0.12	0.45	hook word 3
+sfx_003	0.67	0.12	0.45	hook word 4
+sfx_006	0.90	0.16	0.60	clip phone rises
+sfx_006	1.90	0.16	0.65	app window tilts up
+sfx_003	2.75	0.12	0.55	file chip drops in
+sfx_002	3.45	0.00	0.90	file taken
+sfx_009	3.60	0.29	0.30	job screen
+sfx_006	6.20	0.16	0.55	results
+sfx_001	7.50	2.59	0.45	phones lift out
+sfx_003	7.60	0.12	0.30	phone lands
+sfx_003	7.77	0.12	0.30	phone lands
+sfx_003	7.94	0.12	0.30	phone lands
+sfx_003	8.11	0.12	0.30	phone lands
+sfx_006	13.16	0.16	0.50	statement one
+sfx_006	14.66	0.16	0.50	statement two
+sfx_006	16.16	0.16	0.50	statement three
+sfx_004	17.70	0.23	0.60	end card
