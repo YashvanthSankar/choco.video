@@ -65,6 +65,10 @@ pub trait Backend: Send + Sync {
     fn speech_engines(&self) -> Vec<SpeechEngine>;
     fn hw_decoders(&self) -> Vec<HwCodec>;
     fn hw_encoders(&self) -> Vec<HwCodec>;
+    /// Every GPU, best first, for diagnostics ("NVIDIA GeForce RTX 4060 · Nvidia · 8188 MB").
+    fn gpus(&self) -> Vec<String> {
+        self.info().gpu.into_iter().collect()
+    }
 
     fn recommended_models(&self) -> ModelRecommendation {
         let engines = self.speech_engines();

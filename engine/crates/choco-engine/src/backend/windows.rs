@@ -42,6 +42,12 @@ impl Backend for WindowsBackend {
     fn hw_encoders(&self) -> Vec<HwCodec> {
         gpu::encoder_order(&self.gpus)
     }
+    fn gpus(&self) -> Vec<String> {
+        self.gpus
+            .iter()
+            .map(|g| format!("{} · {:?} · {} MB", g.name, g.vendor, g.dedicated >> 20))
+            .collect()
+    }
 }
 
 /// Hardware adapters from DXGI, without Microsoft's software adapter.

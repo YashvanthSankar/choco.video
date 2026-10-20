@@ -42,13 +42,22 @@ pub struct Defaults {
 impl Default for Defaults {
     fn default() -> Self {
         let out = dirs_movies().join("choco");
-        Self { style: "bold".into(), preset: "shorts".into(), layout: "auto".into(), max_clips: 10, min_score: 55, output_dir: out.to_string_lossy().into_owned() }
+        Self {
+            style: "bold".into(),
+            preset: "shorts".into(),
+            layout: "auto".into(),
+            max_clips: 10,
+            min_score: 55,
+            output_dir: out.to_string_lossy().into_owned(),
+        }
     }
 }
 
 /// The user's videos folder: ~/Movies on macOS, %USERPROFILE%\Videos on Windows.
 fn dirs_movies() -> PathBuf {
-    dirs::video_dir().or_else(|| dirs::home_dir().map(|h| h.join("Movies"))).unwrap_or_else(std::env::temp_dir)
+    dirs::video_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join("Movies")))
+        .unwrap_or_else(std::env::temp_dir)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -72,13 +81,20 @@ impl Settings {
         std::fs::read_to_string(Self::path(config_dir))
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_else(|| Settings { speech: "auto".into(), ..Default::default() })
+            .unwrap_or_else(|| Settings {
+                speech: "auto".into(),
+                ..Default::default()
+            })
     }
 
     pub fn save(&self, config_dir: &Path) -> Result<(), String> {
         std::fs::create_dir_all(config_dir).map_err(|e| e.to_string())?;
         let tmp = config_dir.join("settings.json.tmp");
-        std::fs::write(&tmp, serde_json::to_string_pretty(self).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        std::fs::write(
+            &tmp,
+            serde_json::to_string_pretty(self).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
         std::fs::rename(tmp, Self::path(config_dir)).map_err(|e| e.to_string())
     }
 }
@@ -124,4 +140,3 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 }
-

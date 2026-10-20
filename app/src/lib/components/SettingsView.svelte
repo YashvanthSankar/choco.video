@@ -29,6 +29,17 @@
     await api.setApiKey("");
     keyRemoved = true;
   }
+  let copied = $state("");
+  async function copyDiagnostics() {
+    try {
+      const d = await api.diagnostics();
+      await navigator.clipboard.writeText(JSON.stringify(d, null, 2));
+      copied = "Copied. Paste it into your bug report.";
+    } catch (e) {
+      copied = `Could not copy: ${e}`;
+    }
+    setTimeout(() => (copied = ""), 4000);
+  }
   const appleSpeech = $derived(status.speech_engines.some((e) => e.kind === "apple_speech"));
 </script>
 
@@ -71,6 +82,10 @@
 
   <h2 class="sp">About</h2>
   <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · {words.osName} {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, system fonts.</p>
+  <div class="row diag">
+    <button class="small" onclick={copyDiagnostics}>Copy diagnostics</button>
+    <span class="small muted">{copied || "For bug reports: hardware, encoders and settings. Never your key, videos or transcripts."}</span>
+  </div>
 
   <div class="row end">
     {#if error}<span class="err small">{error}</span>{/if}
@@ -87,6 +102,7 @@
   .sp { margin-top: 28px; }
   .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 14px; }
   .wide { grid-column: 1 / -1; }
+  .diag { gap: 12px; margin-top: 10px; }
   .end { justify-content: flex-end; margin-top: 24px; gap: 12px; }
   @media (max-width: 680px) { .wrap { padding: 25px 18px; } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
 </style>

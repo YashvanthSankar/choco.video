@@ -93,6 +93,7 @@ export interface ProgressEvent {
 
 export const api = {
   status: () => invoke<Status>("status"),
+  diagnostics: () => invoke<Record<string, unknown>>("diagnostics"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   setApiKey: (key: string) => invoke<void>("set_api_key", { key }),
   providerModels: (baseUrl: string, key?: string) => invoke<string[]>("provider_models", { baseUrl, key: key ?? null }),
