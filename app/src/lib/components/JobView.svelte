@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { words } from "$lib/platform.svelte";
   import { type ProgressEvent } from "$lib/api";
 
   let { file, events, onCancel }: { file: string; events: ProgressEvent[]; onCancel: () => void } = $props();
@@ -36,7 +37,7 @@
       {/each}
     </ol>
   </div>
-  <div class="row end"><span class="small muted">Processing stays on your Mac; only transcript text reaches your chosen provider.</span><button disabled={cancelling} onclick={() => { cancelling = true; onCancel(); }}>{cancelling ? "Cancelling…" : "Cancel job"}</button></div>
+  <div class="row end"><span class="small muted">Processing stays on your {words.machine}; only transcript text reaches your chosen provider.</span><button disabled={cancelling} onclick={() => { cancelling = true; onCancel(); }}>{cancelling ? "Cancelling…" : "Cancel job"}</button></div>
 </div>
 <style>
   .wrap { max-width: 670px; margin: 0 auto; padding: 54px 28px; }

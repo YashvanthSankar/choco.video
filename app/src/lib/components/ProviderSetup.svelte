@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { words } from "$lib/platform.svelte";
   import { api, OPENCODE_URL, OPENCODE_SIGNUP, type Status, type Settings, type ProviderKind } from "$lib/api";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { untrack } from "svelte";
@@ -98,14 +99,16 @@
     <strong>Another provider</strong>
     <span class="small muted">Any OpenAI-compatible endpoint: OpenRouter, Groq, DeepSeek, LM Studio, Ollama…</span>
   </button>
+  {#if words.isMac}
   <button class="option" aria-pressed={settings.provider.kind === "apple"} class:selected={settings.provider.kind === "apple"} disabled={!appleReady} onclick={() => choose("apple")}>
     <strong>Apple on-device</strong> <span class="pill">no key</span>
     <span class="small muted">
       {appleReady ? "Free and offline. Slower, and picks are weaker than a hosted model." : appleHint.text}
     </span>
   </button>
+  {/if}
 </div>
-{#if !appleReady && appleHint.settings}
+{#if words.isMac && !appleReady && appleHint.settings}
   <p class="small muted hint">
     No key yet? Apple's free picker works once Apple Intelligence is on.
     <button class="link" onclick={() => openUrl(SIRI_SETTINGS).catch(() => {})}>Open Apple Intelligence settings</button>
@@ -118,7 +121,7 @@
       <label for="base">Base URL</label>
       <input id="base" type="text" placeholder="https://api.example.com/v1" bind:value={settings.provider.base_url} />
     {/if}
-    <label for="key">API key {#if hasKey}<span class="ok">· saved in your Keychain</span>{/if}</label>
+    <label for="key">API key {#if hasKey}<span class="ok">· saved in your {words.vault}</span>{/if}</label>
     <div class="row">
       <input id="key" class="grow" type="password" placeholder={hasKey ? "Paste a new key to replace it" : "Paste your key"} bind:value={key} />
       <button class="primary" disabled={busy || (!key.trim() && !hasKey)} onclick={connect}>{hasKey && !key ? "Refresh models" : "Connect"}</button>

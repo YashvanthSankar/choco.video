@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { words } from "$lib/platform.svelte";
   import { api, fmtTime, type ExportedClip } from "$lib/api";
   import { convertFileSrc } from "@tauri-apps/api/core";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -57,7 +58,7 @@
     <p class="small">{c.description}</p>
     {#if c.reasons.length}<p class="small reasons">Why: {c.reasons[0]}</p>{/if}
     <div class="row actions">
-      <button onclick={() => revealItemInDir(clip.mp4)}>Show in Finder</button>
+      <button onclick={() => revealItemInDir(clip.mp4)}>{words.reveal}</button>
       <button onclick={copyCaption}>{copied ? "Copied" : "Copy caption"}</button>
       <button class="ghost" onclick={() => (editing = !editing)}>Restyle</button>
     </div>

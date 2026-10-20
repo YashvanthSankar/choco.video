@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { words } from "$lib/platform.svelte";
   import { type Settings, type JobRequest } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -69,7 +70,7 @@
     <label for="out">Save clips to</label><div class="row destination"><input id="out" class="grow" type="text" readonly value={outputDir} /><button onclick={pickDir}>Choose…</button></div>
   </div>
   {#if error}<p class="err" role="alert">{error}</p>{/if}
-  <div class="row end"><span class="small muted">Your video stays on this Mac.</span><button class="primary big" disabled={!file} title={!file ? 'Choose a source file to find clips' : 'Find clips'} onclick={start}>Find clips <span aria-hidden="true">→</span></button></div>
+  <div class="row end"><span class="small muted">Your video stays on this {words.machine}.</span><button class="primary big" disabled={!file} title={!file ? 'Choose a source file to find clips' : 'Find clips'} onclick={start}>Find clips <span aria-hidden="true">→</span></button></div>
 </div>
 <style>
   .wrap { max-width: 850px; margin: 0 auto; padding: 42px 28px 40px; }

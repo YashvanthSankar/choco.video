@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { words } from "$lib/platform.svelte";
   import { api, onModelProgress, type Status, type Settings } from "$lib/api";
   import ProviderSetup from "./ProviderSetup.svelte";
   import { untrack } from "svelte";
@@ -65,7 +66,7 @@
     <h1>Turn long videos into shorts</h1>
     <p>Drop in a podcast, talk or stream. choco.video finds the best moments, follows the speaker, adds captions and exports vertical clips ready for TikTok, Reels and Shorts.</p>
     <div class="card privacy">
-      <strong>Your video never leaves this Mac.</strong>
+      <strong>Your video never leaves this {words.machine}.</strong>
       <p class="small">Transcription, face tracking, captions and rendering all run here. Only the transcript text is sent to the clip picker you choose next, and only if you choose a hosted one.</p>
     </div>
     <div class="nav"><button class="primary" onclick={() => (step = 1)}>Set up the clip picker</button></div>
@@ -80,7 +81,7 @@
   {:else if step === 2}
     <h1>Speech recognition</h1>
     {#if appleSpeech}
-      <div class="card"><strong class="ok">Ready.</strong> <span class="muted">This Mac transcribes with Apple's built-in speech engine. Nothing to download.</span></div>
+      <div class="card"><strong class="ok">Ready.</strong> <span class="muted">This {words.machine} transcribes with Apple's built-in speech engine. Nothing to download.</span></div>
     {:else if whisperInstalled}
       <div class="card"><strong class="ok">Ready.</strong> <span class="muted">The Whisper speech model is installed.</span></div>
     {:else}

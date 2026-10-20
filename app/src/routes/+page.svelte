@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { platform } from "$lib/platform.svelte";
   import { onMount } from "svelte";
   import { api, onJobDone, onJobError, onJobProgress, type JobRequest, type ProgressEvent, type RunResult, type Settings, type Status } from "$lib/api";
   import Onboarding from "$lib/components/Onboarding.svelte";
@@ -19,6 +20,7 @@
 
   async function refresh() {
     status = await api.status();
+    platform.os = status.hardware.os === "windows" ? "windows" : "macos";
   }
 
   onMount(() => {

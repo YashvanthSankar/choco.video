@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { words } from "$lib/platform.svelte";
   import { api, type Status, type Settings } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import ProviderSetup from "./ProviderSetup.svelte";
@@ -37,7 +38,7 @@
   <h2>Clip picker</h2>
   <ProviderSetup {status} bind:settings />
   {#if status.has_key && !keyRemoved}<button class="ghost small" onclick={removeKey}>Remove saved key</button>{/if}
-  {#if keyRemoved}<p class="small muted">Key removed from the Keychain.</p>{/if}
+  {#if keyRemoved}<p class="small muted">Key removed from the {words.vault}.</p>{/if}
 
   <h2 class="sp">Defaults</h2>
   <div class="card grid">
@@ -69,7 +70,7 @@
   </div>
 
   <h2 class="sp">About</h2>
-  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · macOS {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, system fonts.</p>
+  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · {words.osName} {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, system fonts.</p>
 
   <div class="row end">
     {#if error}<span class="err small">{error}</span>{/if}
