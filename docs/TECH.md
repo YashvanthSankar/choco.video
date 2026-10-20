@@ -652,7 +652,7 @@ Start menu\Programs\choco.video\choco.video.lnk
 
 - `cargo deny` stays on the Ubuntu job. With no `[graph] targets` set it already resolves every platform, so Windows-only crates are checked today; nothing changes in `deny.toml`.
 - `ffmpeg-windows.yml` (manual): `ilammy/msvc-dev-cmd@v1` for the MSVC environment, `msys2/setup-msys2@v2` (`msystem: MSYS`, `path-type: inherit`, packages `make diffutils nasm pkgconf`), `pip install meson ninja` (dev tooling only), `./scripts/ffmpeg/build-windows.sh`, zip, sha256, `softprops/action-gh-release@v2`.
-- `check-imports.sh` runs `dumpbin /dependents` (and `/imports` for the delay-load table). It fails on `vcruntime140*.dll`, `msvcp140*.dll`, `api-ms-win-crt-*.dll`, `libgcc*`, `libwinpthread*`, any FFmpeg DLL other than the six, or `vulkan-1.dll` in the normal import table.
+- `check-imports.sh` runs `dumpbin /dependents` (and `/imports` for the delay-load table). It fails on `vcruntime140*.dll`, `msvcp140*.dll`, `libgcc*`, `libwinpthread*`, any FFmpeg DLL other than the six, or `vulkan-1.dll` in the normal import table. The Universal CRT (`api-ms-win-crt-*`) is allowed: Windows 10 and 11 ship it, and Tauri's `staticVCRuntime` links it dynamically by design (measured on the first app-windows run).
 
 ### 19.10 Test plan
 
