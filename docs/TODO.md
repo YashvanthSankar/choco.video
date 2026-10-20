@@ -67,7 +67,7 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [ ] Developer ID signing + notarization (needs an Apple Developer account, which we do not have). Workaround shipped: `curl -fsSL https://chocovideo.vercel.app/install.sh | sh` (`scripts/install.sh`) installs with no Gatekeeper prompt; the DMG route needs Privacy & Security › Open Anyway once
 - [ ] Tauri updater with signed manifests and a release channel
 - [x] App icon: frosted-glass clip (`brand/app-icon.svg`), shipped in 0.1.3 on the app, the DMG volume and the site
-- [ ] First-launch guidance when Apple Intelligence is off and no key is set (today the Apple option is disabled with a one-line reason)
+- [x] First-launch guidance when Apple Intelligence is off and no key is set → the picker step names the exact fix (macOS 26, turn on Apple Intelligence, model still downloading, Mac not eligible), links to Apple Intelligence settings and the OpenCode key page, and "check again" re-reads Apple's status without a restart
 - [x] 40 s launch video from real choco.video output (HyperFrames project in `videos/choco-launch`), in the site hero
 - [ ] Launch posts (Product Hunt, r/podcasting, r/NewTubers, creator Discords)
 
