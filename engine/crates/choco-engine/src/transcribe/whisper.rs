@@ -8,9 +8,6 @@ use crate::backend::Device;
 use crate::model::{Progress, Segment, Transcript, Word};
 use crate::models_registry;
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::time::Duration;
 use whisper_rs::{
     DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext,
     WhisperContextParameters,
@@ -61,20 +58,90 @@ pub fn transcribe(
         .language
         .as_deref()
         .map(|l| l.split(['-', '_']).next().unwrap_or(l).to_lowercase());
-    let lang_ref = lang.as_deref().unwrap_or("auto");
 
     let threads = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
         .clamp(1, 8) as i32;
-    // whisper-rs leaks the boxed progress closure (no Drop on FullParams), so anything it
-    // captures lives forever. A channel sender inside it would never close; a shared atomic
-    // polled until the worker finishes cannot deadlock and leaks only one small Arc.
-    let pct = Arc::new(AtomicI32::new(0));
-    let pct_cb = Arc::clone(&pct);
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+
+    // whisper.cpp falls into hallucination loops on long conversation (one sentence repeated
+    // 174 times on a 72-min podcast) and the speech under a loop is lost. Decoding chunks of at
+    // most 30 s, cut at the quietest moment, bounds a loop to one chunk; a chunk that still loops
+    // is decoded again with sampling, then beam search, and the cleanest decode is kept.
+    let chunks = chunk_bounds(&audio);
+    let total = audio.len().max(1) as f32;
+    let mut language: Option<String> = lang.clone();
+    let mut segments = Vec::new();
+    let mut retried = 0usize;
+    for &(a, b) in &chunks {
+        progress(Progress::new(STAGE, a as f32 / total, "transcribing"));
+        let offset_ms = (a as u64 * 1000) / SAMPLE_RATE as u64;
+        let secs = (b - a) as f32 / SAMPLE_RATE as f32;
+        let mut best: Option<(i64, Vec<Segment>)> = None;
+        for (i, attempt) in ATTEMPTS.iter().enumerate() {
+            let lang_ref = language.as_deref().unwrap_or("auto");
+            let params = full_params(attempt, lang_ref, threads);
+            state.full(params, &audio[a..b]).map_err(werr)?;
+            if language.is_none() {
+                // Detect once, on the first chunk, so later chunks cannot flip languages.
+                language =
+                    whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
+            }
+            let segs = read_segments(&state, offset_ms);
+            let words: Vec<Word> = segs.iter().flat_map(|s| s.words.iter().cloned()).collect();
+            let n = words.len();
+            let kept = super::cleanup::drop_repeated_ngrams(words, 16, 3).len();
+            let looped = n - kept >= 6 || (secs > 10.0 && (kept as f32) / secs < 0.6 && n > kept);
+            let score = kept as i64 - 3 * (n - kept) as i64;
+            if best.as_ref().is_none_or(|(s, _)| score > *s) {
+                best = Some((score, segs));
+            }
+            if !looped {
+                break;
+            }
+            if i + 1 < ATTEMPTS.len() {
+                retried += 1;
+            }
+        }
+        segments.extend(best.map(|(_, s)| s).unwrap_or_default());
+    }
+    if retried > 0 {
+        progress(Progress::new(
+            STAGE,
+            1.0,
+            format!("re-decoded {retried} looping chunks"),
+        ));
+    }
+    let language = language.unwrap_or_else(|| "auto".into());
+    progress(Progress::new(STAGE, 1.0, "transcribed"));
+    Ok(Transcript {
+        language,
+        engine: format!("whisper:{}", manifest.id.trim_start_matches("whisper-")),
+        segments,
+    })
+}
+
+const SAMPLE_RATE: usize = 16_000;
+
+/// One decode setting: greedy first, then sampling and beam search for chunks that loop.
+enum Attempt {
+    Greedy,
+    Sample(f32),
+    Beam,
+}
+const ATTEMPTS: [Attempt; 3] = [Attempt::Greedy, Attempt::Sample(0.5), Attempt::Beam];
+
+fn full_params<'a>(attempt: &Attempt, lang: &'a str, threads: i32) -> FullParams<'a, 'a> {
+    let strategy = match attempt {
+        Attempt::Beam => SamplingStrategy::BeamSearch {
+            beam_size: 5,
+            patience: -1.0,
+        },
+        _ => SamplingStrategy::Greedy { best_of: 1 },
+    };
+    let mut params = FullParams::new(strategy);
     params.set_n_threads(threads);
-    params.set_language(Some(lang_ref));
+    params.set_language(Some(lang));
     params.set_token_timestamps(true);
     params.set_no_context(true); // fewer runaway repeats across windows
     params.set_suppress_blank(true);
@@ -83,29 +150,54 @@ pub fn transcribe(
     params.set_print_realtime(false);
     params.set_print_special(false);
     params.set_print_timestamps(false);
-    params.set_progress_callback_safe(move |p: i32| pct_cb.store(p, Ordering::Relaxed));
-
-    let result = std::thread::scope(|s| {
-        let worker = s.spawn(|| state.full(params, &audio).map(|_| ()));
-        let mut last = -1;
-        while !worker.is_finished() {
-            let p = pct.load(Ordering::Relaxed);
-            if p != last {
-                progress(Progress::new(STAGE, p as f32 / 100.0, "transcribing"));
-                last = p;
-            }
-            std::thread::sleep(Duration::from_millis(200));
-        }
-        worker.join()
-    });
-    match result {
-        Ok(r) => r.map_err(werr)?,
-        Err(_) => return Err(werr("whisper worker panicked")),
+    if let Attempt::Sample(t) = attempt {
+        params.set_temperature(*t);
     }
+    params
+}
 
-    let language = whisper_rs::get_lang_str(state.full_lang_id_from_state())
-        .unwrap_or(lang_ref)
-        .to_string();
+/// Chunk boundaries (sample ranges) of at most 30 s, each cut at the quietest 200 ms between
+/// 20 s and 30 s so a cut rarely lands inside a word. Near-silent chunks are left out.
+fn chunk_bounds(audio: &[f32]) -> Vec<(usize, usize)> {
+    const FRAME: usize = SAMPLE_RATE / 50; // 20 ms
+    const MAX: usize = 30 * SAMPLE_RATE;
+    const MIN: usize = 20 * SAMPLE_RATE;
+    let energy: Vec<f32> = audio
+        .chunks(FRAME)
+        .map(|f| f.iter().map(|x| x * x).sum::<f32>() / f.len() as f32)
+        .collect();
+    let mut out = Vec::new();
+    let mut a = 0;
+    while a < audio.len() {
+        let b = if audio.len() - a <= MAX {
+            audio.len()
+        } else {
+            // Quietest 10-frame run whose centre falls in [a + 20 s, a + 30 s).
+            let (lo, hi) = ((a + MIN) / FRAME, (a + MAX) / FRAME - 10);
+            let mut run: f32 = energy[lo..lo + 10].iter().sum();
+            let (mut best, mut at) = (run, lo);
+            for f in lo + 1..=hi {
+                run += energy[f + 9] - energy[f - 1];
+                if run < best {
+                    (best, at) = (run, f);
+                }
+            }
+            (at + 5) * FRAME
+        };
+        let peak = energy[a / FRAME..b.div_ceil(FRAME).min(energy.len())]
+            .iter()
+            .fold(0.0f32, |m, &e| m.max(e));
+        // -60 dBFS: nothing to transcribe, and whisper invents "Thank you." on silence.
+        if peak > 1e-6 {
+            out.push((a, b));
+        }
+        a = b;
+    }
+    out
+}
+
+/// Words and segments of the last decode, timed from the start of the whole file.
+fn read_segments(state: &whisper_rs::WhisperState, offset_ms: u64) -> Vec<Segment> {
     let mut segments = Vec::new();
     for seg in state.as_iter() {
         let mut words: Vec<Word> = Vec::new();
@@ -135,9 +227,12 @@ pub fn transcribe(
                 continue; // special token
             }
             let data = tok.token_data();
-            let (mut t0, t1) = ((data.t0.max(0) as u64) * 10, (data.t1.max(0) as u64) * 10);
+            let (mut t0, t1) = (
+                offset_ms + (data.t0.max(0) as u64) * 10,
+                offset_ms + (data.t1.max(0) as u64) * 10,
+            );
             if data.t_dtw >= 0 {
-                t0 = data.t_dtw as u64 * 10;
+                t0 = offset_ms + data.t_dtw as u64 * 10;
             }
             let starts_word = bytes.starts_with(b" ") || cur.is_empty();
             if starts_word && !cur.is_empty() {
@@ -162,18 +257,13 @@ pub fn transcribe(
             continue;
         }
         segments.push(Segment {
-            start_ms: (seg.start_timestamp().max(0) as u64) * 10,
-            end_ms: (seg.end_timestamp().max(0) as u64) * 10,
+            start_ms: offset_ms + (seg.start_timestamp().max(0) as u64) * 10,
+            end_ms: offset_ms + (seg.end_timestamp().max(0) as u64) * 10,
             text,
             words,
         });
     }
-    progress(Progress::new(STAGE, 1.0, "transcribed"));
-    Ok(Transcript {
-        language,
-        engine: format!("whisper:{}", manifest.id.trim_start_matches("whisper-")),
-        segments,
-    })
+    segments
 }
 
 /// The whisper.cpp DTW alignment-head preset for a registry model id, if it is a standard model.
@@ -204,4 +294,47 @@ fn dtw_preset(model_id: &str) -> Option<DtwModelPreset> {
     } else {
         return None;
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A tone with a short pause at `gap_s`, then more tone.
+    fn speech_with_gap(total_s: f32, gap_s: f32) -> Vec<f32> {
+        let n = (total_s * SAMPLE_RATE as f32) as usize;
+        let gap = (gap_s * SAMPLE_RATE as f32) as usize;
+        (0..n)
+            .map(|i| {
+                if (gap..gap + SAMPLE_RATE / 2).contains(&i) {
+                    0.0
+                } else {
+                    0.3 * (i as f32 * 0.07).sin()
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn cuts_at_the_pause_and_never_exceeds_30_s() {
+        let audio = speech_with_gap(75.0, 24.0);
+        let chunks = chunk_bounds(&audio);
+        assert_eq!(chunks[0].0, 0);
+        let cut = chunks[0].1 as f32 / SAMPLE_RATE as f32;
+        assert!((24.0..24.5).contains(&cut), "cut at {cut} s");
+        for w in chunks.windows(2) {
+            assert_eq!(w[0].1, w[1].0, "chunks are contiguous");
+        }
+        assert!(chunks.iter().all(|(a, b)| b - a <= 30 * SAMPLE_RATE));
+        assert_eq!(chunks.last().unwrap().1, audio.len());
+    }
+
+    #[test]
+    fn skips_silence() {
+        let mut audio = vec![0.0f32; 40 * SAMPLE_RATE];
+        audio.extend(speech_with_gap(10.0, 100.0));
+        let chunks = chunk_bounds(&audio);
+        assert_eq!(chunks.len(), 1, "{chunks:?}");
+        assert_eq!(chunks[0].1, audio.len());
+    }
 }
