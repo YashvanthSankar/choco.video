@@ -114,3 +114,27 @@ pub fn transcribe(
     serde_json::from_slice(&out)
         .map_err(|e| TranscribeError::Apple(format!("bad helper output: {e}")))
 }
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod tests {
+    use super::*;
+    use crate::backend::SpeechEngine;
+
+    /// Apple speech and the Apple picker stay compiled everywhere and switch off at runtime.
+    #[test]
+    fn apple_paths_are_off_outside_macos() {
+        assert_eq!(helper_path(), None);
+        assert!(status().is_none());
+        assert!(!crate::highlights::picker::apple::available());
+        let opts = TranscribeOptions {
+            language: Some("en-US".into()),
+            whisper_model: String::new(),
+            models_dir: std::env::temp_dir(),
+        };
+        let err = transcribe(Path::new("missing.wav"), &opts, &|_: Progress| {}).unwrap_err();
+        assert!(
+            matches!(err, TranscribeError::Unavailable(SpeechEngine::AppleSpeech)),
+            "{err}"
+        );
+    }
+}

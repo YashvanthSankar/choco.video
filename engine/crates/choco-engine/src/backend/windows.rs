@@ -106,3 +106,34 @@ fn total_memory() -> Option<u64> {
     unsafe { GlobalMemoryStatusEx(&mut m) }.ok()?;
     Some(m.ullTotalPhys)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reports_this_windows_machine() {
+        let b = WindowsBackend::detect();
+        let info = b.info();
+        assert!(info.memory_bytes.unwrap_or(0) > 0, "GlobalMemoryStatusEx");
+        assert!(
+            info.os_version.starts_with("10.0."),
+            "RtlGetVersion: {}",
+            info.os_version
+        );
+        assert_eq!(info.os, "windows");
+    }
+
+    #[test]
+    fn media_foundation_is_always_the_last_resort() {
+        let b = WindowsBackend::detect();
+        assert_eq!(b.hw_encoders().last(), Some(&HwCodec::MediaFoundation));
+        assert_eq!(b.hw_decoders(), vec![HwCodec::Software]);
+        assert_eq!(
+            b.speech_engines(),
+            vec![SpeechEngine::Whisper {
+                device: Device::Cpu
+            }]
+        );
+    }
+}
