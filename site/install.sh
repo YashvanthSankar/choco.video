@@ -34,7 +34,7 @@ got="$(shasum -a 256 "$tmp/$ASSET" | cut -d' ' -f1)"
 [ "$want" = "$got" ] || fail "checksum mismatch (expected $want, got $got); nothing was installed"
 say "Checksum verified."
 
-mnt="$(hdiutil attach -nobrowse -readonly -noautoopen "$tmp/$ASSET" | awk -F'\t' '/\/Volumes\// {print $NF; exit}')"
+mnt="$(hdiutil attach -nobrowse -readonly -noautoopen "$tmp/$ASSET" 2>/dev/null | awk -F'\t' '/\/Volumes\// {print $NF; exit}')"
 [ -n "$mnt" ] && [ -d "$mnt/choco.video.app" ] || fail "could not open the disk image"
 
 dest="/Applications"
