@@ -105,6 +105,23 @@ pub fn platform_candidates() -> &'static [Candidate] {
     })
 }
 
+/// Why every encoder may have failed, when the cause is the machine rather than the clip.
+/// Windows N editions ship without Media Foundation (`mfplat.dll`), which the Media Foundation
+/// encoders need; the fix is Microsoft's Media Feature Pack, not anything in choco.video.
+pub fn missing_runtime_hint() -> Option<&'static str> {
+    if !cfg!(target_os = "windows") {
+        return None;
+    }
+    let root = std::env::var_os("SystemRoot")?;
+    let mf = std::path::Path::new(&root)
+        .join("System32")
+        .join("mfplat.dll");
+    (!mf.is_file()).then_some(
+        ". This looks like a Windows N edition without Media Foundation: install the Media \
+         Feature Pack (Settings > System > Optional features > Add a feature), then try again",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

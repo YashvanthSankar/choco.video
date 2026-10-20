@@ -283,14 +283,15 @@ pub fn render_clip(
     }
     let (vcodec, mut venc, encoder_name) = opened.ok_or_else(|| {
         RenderError::Unsupported(format!(
-            "no H.264 encoder opened ({})",
+            "no H.264 encoder opened ({}){}",
             if !tried.is_empty() {
                 tried.join("; ")
             } else if let Ok(only) = std::env::var("CHOCO_ENCODERS") {
                 format!("CHOCO_ENCODERS={only} matches no encoder this machine offers")
             } else {
                 "this platform has no H.264 encoder configured".into()
-            }
+            },
+            encoders::missing_runtime_hint().unwrap_or_default()
         ))
     })?;
 
