@@ -14,14 +14,25 @@
   let message = $state("");
   let ok = $state<boolean | null>(null);
 
-  const appleReady = $derived(!!status.apple?.llm_available);
+  // Re-read on "Check again", so turning Apple Intelligence on needs no restart.
+  let apple = $state(untrack(() => status.apple));
+  let checking = $state(false);
+  async function recheckApple() {
+    checking = true;
+    try {
+      apple = (await api.status()).apple;
+    } finally {
+      checking = false;
+    }
+  }
+  const appleReady = $derived(!!apple?.llm_available);
   const SIRI_SETTINGS = "x-apple.systempreferences:com.apple.Siri-Settings.extension";
   // Turn the helper's availability string into one instruction the user can act on.
   const appleHint = $derived.by((): { text: string; settings: boolean } => {
-    const s = status.apple?.llm_status ?? "";
-    const os = status.apple?.os ?? "";
-    if (!status.apple || s.includes("needs macOS 26")) return { text: `Needs macOS 26 or later${os ? `; this Mac runs ${os}` : ""}.`, settings: false };
-    if (s.includes("appleIntelligenceNotEnabled")) return { text: "Turn on Apple Intelligence in System Settings, then reopen choco.video.", settings: true };
+    const s = apple?.llm_status ?? "";
+    const os = apple?.os ?? "";
+    if (!apple || s.includes("needs macOS 26")) return { text: `Needs macOS 26 or later${os ? `; this Mac runs ${os}` : ""}.`, settings: false };
+    if (s.includes("appleIntelligenceNotEnabled")) return { text: "Turn on Apple Intelligence in System Settings.", settings: true };
     if (s.includes("modelNotReady")) return { text: "Apple Intelligence is still downloading its model. Try again in a few minutes.", settings: true };
     if (s.includes("deviceNotEligible")) return { text: "This Mac does not support Apple Intelligence. Use a key instead.", settings: false };
     return { text: "Apple's on-device model is not available on this Mac right now.", settings: false };
@@ -111,7 +122,8 @@
 {#if words.isMac && !appleReady && appleHint.settings}
   <p class="small muted hint">
     No key yet? Apple's free picker works once Apple Intelligence is on.
-    <button class="link" onclick={() => openUrl(SIRI_SETTINGS).catch(() => {})}>Open Apple Intelligence settings</button>
+    <button class="link" onclick={() => openUrl(SIRI_SETTINGS).catch(() => {})}>Open Apple Intelligence settings</button>,
+    then <button class="link" disabled={checking} onclick={recheckApple}>{checking ? "checking…" : "check again"}</button>.
   </p>
 {/if}
 

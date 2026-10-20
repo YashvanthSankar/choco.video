@@ -19,8 +19,9 @@
   const appleSpeech = $derived(status.speech_engines[0]?.kind === "apple_speech");
   // ProviderSetup proves a new key live and reports it; a key saved in an earlier session also counts.
   let keySaved = $state(untrack(() => status.has_key));
+  // The Apple option can only be chosen while ProviderSetup sees it available (it re-checks live).
   const pickerReady = $derived(
-    settings.provider.kind === "apple" ? !!status.apple?.llm_available : keySaved && !!settings.provider.score_model
+    settings.provider.kind === "apple" ? true : keySaved && !!settings.provider.score_model
   );
   const speechReady = $derived(appleSpeech || whisperInstalled);
 
@@ -86,7 +87,7 @@
       <div class="card"><strong class="ok">Ready.</strong> <span class="muted">The Whisper speech model is installed.</span></div>
     {:else}
       <div class="card">
-        <p>This Mac needs a one-time speech model download (about 550 MB). It runs fully offline afterwards.</p>
+        <p>This {words.machine} needs a one-time speech model download (about 550 MB). It runs fully offline afterwards.</p>
         {#if downloading}
           <div class="bar"><div style={`width:${Math.max(2, dl.fraction * 100)}%`}></div></div>
           <p class="small">{dl.message}</p>
