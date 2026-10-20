@@ -41,6 +41,17 @@ pub type Result<T> = std::result::Result<T, TranscribeError>;
 
 /// Transcribe a 16 kHz mono f32 WAV produced by [`crate::ingest::extract_audio`].
 pub fn transcribe(audio_wav: &Path, engine: SpeechEngine, opts: &TranscribeOptions, progress: ProgressFn) -> Result<Transcript> {
+    // Apple speech returns Hindi in Latin transliteration (measured: every word correct, none in
+    // Devanagari). Captions in the wrong script are useless, so prefer whisper there when it is
+    // installed. Add locales here only after measuring.
+    #[cfg(feature = "whisper")]
+    let engine = match (engine, opts.language.as_deref()) {
+        (SpeechEngine::AppleSpeech, Some(l)) if l.to_lowercase().starts_with("hi") => {
+            let installed = models_registry::find(&opts.whisper_model).is_some_and(|mf| models_registry::is_installed(&opts.models_dir, &mf));
+            if installed { SpeechEngine::Whisper { device: Device::Metal } } else { engine }
+        }
+        _ => engine,
+    };
     let raw = match engine {
         SpeechEngine::AppleSpeech => match apple::transcribe(audio_wav, opts, progress) {
             // Apple speech covers ~45 locales. For any other language fall back to whisper when
