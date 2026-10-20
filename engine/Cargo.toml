@@ -49,3 +49,11 @@ opt-level = 3
 
 [profile.dev.package.whisper-rs]
 opt-level = 3
+
+# Build scripts optimized: ffmpeg-sys-next runs bindgen, which overflowed the 1 MB main-thread
+# stack on Windows when built at opt-level 0 (STATUS_STACK_OVERFLOW in the app build).
+[profile.release.build-override]
+opt-level = 3
+
+[profile.dev.build-override]
+opt-level = 3

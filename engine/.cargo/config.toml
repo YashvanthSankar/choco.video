@@ -15,5 +15,7 @@ rustflags = ["-C", "link-arg=-mmacosx-version-min=14.0"]
 # One static C runtime on Windows: no VC++ redistributable for users (docs/TECH.md §19). The cmake
 # crate builds whisper.cpp with the matching /MT; scripts/check-imports.sh proves nothing links
 # vcruntime140.dll.
+# 8 MB main-thread stack (reserved, not committed) for every Windows binary, build scripts
+# included: bindgen in ffmpeg-sys-next overflowed the 1 MB default.
 [target.x86_64-pc-windows-msvc]
-rustflags = ["-C", "target-feature=+crt-static"]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=/STACK:8388608"]
