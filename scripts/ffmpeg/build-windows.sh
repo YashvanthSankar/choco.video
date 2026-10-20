@@ -42,6 +42,8 @@ if [[ ! -f "$DEPS/lib/libdav1d.a" && ! -f "$DEPS/lib/dav1d.lib" ]]; then
       --default-library=static -Db_vscrt=mt -Denable_tools=false -Denable_tests=false -Denable_examples=false && \
     ninja -C build install )
 fi
+# Meson names an MSVC static library libdav1d.a; FFmpeg's MSVC link step asks for dav1d.lib.
+[[ -f "$DEPS/lib/libdav1d.a" && ! -f "$DEPS/lib/dav1d.lib" ]] && cp "$DEPS/lib/libdav1d.a" "$DEPS/lib/dav1d.lib"
 
 # --- NVENC and AMF headers (no code is linked; both load the vendor runtime at encoder open)
 NV_TAR="$WORK/nv-codec-headers-$NVCODEC_TAG.tar.gz"

@@ -51,8 +51,9 @@ button, input { font: inherit; color: inherit; }
 /* nav: wordmark, a few links, one action */
 .nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); }
 .nav .row { display: flex; align-items: center; gap: 28px; height: 68px; }
-.word { font-weight: 700; font-size: var(--step-lead); letter-spacing: -0.03em; text-decoration: none; }
-.word i { font-style: normal; color: var(--ink); background: var(--accent); border-radius: 4px; padding: 0 2px; }
+.word { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 22px; letter-spacing: -0.035em; text-decoration: none; color: var(--ink); }
+.word img { width: 36px; height: 36px; margin: -4px 0; }
+.word i { font-style: normal; color: #c4560c; }
 .nav .links { display: flex; gap: 24px; margin-left: auto; }
 .nav .links a { text-decoration: none; color: var(--ink); font-weight: 500; }
 .nav .links a:hover { text-decoration: underline; text-underline-offset: 4px; }
@@ -227,9 +228,10 @@ button, input { font: inherit; color: inherit; }
 
 /* footer: the name, built from blocks */
 .foot-band { margin-top: var(--gap); background: var(--choc); color: var(--on-choc); border-radius: var(--r) var(--r) 0 0; padding: 48px 40px 32px; display: grid; gap: 56px; }
-.blocks { display: flex; gap: 4px; align-items: flex-end; height: 34svh; min-height: 200px; }
-.blocks span { flex: 1; display: grid; place-items: center; border-radius: 10px; font-weight: 700; font-size: clamp(48px, 9vw, 150px); line-height: 1; letter-spacing: -0.04em; color: var(--choc); }
-.blocks span:nth-child(3n+1) { background: var(--accent); } .blocks span:nth-child(3n+2) { background: var(--surface); } .blocks span:nth-child(3n) { background: var(--latte); }
+.lockup { display: flex; align-items: center; gap: clamp(20px, 3vw, 44px); min-height: 26svh; }
+.lockup img { width: clamp(96px, 13vw, 200px); height: auto; aspect-ratio: 1; }
+.lockup p { font-weight: 700; font-size: clamp(56px, 10vw, 168px); line-height: 0.9; letter-spacing: -0.05em; color: var(--on-choc); }
+.lockup p i { font-style: normal; color: #ff9a4d; }
 .cols { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; font-size: var(--step-small); }
 .cols div { grid-column: span 2; display: grid; gap: 8px; align-content: start; }
 .cols div b { font-weight: 600; margin-bottom: 4px; }
@@ -295,8 +297,8 @@ button, input { font: inherit; color: inherit; }
   .cta .dlg { align-self: end; width: 100%; }
   .app .go { height: 52px; }
   .foot-band { padding: 32px 20px 24px; }
-  .blocks { height: 22svh; min-height: 120px; }
-  .blocks span { font-size: 12vw; }
+  .lockup { min-height: 0; justify-content: center; }
+  .lockup p { font-size: 14vw; }
   .cols div { grid-column: span 6; }
   .cols .credit { grid-column: 1 / -1; }
 }
@@ -312,7 +314,7 @@ button, input { font: inherit; color: inherit; }
 
 <header class="nav frame">
   <div class="row">
-    <a class="word" href="#top">choco<i>.</i>video</a>
+    <a class="word" href="#top" aria-label="choco.video home"><img src="media/icon-128.png" width="36" height="36" alt="">choco<i>.</i>video</a>
     <nav class="links" aria-label="Sections">
       <a href="#clips">The clips</a><a href="#how">How it works</a><a href="#cost">Cost</a><a href="#questions">Questions</a>
     </nav>
@@ -451,7 +453,7 @@ button, input { font: inherit; color: inherit; }
 </main>
 
 <footer class="foot-band" style="margin-left:max(var(--m), env(safe-area-inset-left, 0px));margin-right:max(var(--m), env(safe-area-inset-right, 0px))">
-  <p class="blocks" aria-label="choco.video"><span style="height:72%">c</span><span style="height:100%">h</span><span style="height:64%">o</span><span style="height:84%">c</span><span style="height:70%">o</span></p>
+  <div class="lockup"><img src="media/icon-320.png" width="200" height="200" alt=""><p>choco<i>.</i>video</p></div>
   <div class="cols">
     <div><b>App</b><a href="https://github.com/YashvanthSankar/choco.video/releases/latest/download/choco.video-macos-arm64.dmg">Download</a><a href="https://github.com/YashvanthSankar/choco.video/releases">Release notes</a><a href="https://github.com/YashvanthSankar/choco.video/blob/main/docs/TODO.md">Roadmap</a></div>
     <div><b>Source</b><a href="https://github.com/YashvanthSankar/choco.video">GitHub</a><a href="https://github.com/YashvanthSankar/choco.video/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/YashvanthSankar/choco.video/blob/main/LICENSE">MIT licence</a></div>
@@ -562,7 +564,7 @@ button, input { font: inherit; color: inherit; }
   // Entrances: each section's parts rise once as it enters.
   const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.15 });
   document.querySelectorAll("[data-rise]").forEach((el) => io.observe(el));
-  ["#film video", ".show .stage", ".how .fields", ".stats .fig", ".price .tile", ".qcard", ".cta .dlg", ".blocks span"].forEach((sel) => document.querySelectorAll(sel).forEach((el, i) => {
+  ["#film video", ".show .stage", ".how .fields", ".stats .fig", ".price .tile", ".qcard", ".cta .dlg", ".lockup"].forEach((sel) => document.querySelectorAll(sel).forEach((el, i) => {
     if (reduce) return;
     el.animate([{ opacity: 0, transform: "translateY(28px)" }, { opacity: 1, transform: "none" }], { duration: 700, delay: 80 * (i % 5), easing: "cubic-bezier(.2,.7,.1,1)", fill: "backwards" }).pause();
     const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { el.getAnimations().forEach((a) => a.play()); o.disconnect(); } }, { threshold: 0.1 });
