@@ -3,8 +3,11 @@ use std::{env, path::PathBuf, process::Command};
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=CHOCO_FFMPEG_LIB_DIR");
-    // Tests and examples of this crate need to find the FFmpeg dylibs at runtime.
-    if let Ok(dir) = env::var("CHOCO_FFMPEG_LIB_DIR") {
+    // Tests and examples of this crate need to find the FFmpeg dylibs at runtime. `-rpath` is a
+    // Unix linker flag; on Windows the DLLs sit beside the executable instead.
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows")
+        && let Ok(dir) = env::var("CHOCO_FFMPEG_LIB_DIR")
+    {
         println!("cargo::rustc-link-arg=-Wl,-rpath,{dir}");
     }
 

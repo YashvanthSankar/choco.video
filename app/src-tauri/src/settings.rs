@@ -46,8 +46,9 @@ impl Default for Defaults {
     }
 }
 
+/// The user's videos folder: ~/Movies on macOS, %USERPROFILE%\Videos on Windows.
 fn dirs_movies() -> PathBuf {
-    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default().join("Movies")
+    dirs::video_dir().or_else(|| dirs::home_dir().map(|h| h.join("Movies"))).unwrap_or_else(std::env::temp_dir)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

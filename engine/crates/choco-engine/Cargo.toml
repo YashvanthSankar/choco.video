@@ -9,11 +9,13 @@ rust-version.workspace = true
 build = "build.rs"
 
 [features]
-default = ["apple-speech", "whisper", "metal"]
+default = ["apple-speech", "whisper"]
 # Apple SpeechAnalyzer transcriber via a small Swift helper, macOS 26+. Zero download.
 apple-speech = []
 # whisper.cpp transcriber. Default on Windows and macOS < 26; model is a runtime download.
 whisper = ["dep:whisper-rs"]
+# Metal is switched on for every macOS build by the target table below, so a plain
+# `cargo build` is correct on both OSes. The features stay for explicit builds.
 metal = ["whisper-rs?/metal"]
 vulkan = ["whisper-rs?/vulkan"]
 
@@ -30,6 +32,9 @@ png = "0.18"
 sha2 = "0.11"
 tract-onnx = { version = "0.23", default-features = false }
 cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { workspace = true, optional = true, features = ["metal"] }
 
 [dev-dependencies]
 tempfile.workspace = true

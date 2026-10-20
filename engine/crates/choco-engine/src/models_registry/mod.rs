@@ -67,7 +67,7 @@ pub fn find(id: &str) -> Option<ModelManifest> {
 pub fn default_dir() -> PathBuf {
     std::env::var_os("CHOCO_MODELS_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|| dirs::data_dir().unwrap_or_else(std::env::temp_dir).join("choco.video").join("models"))
+        .unwrap_or_else(|| dirs::data_local_dir().unwrap_or_else(std::env::temp_dir).join("choco.video").join("models"))
 }
 
 pub fn path_for(dir: &Path, m: &ModelManifest) -> PathBuf {

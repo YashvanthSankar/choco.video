@@ -7,6 +7,7 @@ fn main() {
     // Development only (`tauri dev`): the vendored FFmpeg build. Release binaries must not carry
     // a path from the build machine; they load FFmpeg from Contents/Frameworks.
     if std::env::var("PROFILE").as_deref() == Ok("debug")
+        && std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows")
         && let Ok(dir) = std::env::var("CHOCO_FFMPEG_LIB_DIR")
     {
         println!("cargo::rustc-link-arg=-Wl,-rpath,{dir}");

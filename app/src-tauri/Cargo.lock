@@ -659,6 +659,7 @@ name = "choco-app"
 version = "0.1.2"
 dependencies = [
  "choco-engine",
+ "dirs",
  "keyring",
  "serde",
  "serde_json",
