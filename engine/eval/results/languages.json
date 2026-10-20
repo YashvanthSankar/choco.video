@@ -1,0 +1,159 @@
+{
+ "generated": "2026-10-20",
+ "rows": [
+  {
+   "locale": "en-US",
+   "voice": "Samantha",
+   "metric": "wer",
+   "ref_units": 41,
+   "apple": {
+    "rate": 0.0,
+    "secs": 1.2
+   },
+   "whisper": {
+    "rate": 0.0,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "es-ES",
+   "voice": "Mónica",
+   "metric": "wer",
+   "ref_units": 39,
+   "apple": {
+    "rate": 0.0,
+    "secs": 0.4
+   },
+   "whisper": {
+    "rate": 0.0,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "fr-FR",
+   "voice": "Thomas",
+   "metric": "wer",
+   "ref_units": 45,
+   "apple": {
+    "rate": 0.0,
+    "secs": 0.4
+   },
+   "whisper": {
+    "rate": 0.133,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "de-DE",
+   "voice": "Anna",
+   "metric": "wer",
+   "ref_units": 37,
+   "apple": {
+    "rate": 0.0,
+    "secs": 0.4
+   },
+   "whisper": {
+    "rate": 0.0,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "it-IT",
+   "voice": "Alice",
+   "metric": "wer",
+   "ref_units": 40,
+   "apple": {
+    "rate": 0.025,
+    "secs": 0.4
+   },
+   "whisper": {
+    "rate": 0.0,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "pt-BR",
+   "voice": "Luciana",
+   "metric": "wer",
+   "ref_units": 42,
+   "apple": {
+    "rate": 0.071,
+    "secs": 33.8
+   },
+   "whisper": {
+    "rate": 0.0,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "nl-NL",
+   "voice": "Xander",
+   "metric": "wer",
+   "ref_units": 38,
+   "apple": {
+    "rate": 0.0,
+    "secs": 1.6
+   },
+   "whisper": {
+    "rate": 0.0,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "hi-IN",
+   "voice": "Lekha",
+   "metric": "wer",
+   "ref_units": 45,
+   "apple": {
+    "rate": 1.0,
+    "secs": 138.1
+   },
+   "whisper": {
+    "rate": 0.8,
+    "secs": 2.1
+   }
+  },
+  {
+   "locale": "ko-KR",
+   "voice": "Yuna",
+   "metric": "wer",
+   "ref_units": 31,
+   "apple": {
+    "rate": 0.032,
+    "secs": 111.6
+   },
+   "whisper": {
+    "rate": 0.226,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "ja-JP",
+   "voice": "Kyoko",
+   "metric": "cer",
+   "ref_units": 100,
+   "apple": {
+    "rate": 0.0,
+    "secs": 92.8
+   },
+   "whisper": {
+    "rate": 0.04,
+    "secs": 1.6
+   }
+  },
+  {
+   "locale": "zh-CN",
+   "voice": "Tingting",
+   "metric": "cer",
+   "ref_units": 68,
+   "apple": {
+    "rate": 0.029,
+    "secs": 76.0
+   },
+   "whisper": {
+    "rate": 0.074,
+    "secs": 1.6
+   }
+  }
+ ]
+}
