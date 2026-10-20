@@ -64,9 +64,9 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [x] **v0.1.1 released**: https://github.com/YashvanthSankar/choco.video/releases/tag/v0.1.1 (10 MB DMG, verified to launch from a fresh download once opened via right-click → Open). v0.1.0 is marked superseded: hardened runtime refused its own FFmpeg dylibs, so it died at launch. The build script now launches the app and fails if it exits. The repo is still private, so the website's download link returns 404 until it is made public
 - [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`; then rerun `choco eval` per model and freeze `OPENCODE_RECOMMENDED`
 - [x] Pushed; first CI runs found two real gaps (the bundled face model was gitignored, fixtures never generated) and an unmaintained-crate advisory → fixed
-- [ ] Developer ID signing + notarization (needs your Apple Developer account); without it macOS blocks the first launch and users must click Open Anyway in System Settings › Privacy & Security (right-click › Open stopped working in macOS 15)
+- [ ] Developer ID signing + notarization (needs an Apple Developer account, which we do not have). Workaround shipped: `curl -fsSL https://chocovideo.vercel.app/install.sh | sh` (`scripts/install.sh`) installs with no Gatekeeper prompt; the DMG route needs Privacy & Security › Open Anyway once
 - [ ] Tauri updater with signed manifests and a release channel
-- [~] App icon: an interim icon ships in 0.1.0; the final logo is still being chosen (four directions rejected so far)
+- [x] App icon: frosted-glass clip (`brand/app-icon.svg`), shipped in 0.1.3 on the app, the DMG volume and the site
 - [ ] First-launch guidance when Apple Intelligence is off and no key is set (today the Apple option is disabled with a one-line reason)
 - [x] 40 s launch video from real choco.video output (HyperFrames project in `videos/choco-launch`), in the site hero
 - [ ] Launch posts (Product Hunt, r/podcasting, r/NewTubers, creator Discords)
