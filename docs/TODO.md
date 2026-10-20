@@ -86,13 +86,13 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 - [x] `-Wl,-rpath` link args in the four `build.rs` files emitted for macOS only (MSVC `link.exe` does not take them)
 - [x] Models under `dirs::data_local_dir()` instead of `data_dir()` → same path on macOS; `%LOCALAPPDATA%\choco.video\models` on Windows instead of roaming `%APPDATA%`
 - [x] App default output folder from `dirs::video_dir()` (the same folder Tauri's `path().video_dir()` resolves) instead of `$HOME/Movies` (`HOME` is unset on Windows) → Mac default unchanged
-- [ ] UI strings that name the OS (Finder, Keychain, "this Mac", Apple options) driven by `status.hardware.os` → every Mac screen unchanged
+- [x] UI strings that name the OS (Finder, Keychain, "this Mac", Apple options) driven by `status.hardware.os` → every Mac screen unchanged
 - [ ] `Backend::verify(engine, model)` (default `true`) so a backend can prove an accelerated engine before a long job; the pipeline falls through `speech_engines()` on failure → Mac behaviour unchanged
 
 ### CI
 
-- [ ] Mac job uploads the synthetic fixtures (`engine/fixtures/media`) as an artifact; the Windows job downloads them (`generate.sh` needs macOS `say`) → both OSes test the same bytes
-- [ ] `windows-latest` job on the interim BtbN LGPL build: toolchain from `rust-toolchain.toml` (add `x86_64-pc-windows-msvc` to `targets`), `FFMPEG_DIR` + `LIBCLANG_PATH`, FFmpeg `bin/` on `PATH`, `cargo build --release --all`, `cargo test --all`, `cargo clippy --all --all-targets -- -D warnings` → green on the stub backend; first Windows feedback loop without a Windows machine
+- [x] Mac job uploads the synthetic fixtures (`engine/fixtures/media`) as an artifact; the Windows job downloads them (`generate.sh` needs macOS `say`) → both OSes test the same bytes
+- [x] `windows-latest` job on the interim BtbN LGPL build (mirrored to a prerelease, sha256-pinned) → first run green: release build 7m24s, 71 unit + 7 media + 10 render tests pass with `CHOCO_ENCODERS=h264_mf` (GPU MFT absent, the software MFT renders), clippy clean. All three render snapshots match the Mac references, so cross-OS determinism of the compositor and captions is measured, not assumed. Original plan:: toolchain from `rust-toolchain.toml` (add `x86_64-pc-windows-msvc` to `targets`), `FFMPEG_DIR` + `LIBCLANG_PATH`, FFmpeg `bin/` on `PATH`, `cargo build --release --all`, `cargo test --all`, `cargo clippy --all --all-targets -- -D warnings` → green on the stub backend; first Windows feedback loop without a Windows machine
 - [ ] Switch the job to the minimal prebuilt (below), fetched by URL and checked against the sha256 in `scripts/ffmpeg/VERSIONS`
 - [ ] Vulkan SDK (LunarG, pinned version) installed in the job; build, test and clippy with `--features choco-engine/vulkan`. The runner has no GPU, so the suite also proves the CPU fallback
 - [ ] `cargo deny check` already resolves every target; confirm the Windows-only crates (`windows-native-keyring-store`, `windows`, `webview2-com`, …) pass licenses and bans → no `deny.toml` change
