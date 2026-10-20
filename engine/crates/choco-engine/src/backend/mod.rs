@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 mod cpu;
+pub mod gpu;
 #[cfg(target_os = "macos")]
 mod mac;
 #[cfg(target_os = "windows")]

@@ -33,6 +33,10 @@ sha2 = "0.11"
 tract-onnx = { version = "0.23", default-features = false }
 cosmic-text = { version = "0.19", default-features = false, features = ["std", "swash"] }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# DXGI adapter enumeration, OS build and memory for backend/windows.rs (MIT OR Apache-2.0).
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Dxgi", "Win32_System_SystemInformation", "Wdk_System_SystemServices"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { workspace = true, optional = true, features = ["metal"] }
 
