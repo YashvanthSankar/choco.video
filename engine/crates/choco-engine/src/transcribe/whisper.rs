@@ -83,10 +83,22 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
     let mut segments = Vec::new();
     for seg in state.as_iter() {
         let mut words: Vec<Word> = Vec::new();
+        // Whisper tokens are byte pieces: one Devanagari or CJK character can span several
+        // tokens, so decode each word's bytes once, not each token (per-token lossy decoding
+        // turned every non-Latin script into replacement characters).
+        let mut cur: Vec<u8> = Vec::new();
+        let (mut cur_start, mut cur_end, mut cur_conf) = (0u64, 0u64, 1.0f32);
+        let flush = |cur: &mut Vec<u8>, start: u64, end: u64, conf: f32, words: &mut Vec<Word>| {
+            let text = String::from_utf8_lossy(cur).trim().to_string();
+            if !text.is_empty() {
+                words.push(Word { start_ms: start, end_ms: end.max(start + 1), text, confidence: conf });
+            }
+            cur.clear();
+        };
         for t in 0..seg.n_tokens() {
             let Some(tok) = seg.get_token(t) else { continue };
-            let Ok(text) = tok.to_str_lossy() else { continue };
-            if text.starts_with("[_") || text.starts_with("<|") {
+            let Ok(bytes) = tok.to_bytes() else { continue };
+            if bytes.starts_with(b"[_") || bytes.starts_with(b"<|") {
                 continue; // special token
             }
             let data = tok.token_data();
@@ -94,19 +106,21 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
             if data.t_dtw >= 0 {
                 t0 = data.t_dtw as u64 * 10;
             }
-            let starts_word = text.starts_with(' ') || words.is_empty();
-            let piece = text.trim();
-            if piece.is_empty() {
-                continue;
+            let starts_word = bytes.starts_with(b" ") || cur.is_empty();
+            if starts_word && !cur.is_empty() {
+                flush(&mut cur, cur_start, cur_end, cur_conf, &mut words);
             }
-            if starts_word {
-                words.push(Word { start_ms: t0, end_ms: t1.max(t0 + 1), text: piece.to_string(), confidence: data.p });
-            } else if let Some(w) = words.last_mut() {
-                w.text.push_str(piece);
-                w.end_ms = t1.max(w.end_ms);
-                w.confidence = w.confidence.min(data.p);
+            if cur.is_empty() {
+                cur_start = t0;
+                cur_end = t1;
+                cur_conf = data.p;
+            } else {
+                cur_end = t1.max(cur_end);
+                cur_conf = cur_conf.min(data.p);
             }
+            cur.extend_from_slice(bytes);
         }
+        flush(&mut cur, cur_start, cur_end, cur_conf, &mut words);
         let text = seg.to_str_lossy().map(|s| s.trim().to_string()).unwrap_or_default();
         if words.is_empty() && text.is_empty() {
             continue;
