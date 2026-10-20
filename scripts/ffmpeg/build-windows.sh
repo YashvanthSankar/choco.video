@@ -113,6 +113,8 @@ done
 make -j"$JOBS"
 rm -rf "$PREFIX" && make install
 cp "$SRC/COPYING.LGPLv2.1" "$PREFIX/LICENSE.txt"
+# The MSVC install leaves the import libraries in bin/; Rust links from lib/.
+cp "$PREFIX"/bin/*.lib "$PREFIX/lib/"
 echo "--- license"; grep -E '^#define CONFIG_(GPL|NONFREE|VERSION3) ' config.h
 echo "--- DLLs"; ls -la "$PREFIX/bin"/*.dll
 du -ch "$PREFIX/bin"/*.dll | tail -1
