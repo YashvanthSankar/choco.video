@@ -98,7 +98,7 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 - [ ] `cargo deny check` already resolves every target; confirm the Windows-only crates (`windows-native-keyring-store`, `windows`, `webview2-com`, …) pass licenses and bans → no `deny.toml` change
 - [~] Import check: `scripts/check-imports.sh` (llvm-readobj, so no Visual Studio environment is needed) runs in the Windows job on `choco.exe`, `choco_ffi.dll` and the six FFmpeg DLLs; the engine links the C runtime statically (`+crt-static` in `engine/.cargo/config.toml`). Our FFmpeg DLLs pass locally (they import only KERNEL32, bcrypt, ole32 and each other). The app exe joins when the Windows app builds. Original: (`dumpbin /dependents`) on `choco.exe`, the app exe and every FFmpeg DLL → fails on `vcruntime140*.dll`, `msvcp140.dll`, `api-ms-win-crt-*`, `libgcc*`, `libwinpthread*`, or a `vulkan-1.dll` that is not delay-loaded
 - [ ] `scripts/size-check.sh` learns Windows (`*.exe`, `$FFMPEG_DIR/bin/*.dll`, `7z` when `zip` is missing) → job summary table; fails over 50 MB installed / 25 MB installer estimate
-- [ ] Launch smoke test: the bundled app starts from its install folder and is still running after 6 s (port of the `build-app.sh` check that caught 0.1.0)
+- [~] Launch smoke test: the bundled app starts from its install folder and is still running after 6 s (port of the `build-app.sh` check that caught 0.1.0) → `scripts/build-app-windows.sh` installs silently, launches for 8 s, uninstalls; first CI run pending
 
 ### Minimal LGPL FFmpeg for Windows x64
 
@@ -120,7 +120,7 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 - [ ] CPU baseline AVX2 + FMA + F16C (ggml built with `GGML_NATIVE=OFF`, so a CI runner with AVX-512 cannot leak into the binary); no AVX2 → whisper reported unavailable with a plain reason, never an illegal-instruction crash
 - [ ] `recommended_models()` unchanged (turbo at ≥ 8 GiB, base below)
 - [ ] `choco doctor` on Windows: adapters and driver versions, encoders that opened (`--probe-encoders` opens each and encodes two 1080x1920 frames), Vulkan verdict, AVX2, Media Foundation present
-- [ ] Unit tests on Windows: memory > 0, OS version non-empty, encoder list ends with `MediaFoundation`; `detect_reports_something_sane` passes unchanged
+- [~] Unit tests on Windows: memory > 0, OS version non-empty, encoder list ends with `MediaFoundation`; `detect_reports_something_sane` passes unchanged → `backend/windows.rs` tests written (memory, OS build, MediaFoundation last, CPU whisper); run on the Windows runner
 
 ### Transcription (whisper.cpp)
 
@@ -136,38 +136,38 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 ### Faces, captions, render
 
 - [ ] Faces: `tract-onnx` 0.23 is pure Rust on x86_64 (no C in `cargo tree`), YuNet compiled in via `include_bytes!` → detections on fixture frames match a Mac-committed reference within 1 px per box edge and 0.01 score
-- [ ] Captions: the rasterizer loads only the bundled fonts (no system fonts) → new cross-OS test: blake3 of the RGBA raster for each preset matches a Mac-committed hash. A mismatch gets its cause found (libm call, SIMD path), not a second reference
+- [~] Captions: the rasterizer loads only the bundled fonts (no system fonts) → new cross-OS test: blake3 of the RGBA raster for each preset matches a Mac-committed hash. A mismatch gets its cause found (libm call, SIMD path), not a second reference → `every_preset_rasterizes_identically_on_every_os` holds blake3 hashes of all four presets recorded on macOS; the Windows runner must match them
 - [ ] Render snapshots (3) pass against the Mac references unchanged (MAD ≤ 2.0 luma, composed before encoding); no Windows-specific references
 - [ ] Each of `h264_nvenc`, `h264_amf`, `h264_qsv`, `h264_mf` produces a 1080x1920 H.264 High, constant-frame-rate, `+faststart` MP4 that probes back with the requested frame count → PSNR of encoded vs composed frames ≥ 38 dB at 10 Mbps (`#[ignore]` test, run on matrix hardware)
-- [ ] Encoder failure mid-clip → the clip is rendered once more with the next encoder; the error lists every encoder tried and why it failed
+- [x] Encoder failure mid-clip → the clip is rendered once more with the next encoder; the error lists every encoder tried and why it failed → `render_clip` retries from the next candidate; the final error names each encoder's failure; `tests/encoder_retry.rs` forces a failure at frame 5
 - [ ] Intel: compare `h264_qsv` with `h264_mf` + `hw_encoding=1` (Intel's hardware MFT) → if within 0.5 dB PSNR at the same bitrate, drop QSV and libvpl
-- [ ] Windows N without the Media Feature Pack (no `mfplat.dll`): message names the Media Feature Pack instead of "encoder missing"
+- [x] Windows N without the Media Feature Pack (no `mfplat.dll`): message names the Media Feature Pack instead of "encoder missing" → `encoders::missing_runtime_hint()` appends the Media Feature Pack instruction when no encoder opens and `System32\mfplat.dll` is missing (needs an N machine to see it live)
 - [ ] Render speed, 62 s clip → ≥ 3x realtime with a hardware encoder, ≥ 1.5x with the Media Foundation software MFT (Mac: 5.7x)
 - [ ] D3D11VA decode only if measured: a 4K HEVC 60 fps phone clip renders below 1.5x realtime on the weakest matrix machine → then decode through D3D11VA and transfer to system memory for the CPU compositor
-- [ ] Paths: a source under a non-ASCII folder and one with a > 260-character path go through probe, render and export (test copies a fixture there); never hand a `\\?\` verbatim path to FFmpeg or the webview
+- [~] Paths: a source under a non-ASCII folder and one with a > 260-character path go through probe, render and export (test copies a fixture there); never hand a `\\?\` verbatim path to FFmpeg or the webview → `non_ascii_and_long_paths` (tests/render.rs) passes on macOS; runs on the Windows runner
 
 ### Apple-only paths on Windows
 
-- [ ] Apple speech and the Apple picker stay compiled and are runtime-gated (`helper_path()` is `None` off macOS) → Windows tests: `transcribe(.., AppleSpeech, ..)` returns `Unavailable`, `picker::apple::available()` is false, `build.rs` never runs `swiftc`
+- [~] Apple speech and the Apple picker stay compiled and are runtime-gated (`helper_path()` is `None` off macOS) → Windows tests: `transcribe(.., AppleSpeech, ..)` returns `Unavailable`, `picker::apple::available()` is false, `build.rs` never runs `swiftc` → test `apple_paths_are_off_outside_macos` (transcribe/apple.rs) written; runs on the Windows runner
 - [ ] VideoToolbox: only reachable through the encoder table row, which the Windows backend never lists; no `cfg` in `render/`
 - [ ] App: Apple options hidden on Windows (no "needs macOS 26" text); onboarding goes provider key → whisper download → GPU check
 - [ ] Keychain → Windows Credential Manager through the existing `keyring` 4.2 (default `v1` feature pulls `windows-native-keyring-store` 1.1 on Windows): same service and user names; key saved, read after restart, deleted; a key over Credential Manager's 2,560-byte limit is refused with a message; never written anywhere else → app settings test runs on the Windows runner
 
 ### App (Tauri) on Windows
 
-- [ ] `tauri.windows.conf.json` (merged over `tauri.conf.json` by Tauri): window array without `titleBarStyle` and `hiddenTitle`, `bundle.targets: ["nsis"]`, the six FFmpeg DLLs as `resources` mapped beside the exe, `bundle.windows` settings (`TECH.md §19.7`)
+- [x] `tauri.windows.conf.json` (merged over `tauri.conf.json` by Tauri): window array without `titleBarStyle` and `hiddenTitle`, `bundle.targets: ["nsis"]`, the six FFmpeg DLLs as `resources` mapped beside the exe, `bundle.windows` settings (`TECH.md §19.7`) → written as §19.7 minus `signCommand` (no signing account yet)
 - [ ] WebView2: `webviewInstallMode: downloadBootstrapper` (silent); Windows 11 ships WebView2 → install tested on a clean Windows 11 VM, offline and online
-- [ ] Static CRT: Tauri's `build.windows.staticVCRuntime` (default on) for the app, `+crt-static` for the CLI → no VC++ redistributable; import check passes on the installed files
+- [~] Static CRT: Tauri's `build.windows.staticVCRuntime` (default on) for the app, `+crt-static` for the CLI → no VC++ redistributable; import check passes on the installed files → `+crt-static` in both cargo configs, whisper.cpp forced to `/MT` (CMP0091), import check in CI
 - [ ] Data paths: settings `%APPDATA%\video.choco.app\settings.json`, WebView2 profile `%LOCALAPPDATA%\video.choco.app`, models `%LOCALAPPDATA%\choco.video\models`, temp `%TEMP%`, default output `%USERPROFILE%\Videos\choco`
-- [ ] Asset protocol: static scope `$HOME/**` plus runtime `allow_file` / `allow_directory` for the source and output folder the user picks → a clip exported to `D:\` or a USB drive plays inline
+- [x] Asset protocol: static scope `$HOME/**` plus runtime `allow_file` / `allow_directory` for the source and output folder the user picks → a clip exported to `D:\` or a USB drive plays inline → `allow_media` in `app/src-tauri/src/lib.rs` allows each job's source file and output folder, and a reopened run's
 - [ ] File dialogs (tauri-plugin-dialog), dropping a file on the window, "Show in Explorer" (`revealItemInDir` selects the file), open output folder → each checked by hand on the matrix
-- [ ] Title bar: native caption buttons, no traffic-light padding in the header; `Segoe UI Variable` first in the font stack on Windows; light and dark follow the Windows setting
+- [~] Title bar: native caption buttons, no traffic-light padding in the header; `Segoe UI Variable` first in the font stack on Windows; light and dark follow the Windows setting → no macOS button inset on Windows, Segoe UI Variable in the fallback stack; needs a look on a real PC
 - [ ] Inline playback of exported H.264/AAC in WebView2 → works on non-N editions; N editions get the Media Feature Pack message
-- [ ] "Copy diagnostics" in Settings: backend report JSON (OS, GPUs, drivers, encoder, Vulkan verdict, versions); no media, transcript or key → used by the beta issue template; nothing is sent anywhere
+- [x] "Copy diagnostics" in Settings: backend report JSON (OS, GPUs, drivers, encoder, Vulkan verdict, versions); no media, transcript or key → used by the beta issue template; nothing is sent anywhere → Settings › About; hardware, every GPU, encoders, speech engines, picker host and models; no key, paths, media or transcripts
 
 ### Installer, signing, release
 
-- [ ] NSIS, per-user (`installMode: currentUser`, no admin prompt), LZMA; no MSI → Decisions entry
+- [~] NSIS, per-user (`installMode: currentUser`, no admin prompt), LZMA; no MSI → Decisions entry → configured (`currentUser`, LZMA, `windows/hooks.nsh`); `app-windows.yml` builds it
 - [ ] Layout: `%LOCALAPPDATA%\choco.video\` holds the exe, six FFmpeg DLLs and `uninstall.exe`; Start menu shortcut; no PATH change; no registry beyond the uninstall key
 - [ ] Upgrade 0.x → 0.y keeps models and settings; uninstall keeps them unless "Delete the application data" is ticked, which also removes `models\` and `gpu-check.json` through an NSIS uninstall hook → tested on a VM
 - [ ] Size → `setup.exe` ≤ 25 MB, installed folder ≤ 50 MB without models, enforced by the release job
