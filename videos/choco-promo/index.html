@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+@font-face { font-family: GS; src: url("assets/fonts/GeneralSans-500.woff2"); font-weight: 500; }
+@font-face { font-family: GS; src: url("assets/fonts/GeneralSans-600.woff2"); font-weight: 600; }
+@font-face { font-family: GS; src: url("assets/fonts/GeneralSans-700.woff2"); font-weight: 700; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+#root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #f7f2eb; font-family: GS, "Helvetica Neue", Arial, sans-serif; color: #1e1411; }
+/* ambient light, the same two sources as the icon */
+#light { position: absolute; inset: 0; }
+#light i { position: absolute; border-radius: 50%; filter: blur(120px); }
+#l1 { left: -260px; top: -300px; width: 900px; height: 900px; background: #ff9a4d; opacity: .45; }
+#l2 { right: -300px; bottom: -380px; width: 1100px; height: 1100px; background: #ffd84a; opacity: .5; }
+.clip { position: absolute; inset: 0; }
+/* opening + end card */
+.icon { position: absolute; left: 50%; width: 300px; height: 300px; margin-left: -150px; filter: drop-shadow(0 30px 40px rgba(80,40,10,.25)); }
+.word { position: absolute; left: 0; right: 0; text-align: center; font-weight: 700; font-size: 86px; letter-spacing: -0.04em; }
+.word b { color: #c4560c; font-weight: 700; }
+.tag { position: absolute; left: 0; right: 0; text-align: center; font-weight: 500; font-size: 40px; letter-spacing: -0.01em; color: #6b5a50; }
+/* camera and window */
+#stage { position: absolute; inset: 0; perspective: 2200px; perspective-origin: 50% 40%; }
+#cam { position: absolute; left: 240px; top: 90px; width: 1440px; height: 900px; transform-origin: 50% 50%; transform-style: preserve-3d; }
+#win { position: absolute; inset: 0; border-radius: 18px; overflow: hidden; background: #100c0a; box-shadow: 0 2px 0 rgba(255,255,255,.06) inset, 0 50px 120px -30px rgba(60,25,5,.55), 0 20px 40px -20px rgba(60,25,5,.4); }
+#win img { position: absolute; inset: 0; width: 100%; height: 100%; }
+#lights { position: absolute; left: 22px; top: 21px; display: flex; gap: 9px; }
+#lights i { width: 14px; height: 14px; border-radius: 50%; }
+#lights i:nth-child(1) { background: #ff5f57; } #lights i:nth-child(2) { background: #febc2e; } #lights i:nth-child(3) { background: #28c840; }
+#prog { position: absolute; left: 396px; top: 266px; height: 9px; width: 336px; border-radius: 5px; background: #ffd84a; }
+#chip { position: absolute; left: 1180px; top: 760px; padding: 18px 26px; border-radius: 16px; background: #fff; box-shadow: 0 24px 50px -16px rgba(40,20,5,.45); font-weight: 600; font-size: 26px; white-space: nowrap; display: flex; gap: 18px; align-items: center; }
+#chip span { color: #6b5a50; font-weight: 500; }
+#chip i { width: 34px; height: 42px; border-radius: 6px; background: linear-gradient(#ff9a4d, #ffd84a); }
+#cursor { position: absolute; left: 0; top: 0; width: 34px; height: 46px; }
+#ripple { position: absolute; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%; border: 3px solid #ffd84a; opacity: 0; }
+.lbl { position: absolute; font-weight: 600; font-size: 44px; letter-spacing: -0.02em; white-space: nowrap; }
+.lbl small { display: block; font-weight: 500; font-size: 28px; color: #6b5a50; letter-spacing: 0; margin-top: 8px; }
+/* phones */
+.phone { position: absolute; width: 315px; height: 560px; border-radius: 30px; overflow: hidden; background: #000; box-shadow: 0 0 0 7px #120c09, 0 40px 80px -24px rgba(50,20,5,.55); }
+.phone video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.score { position: absolute; left: 14px; top: 14px; padding: 6px 12px; border-radius: 999px; background: #ffd84a; color: #1e1411; font-weight: 700; font-size: 22px; }
+/* statements */
+.say { position: absolute; left: 0; right: 0; top: 410px; text-align: center; font-weight: 700; font-size: 120px; letter-spacing: -0.045em; line-height: 1; }
+.say small { display: block; margin-top: 26px; font-weight: 500; font-size: 38px; letter-spacing: -0.01em; color: #6b5a50; }
+#pill { position: absolute; left: 50%; top: 830px; transform: translateX(-50%); padding: 26px 46px; border-radius: 999px; background: #1e1411; color: #fff; font-weight: 600; font-size: 34px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="30" data-width="1920" data-height="1080">
+  <div id="light"><i id="l1"></i><i id="l2"></i></div>
+
+  <div id="s1" class="clip" data-start="0" data-duration="3.6" data-track-index="0">
+    <img class="icon" id="s1-icon" src="assets/icon.png" alt="" style="top:250px">
+    <div class="word" id="s1-word" style="top:590px">choco<b>.</b>video</div>
+    <div class="tag" id="s1-tag" style="top:700px">Long videos in. Clips out.</div>
+  </div>
+
+  <div id="stage">
+    <div id="cam">
+      <div id="win">
+        <img id="img-home" src="assets/app-home.jpg" alt="">
+        <img id="img-job" src="assets/app-job.jpg" alt="">
+        <div id="prog"></div>
+        <img id="img-results" src="assets/app-results.jpg" alt="">
+        <div id="lights"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="labels">
+    <div class="lbl" id="lbl1" style="left:240px;top:-120px">Drop in a long episode.</div>
+    <div class="lbl" id="lbl2" style="left:240px;top:-120px">It listens and picks, on your Mac.<small>Transcription at 42× real time. Nothing uploaded.</small></div>
+  </div>
+
+  <div id="chip"><i></i>podcast-ep-47.mp4 <span>47:52</span></div>
+  <svg id="cursor" viewBox="0 0 34 46"><path d="M3 2 L3 36 L12 28 L18 42 L24 39 L18 26 L30 26 Z" fill="#111" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>
+  <div id="ripple"></div>
+
+  <div id="phones">
+    <div class="phone" id="ph1" style="left:300px;top:205px"><video id="v1" src="assets/clip-1.mp4" poster="assets/clip-1.jpg" muted data-start="16.4" data-duration="6.8" data-track-index="5"></video><span class="score">82</span></div>
+    <div class="phone" id="ph2" style="left:655px;top:175px"><video id="v2" src="assets/clip-2.mp4" poster="assets/clip-2.jpg" muted data-start="16.4" data-duration="6.8" data-track-index="6"></video><span class="score">78</span></div>
+    <div class="phone" id="ph3" style="left:1010px;top:175px"><video id="v3" src="assets/clip-3.mp4" poster="assets/clip-3.jpg" muted data-start="16.4" data-duration="6.8" data-track-index="7"></video><span class="score">78</span></div>
+    <div class="phone" id="ph4" style="left:1365px;top:205px"><video id="v4" src="assets/clip-4.mp4" poster="assets/clip-4.jpg" muted data-start="16.4" data-duration="6.8" data-track-index="8"></video><span class="score">82</span></div>
+  </div>
+  <div class="lbl" id="lbl3" style="left:0;right:0;text-align:center;top:860px">Four clips, framed on the speaker and captioned.<small>Each with its score and the reasons it was picked.</small></div>
+
+  <div id="s5" class="clip" data-start="23.2" data-duration="4.2" data-track-index="1">
+    <div class="say" id="say1">Your video stays<br>on your Mac.</div>
+    <div class="say" id="say2">20 MB.<small>No account. No subscription. No credits.</small></div>
+    <div class="say" id="say3">Free and<br>open source.</div>
+  </div>
+
+  <div id="s6" class="clip" data-start="27.4" data-duration="2.6" data-track-index="2">
+    <img class="icon" id="s6-icon" src="assets/icon.png" alt="" style="top:200px">
+    <div class="word" id="s6-word" style="top:540px">choco<b>.</b>video</div>
+    <div class="tag" id="s6-tag" style="top:650px">Long videos in. Clips out. On your Mac.</div>
+    <div id="pill">Download for macOS</div>
+  </div>
+</div>
+<script>
+(() => {
+  window.__timelines = window.__timelines || {};
+  const tl = gsap.timeline({ paused: true });
+  const E = "power3.out", IO = "power3.inOut";
+  // Window coordinates → screen: window at (240, 90), 1440×900 = the 1280×800 app at 1.125.
+  const W = (x, y) => [240 + x * 1.125, 90 + y * 1.125];
+  // During the demo the window is scaled 0.86 about its centre (960, 540) and moved down 70.
+  const D = (x, y) => { const [sx, sy] = W(x, y); return [960 + (sx - 960) * 0.86, 540 + (sy - 540) * 0.86 + 70]; };
+
+  // Ambient light drifts slowly the whole time.
+  tl.fromTo("#l1", { x: 0, y: 0 }, { x: 160, y: 90, duration: 30, ease: "sine.inOut" }, 0);
+  tl.fromTo("#l2", { x: 0, y: 0 }, { x: -140, y: -60, duration: 30, ease: "sine.inOut" }, 0);
+
+  // S1 (0–3.6): the icon resolves out of the light.
+  tl.fromTo("#s1-icon", { opacity: 0, scale: 0.7, y: 40, filter: "blur(18px) drop-shadow(0 30px 40px rgba(80,40,10,.25))" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px) drop-shadow(0 30px 40px rgba(80,40,10,.25))", duration: 1.3, ease: E }, 0.15);
+  tl.fromTo("#s1-word", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8, ease: E }, 0.9);
+  tl.fromTo("#s1-tag", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, ease: E }, 1.3);
+  tl.to(["#s1-icon", "#s1-word", "#s1-tag"], { opacity: 0, y: -40, duration: 0.6, ease: "power2.in", stagger: 0.05 }, 3.0);
+
+  // S2 (3.4–10): the app swings up; a file is dragged in; "Find clips" is clicked.
+  tl.set(["#img-job", "#img-results", "#prog"], { opacity: 0 }, 0);
+  tl.fromTo("#cam", { opacity: 0, rotationX: 28, y: 300, scale: 0.78 }, { opacity: 1, rotationX: 0, y: 70, scale: 0.86, duration: 1.6, ease: E }, 3.4);
+  tl.fromTo("#lbl1", { opacity: 0, y: 150 }, { opacity: 1, y: 180, duration: 0.7, ease: E }, 4.4);
+  const drop = D(640, 250), btn = D(970, 768);
+  tl.fromTo("#chip", { opacity: 0, x: 380, y: 140, rotation: 6 }, { opacity: 1, x: 0, y: 0, rotation: 0, duration: 0.8, ease: E }, 5.0);
+  tl.fromTo("#cursor", { opacity: 0, x: 1640, y: 900 }, { opacity: 1, x: 1460, y: 790, duration: 0.7, ease: E }, 5.0);
+  tl.to("#chip", { x: drop[0] - 1180 - 200, y: drop[1] - 760 - 40, scale: 0.9, duration: 1.1, ease: IO }, 5.9);
+  tl.to("#cursor", { x: drop[0] - 200 + 260, y: drop[1] - 10, duration: 1.1, ease: IO }, 5.9);
+  tl.to("#chip", { opacity: 0, scale: 0.5, duration: 0.35, ease: "power2.in" }, 7.05);
+  tl.to("#cursor", { x: btn[0], y: btn[1], duration: 0.9, ease: IO }, 7.3);
+  tl.fromTo("#ripple", { opacity: 1, scale: 0.3, x: btn[0] + 6, y: btn[1] + 8 }, { opacity: 0, scale: 1.6, x: btn[0] + 6, y: btn[1] + 8, duration: 0.6, ease: E }, 8.2);
+  tl.to("#cursor", { scale: 0.85, duration: 0.08, yoyo: false }, 8.2).to("#cursor", { scale: 1, duration: 0.15 }, 8.3);
+  tl.to("#lbl1", { opacity: 0, duration: 0.4 }, 8.6);
+  tl.to("#cursor", { opacity: 0, duration: 0.4 }, 8.9);
+
+  // S3 (9–15): working; the camera pushes into the stage list while progress fills.
+  tl.to("#img-job", { opacity: 1, duration: 0.5 }, 8.7);
+  tl.set("#prog", { opacity: 1 }, 9.1);
+  tl.fromTo("#prog", { width: 336 }, { width: 646, duration: 4.6, ease: "power1.inOut" }, 9.3);
+  tl.to("#cam", { scale: 1.3, x: 200, y: 300, duration: 3.2, ease: IO }, 9.4);
+  tl.fromTo("#lbl2", { opacity: 0, y: 150 }, { opacity: 1, y: 180, duration: 0.7, ease: E }, 10.2);
+  tl.to("#lbl2", { opacity: 0, duration: 0.4 }, 14.1);
+
+  // S4 (14.6–23.2): results; the four cards lift out of the window as phones, playing.
+  tl.to("#cam", { scale: 1, x: 0, y: 0, duration: 1.4, ease: IO }, 14.4);
+  tl.to("#img-results", { opacity: 1, duration: 0.5 }, 14.6);
+  tl.to("#prog", { opacity: 0, duration: 0.3 }, 14.6);
+  const cards = [58, 352, 648, 942].map((x) => W(x, 254));
+  const finals = [[300, 205, -5], [655, 175, -1.5], [1010, 175, 1.5], [1365, 205, 5]];
+  [1, 2, 3, 4].forEach((n, i) => {
+    // Phones sit at their final spots in CSS; they start offset onto the card they lift out of.
+    tl.set(`#ph${n}`, { x: cards[i][0] - finals[i][0], y: cards[i][1] - finals[i][1], rotation: 0, opacity: 0 }, 0);
+    tl.to(`#ph${n}`, { opacity: 1, duration: 0.3 }, 16.2 + i * 0.08);
+    tl.to(`#ph${n}`, { x: 0, y: 0, rotation: finals[i][2], duration: 1.3, ease: IO }, 16.5 + i * 0.1);
+  });
+  tl.to("#cam", { opacity: 0.18, scale: 0.92, filter: "blur(8px)", duration: 1.4, ease: IO }, 16.5);
+  tl.fromTo("#lbl3", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.8, ease: E }, 18.4);
+  tl.to(["#ph1", "#ph2", "#ph3", "#ph4", "#lbl3"], { opacity: 0, y: -50, duration: 0.6, ease: "power2.in", stagger: 0.04 }, 22.6);
+  tl.to("#cam", { opacity: 0, duration: 0.5 }, 22.6);
+
+  // S5 (23.2–27.4): three statements.
+  ["#say1", "#say2", "#say3"].forEach((sel, i) => {
+    const at = 23.3 + i * 1.35;
+    tl.fromTo(sel, { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, at);
+    if (i < 2) tl.to(sel, { opacity: 0, y: -40, duration: 0.35, ease: "power2.in" }, at + 1.0);
+  });
+  tl.to("#say3", { opacity: 0, duration: 0.3 }, 27.1);
+
+  // S6 (27.4–30): end card.
+  tl.fromTo("#s6-icon", { opacity: 0, scale: 0.8, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.9, ease: E }, 27.45);
+  tl.fromTo("#s6-word", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 27.8);
+  tl.fromTo("#s6-tag", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 28.0);
+  tl.fromTo("#pill", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 28.3);
+  tl.set({}, {}, 30);
+  window.__timelines["main"] = tl;
+})();
+</script>
+</body>
+</html>
