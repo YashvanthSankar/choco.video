@@ -1,0 +1,50 @@
+name: ffmpeg-windows
+
+# Builds our minimal LGPL FFmpeg for Windows x64 (scripts/ffmpeg/build-windows.sh) and publishes
+# it as a prerelease asset. Run by hand when the FFmpeg version or allowlist changes; CI and the
+# installer then fetch the zip by URL + sha256 (scripts/ffmpeg/VERSIONS-windows).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+          path-type: inherit
+          install: make diffutils nasm pkgconf tar xz unzip zip
+      - name: meson and ninja (build tools only)
+        shell: pwsh
+        run: pip install meson==1.6.1 ninja==1.11.1.1
+      - name: Build
+        run: ./scripts/ffmpeg/build-windows.sh
+      - name: Package
+        id: pkg
+        run: |
+          cd vendor/ffmpeg
+          Z=ffmpeg-8.1.3-win64-lgpl-minimal.zip
+          zip -qr "$Z" 8.1.3-windows-x64-minimal
+          echo "sha=$(sha256sum "$Z" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "### FFmpeg minimal: $(du -h "$Z" | cut -f1), sha256 $(sha256sum "$Z" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+          du -ch 8.1.3-windows-x64-minimal/bin/*.dll | tail -1 >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish prerelease asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "ffmpeg-win64-8.1.3-minimal"
+          gh release view $tag 2>$null; if ($LASTEXITCODE -ne 0) { gh release create $tag --prerelease --title "Minimal LGPL FFmpeg 8.1.3 for Windows x64" --notes "Built by .github/workflows/ffmpeg-windows.yml from scripts/ffmpeg/build-windows.sh. LGPL 2.1, shared, static CRT. SHA-256 in scripts/ffmpeg/VERSIONS-windows." --target $env:GITHUB_SHA }
+          gh release upload $tag vendor/ffmpeg/ffmpeg-8.1.3-win64-lgpl-minimal.zip --clobber
