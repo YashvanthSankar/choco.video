@@ -5,3 +5,9 @@ CHOCO_FFMPEG_LIB_DIR = { value = "../vendor/ffmpeg/8.1.3-macos-arm64/lib", relat
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-arg=-mmacosx-version-min=14.0"]
+
+# One static C runtime on Windows: no VC++ redistributable for users (docs/TECH.md §19). The cmake
+# crate builds whisper.cpp with the matching /MT; scripts/check-imports.sh proves nothing links
+# vcruntime140.dll.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

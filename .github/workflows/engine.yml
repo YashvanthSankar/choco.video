@@ -89,6 +89,8 @@ jobs:
           path: engine/fixtures/media
       - name: Build (release)
         run: cargo build --release --all
+      - name: Imports (static C runtime, only our six FFmpeg DLLs)
+        run: ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin target/release/choco.exe $(ls target/release/*.dll 2>/dev/null)
       - name: Test (Media Foundation software encoder; the runner has no GPU)
         env:
           CHOCO_ENCODERS: h264_mf
