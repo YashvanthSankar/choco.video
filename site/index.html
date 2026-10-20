@@ -72,6 +72,10 @@ button, input { font: inherit; color: inherit; }
 .card .sub { font-size: var(--step-lead); line-height: 1.35; max-width: 34ch; margin-top: -4px; }
 .card .act { display: grid; gap: 10px; justify-items: start; }
 .card .act small { color: var(--muted); font-size: var(--step-small); }
+.cmd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; max-width: 100%; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: var(--step-small); text-align: left; cursor: pointer; }
+.cmd code { color: var(--ink); font: inherit; font-weight: 600; overflow-wrap: anywhere; }
+.cmd em { font-style: normal; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.qcard .ans code { font: inherit; font-weight: 600; overflow-wrap: anywhere; }
 .card .foot { display: flex; flex-wrap: wrap; gap: 10px 28px; padding: 0 clamp(28px, 4vw, 64px) 28px; }
 .card .foot a { font-weight: 500; text-underline-offset: 4px; }
 .room { position: sticky; top: 80px; height: calc(100svh - 68px - var(--m)); border-radius: var(--r); background: var(--accent); display: grid; place-items: center; overflow: hidden; min-width: 0; }
@@ -254,7 +258,7 @@ button, input { font: inherit; color: inherit; }
   .room { position: relative; top: 0; height: 64svh; order: -1; }
   .card { margin-top: -24px; position: relative; text-align: center; }
   .card .body { justify-items: center; }
-  .card .act { justify-items: center; }
+  .card .act { justify-items: center; } .cmd { justify-content: center; text-align: center; }
   .card .foot { justify-content: center; }
   .card h1 { font-size: clamp(40px, 11vw, 64px); }
   .film { grid-template-columns: 1fr; }
@@ -333,6 +337,7 @@ button, input { font: inherit; color: inherit; }
         <div class="act">
           <a class="btn" href="https://github.com/YashvanthSankar/choco.video/releases/latest/download/choco.video-macos-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.6-1-2.6-4.1zM13.9 4.9c.7-.9 1.2-2 1-3.2-1 .1-2.2.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg>Download for macOS</a>
           <small>Free and open source · 9.9 MB · Apple Silicon, macOS 14 or later</small>
+          <button class="cmd" type="button" data-copy="curl -fsSL https://chocovideo.vercel.app/install.sh | sh" title="Copy the Terminal install command"><span>Or in Terminal, no security prompt:</span> <code>curl -fsSL https://chocovideo.vercel.app/install.sh | sh</code> <em>Copy</em></button>
         </div>
       </div>
       <div class="foot"><a href="#film">Watch the 30-second film</a><a href="#how">How it picks</a><a href="https://github.com/YashvanthSankar/choco.video">Source on GitHub</a></div>
@@ -428,7 +433,7 @@ button, input { font: inherit; color: inherit; }
       <div class="qcard c2" style="--i:1"><span class="tab">Macs</span><div class="sheet"><button aria-expanded="false">Which Macs does it run on?</button><div class="ans"><div>Apple Silicon Macs on macOS 14 or later. On macOS 26 it uses Apple's built-in speech engine with nothing to download; older systems fetch one 550 MB Whisper model the first time.</div></div></div></div>
       <div class="qcard c3" style="--i:2"><span class="tab">Price</span><div class="sheet"><button aria-expanded="false">Is it really free?</button><div class="ans"><div>Yes, and MIT licensed. There is no account and no subscription. If you use a hosted picker you pay that provider directly, about two cents per hour of video with the recommended model.</div></div></div></div>
       <div class="qcard c1" style="--i:3"><span class="tab">Quality</span><div class="sheet"><button aria-expanded="false">How good are the picks?</button><div class="ans"><div>On five public podcasts, two of the recommended model's top five picks matched clips an editor marked, on average. Every pick comes with its reasons, so you can judge it in seconds. The test set is still awaiting human review.</div></div></div></div>
-      <div class="qcard c2" style="--i:4"><span class="tab">Opening</span><div class="sheet"><button aria-expanded="false">macOS says it can't open the app. What now?</button><div class="ans"><div>The app isn't notarized by Apple yet, so macOS blocks the first launch. Open System Settings, go to Privacy &amp; Security, and click Open Anyway next to choco.video. You only do this once.</div></div></div></div>
+      <div class="qcard c2" style="--i:4"><span class="tab">Opening</span><div class="sheet"><button aria-expanded="false">macOS says it can't open the app. What now?</button><div class="ans"><div>The app isn't notarized by Apple, so macOS blocks the first launch of a browser download. Open System Settings, go to Privacy &amp; Security, and click Open Anyway next to choco.video. You only do this once. Or install from Terminal, which skips the prompt entirely: <code>curl -fsSL https://chocovideo.vercel.app/install.sh | sh</code></div></div></div></div>
       <div class="qcard c4" style="--i:5"><span class="tab">Output</span><div class="sheet"><button aria-expanded="false">What do I get for each clip?</button><div class="ans"><div>A 1080 by 1920 MP4 with captions burned in and sound at −14 LUFS, a poster frame, SRT and VTT subtitles, and a title, caption and hashtags ready to paste. Square, 4:5 and 16:9 too.</div></div></div></div>
     </div>
   </section>
@@ -466,6 +471,12 @@ button, input { font: inherit; color: inherit; }
 </footer>
 
 <script>
+document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+  const label = b.querySelector("em");
+  try { await navigator.clipboard.writeText(b.dataset.copy); label.textContent = "Copied"; }
+  catch { label.textContent = "Select and copy"; }
+  setTimeout(() => (label.textContent = "Copy"), 1800);
+}));
 (() => {
   const clips = [
     { id: 1, src: "media/clip-1", title: "Art Imitates Life, But You Need a Life", short: "Art imitates life", score: 82, len: "0:31", at: "5:27", show: "Pretty Big Deal", model: "MiniMax M3", reasons: ["Iconic, quotable line about art and life", "Clear lesson with a practical application", "High energy and conviction"], colour: "var(--accent)" },
