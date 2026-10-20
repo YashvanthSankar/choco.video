@@ -242,3 +242,49 @@ fn snapshot_rotated_static() {
 fn snapshot_fit() {
     snapshot("fit_1000", "speech.mp4", 1_000, Layout::Fit, false);
 }
+
+/// A source under a non-ASCII folder, with a full path over Windows' old 260-character limit,
+/// probes, decodes audio and renders into the same folder.
+#[test]
+fn non_ascii_and_long_paths() {
+    let root = tempfile::tempdir().unwrap();
+    let mut dir = root.path().join("vidéo 日本語 ü");
+    while dir.as_os_str().len() < 280 {
+        dir = dir.join("a fairly long folder name for path length");
+    }
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("clip ünïcödé 字幕.mp4");
+    std::fs::copy(media("speech.mp4"), &src).unwrap();
+    assert!(src.as_os_str().len() > 260, "{}", src.display());
+
+    let asset = ingest::probe(&src).unwrap_or_else(|e| panic!("probe: {e}"));
+    let wav = dir.join("speech ü.wav");
+    ingest::extract_audio(&asset, &wav, &|_| {}).unwrap_or_else(|e| panic!("audio: {e}"));
+    assert!(std::fs::metadata(&wav).unwrap().len() > 10_000);
+
+    let v = asset.video.as_ref().unwrap();
+    let plan = render::center_crop_plan((v.display_width, v.display_height), (1080, 1920), 1_000);
+    let spec = RenderSpec {
+        start_ms: 1_000,
+        end_ms: 2_000,
+        size: (1080, 1920),
+        crop: &plan,
+        captions: None,
+        normalize_audio: true,
+        max_fps: 60,
+        video_bitrate: 6_000_000,
+        poster: None,
+    };
+    let out = dir.join("01 ünïcödé clip.mp4");
+    let mut raster = Rasterizer::new();
+    render::render_clip(
+        &asset,
+        &spec,
+        &out,
+        &mut raster,
+        &|_| {},
+        &AtomicBool::new(false),
+    )
+    .unwrap_or_else(|e| panic!("render: {e}"));
+    assert_vertical(&probe_out(&out), 1_000, true);
+}
