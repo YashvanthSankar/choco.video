@@ -47,7 +47,7 @@
 </script>
 
 <div class="wrap">
-  <div class="intro"><span class="eyebrow">NEW PROJECT</span><h1>Find the moments worth sharing.</h1><p>Turn one long recording into polished, ready-to-post clips.</p></div>
+  <div class="intro"><h1>Find the moments worth sharing.</h1><p>Turn one long recording into polished, ready-to-post clips.</p></div>
   <button class="drop" class:hovering class:has={!!file} onclick={pick} aria-label={file ? `Change source file, currently ${name}` : 'Choose a video or audio file'}>
     <span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></span>
     {#if file}
@@ -74,25 +74,24 @@
 <style>
   .wrap { max-width: 850px; margin: 0 auto; padding: 42px 28px 40px; }
   .intro { margin-bottom: 22px; }
-  .eyebrow { display: block; font-size: 10px; font-weight: 750; letter-spacing: .13em; color: var(--accent); margin-bottom: 8px; }
   .intro p { margin-bottom: 0; }
-  .drop { width: 100%; min-height: 166px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; border: 1.5px dashed var(--line); border-radius: 12px; background: var(--panel); text-align: center; padding: 22px; box-shadow: none; }
+  .drop { width: 100%; min-height: 166px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; border: 1.5px dashed var(--hover); border-radius: 12px; background: var(--panel); text-align: center; padding: 22px; }
   .drop:hover, .drop.hovering { border-color: var(--caramel); background: var(--panel-2); }
-  .drop.hovering { box-shadow: 0 0 0 4px rgb(208 138 87 / 15%); }
+  .drop.hovering { background: var(--panel-2); }
   .drop.has { border-style: solid; }
   .drop strong { font-size: 15px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .drop-icon { width: 40px; height: 40px; display: grid; place-items: center; color: var(--accent); background: var(--panel-2); border-radius: 10px; margin-bottom: 6px; }
   .drop-icon svg { width: 22px; height: 22px; }
   .opts { margin-top: 16px; }
-  .section-head { border-bottom: 1px solid var(--line); padding-bottom: 13px; }
+  .section-head { padding-bottom: 4px; }
   .section-head h2, .section-head p { margin-bottom: 0; }
   .optional { font-weight: 400; margin-left: 4px; }
   .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2px 18px; }
   .field-label { display: block; font-size: 12px; font-weight: 600; margin: 14px 0 6px; }
-  .segments { display: flex; width: 100%; padding: 3px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); min-height: 34px; }
+  .segments { display: flex; width: 100%; padding: 3px; border-radius: 8px; background: var(--panel-2); min-height: 34px; }
   .segments button { flex: 1; min-width: 0; min-height: 26px; padding: 3px 7px; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .segments button:hover:not(:disabled) { background: var(--hover); border: 0; }
-  .segments button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / 12%); }
+  .segments button.active { background: var(--hover); color: var(--text); font-weight: 600; }
   .destination { flex-wrap: nowrap; }
   .end { justify-content: space-between; margin-top: 18px; }
   .big { min-width: 132px; min-height: 36px; }

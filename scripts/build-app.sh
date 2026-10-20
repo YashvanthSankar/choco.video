@@ -25,6 +25,10 @@ for lib in avcodec.62 avformat.62 avfilter.11 avutil.60 swresample.6 swscale.9; 
   cp -L "$FF/lib$lib.dylib" "$TAURI/frameworks/lib$lib.dylib"
 done
 
+# Hardened runtime enforces library validation: every loaded dylib must carry the app's Team ID.
+# An ad-hoc signature has no Team ID, so the bundled FFmpeg dylibs would be refused at launch
+# ("different Team IDs"). Enable it only for Developer ID builds, where notarization requires it.
+if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then HARDENED=true; else HARDENED=false; fi
 cat > "$TAURI/tauri.release.conf.json" <<JSON
 {
   "bundle": {
@@ -32,6 +36,7 @@ cat > "$TAURI/tauri.release.conf.json" <<JSON
     "macOS": {
       "minimumSystemVersion": "14.0",
       "signingIdentity": "${APPLE_SIGNING_IDENTITY:--}",
+      "hardenedRuntime": ${HARDENED},
       "frameworks": [
         "frameworks/libavcodec.62.dylib", "frameworks/libavformat.62.dylib", "frameworks/libavfilter.11.dylib",
         "frameworks/libavutil.60.dylib", "frameworks/libswresample.6.dylib", "frameworks/libswscale.9.dylib"
@@ -53,6 +58,13 @@ otool -L "$APP/Contents/MacOS/choco-app" | grep -E "libav|libsw" | sed 's/^/  /'
 # The whole bundle must be sealed (ad-hoc when no Developer ID): an unsealed bundle is reported
 # as "damaged" by Gatekeeper once downloaded, instead of offering right-click > Open.
 codesign --verify --deep --strict "$APP" || { echo "bundle signature does not verify" >&2; exit 1; }
+# Launch smoke test: the app must load its frameworks and stay up. A signature can verify and the
+# app still die in dyld, which is exactly how 0.1.0 shipped broken.
+"$APP/Contents/MacOS/choco-app" >/tmp/choco-smoke.log 2>&1 & PID=$!
+sleep 6
+if ! kill -0 $PID 2>/dev/null; then echo "app exited at launch:" >&2; head -5 /tmp/choco-smoke.log >&2; exit 1; fi
+kill $PID 2>/dev/null; wait $PID 2>/dev/null || true
+echo "launch smoke test passed"
 if otool -l "$APP/Contents/MacOS/choco-app" | grep -A2 LC_RPATH | grep -q "$ROOT"; then
   echo "release binary carries a build-machine rpath" >&2; exit 1
 fi

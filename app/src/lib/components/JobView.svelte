@@ -22,7 +22,7 @@
 </script>
 
 <div class="wrap">
-  <span class="eyebrow">PROCESSING</span><h1>Finding your best clips</h1><p class="source" title={file}>{file.split("/").pop()}</p>
+  <h1>Finding your best clips</h1><p class="source" title={file}>{file.split("/").pop()}</p>
   <div class="card progress-card">
     <div class="progress-head"><strong>Overall progress</strong><span class="small muted tnum">{Math.round(overall)}% · {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')} elapsed</span></div>
     <div class="bar" role="progressbar" aria-label="Overall progress" aria-valuenow={Math.round(overall)} aria-valuemin="0" aria-valuemax="100"><div style={`width:${overall}%`}></div></div>
@@ -40,14 +40,13 @@
 </div>
 <style>
   .wrap { max-width: 670px; margin: 0 auto; padding: 54px 28px; }
-  .eyebrow { font-size: 10px; font-weight: 750; letter-spacing: .13em; color: var(--accent); }
   h1 { margin-top: 8px; }
   .source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 22px; }
   .progress-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 11px; }
   .bar { height: 7px; border-radius: 20px; background: var(--panel-2); overflow: hidden; }
   .bar div { height: 100%; background: var(--caramel); border-radius: inherit; transition: width .3s ease; }
   .stages { margin: 22px 0 0; padding: 0; list-style: none; }
-  .stage { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; color: var(--muted); border-top: 1px solid var(--line); }
+  .stage { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; color: var(--muted); border-top: 1px solid var(--line); } /* taste-skill-ignore: list rule, app screens keep 1px rules in lists */
   .stage strong { font-weight: 550; }
   .stage.now { color: var(--text); }
   .stage.now strong { font-weight: 700; }

@@ -51,11 +51,11 @@
       </button>
     {/if}
   </div>
-  <div class="meta"><span class="rank">CLIP {String(clip.rank).padStart(2, "0")}</span>
-    <div class="row top"><span class="pill score">{c.score} score</span><span class="small muted tnum">{fmtTime(c.start_ms)}–{fmtTime(c.end_ms)} · {Math.round((c.end_ms - c.start_ms) / 1000)}s</span></div>
+  <div class="meta">
+    <div class="row top"><span class="score tnum"><b>{c.score}</b> score · #{clip.rank}</span><span class="small muted tnum">{fmtTime(c.start_ms)}–{fmtTime(c.end_ms)} · {Math.round((c.end_ms - c.start_ms) / 1000)}s</span></div>
     <h3>{c.title}</h3>
     <p class="small">{c.description}</p>
-    {#if c.reasons.length}<p class="small reasons">{c.reasons.join(" · ")}</p>{/if}
+    {#if c.reasons.length}<p class="small reasons">Why: {c.reasons[0]}</p>{/if}
     <div class="row actions">
       <button onclick={() => revealItemInDir(clip.mp4)}>Show in Finder</button>
       <button onclick={copyCaption}>{copied ? "Copied" : "Copy caption"}</button>
@@ -82,14 +82,14 @@
   .play svg { width: 42px; height: 42px; padding: 11px; background: var(--play-control); border-radius: 50%; }
   .poster:hover .play { background: var(--play-scrim-hover); }
   .meta { padding: 15px; display: flex; flex-direction: column; flex: 1; }
-  .rank { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .12em; margin-bottom: 8px; }
   .top { gap: 8px; justify-content: space-between; margin-bottom: 9px; }
   .top .small { white-space: nowrap; }
-  .score { background: var(--panel-2); color: var(--text); border-color: var(--line); }
+  .score { font-size: 13px; color: var(--muted); }
+  .score b { color: var(--data); font-weight: 600; font-size: 15px; }
   h3 { font-size: 14px; line-height: 1.3; margin-bottom: 5px; }
   p { margin-bottom: 9px; }
-  .reasons { display: none; }
-  .actions { flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+  .reasons { color: var(--meta); }
+  .actions { flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 8px; }
   .actions button { padding: 5px 7px; min-height: 29px; font-size: 11px; }
   .edit { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 11px; }
   .edit select { padding: 6px; font-size: 12px; }

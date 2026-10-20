@@ -162,12 +162,12 @@
   .hint { margin: 10px 2px 0; }
   .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
   .options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 18px 0; }
-  .option { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-height: 132px; text-align: left; padding: 15px; border-radius: 10px; background: var(--panel); box-shadow: none; }
+  .option { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-height: 132px; text-align: left; padding: 15px; border-radius: 10px; background: var(--panel);  }
   .option strong { font-size: 13px; }
   .option .pill { margin-top: -2px; }
-  .option.selected { border-color: var(--caramel); box-shadow: 0 0 0 1px var(--caramel) inset; background: var(--panel-2); }
+  .option.selected { background: var(--hover); outline: 2px solid var(--text); outline-offset: -2px; }
   .option:disabled { opacity: .65; }
-  .setup { margin-top: 4px; box-shadow: none; }
+  .setup { margin-top: 4px; }
   .setup p { margin-top: 10px; }
   .models { align-items: flex-end; margin-bottom: 12px; }
   .msg { margin-top: 10px; }

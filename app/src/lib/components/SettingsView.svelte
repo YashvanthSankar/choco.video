@@ -82,7 +82,7 @@
   .wrap { max-width: 870px; margin: 0 auto; padding: 38px 28px 48px; }
   .head { margin-bottom: 28px; }
   .head p { margin: 0; }
-  h2 { border-top: 1px solid var(--line); padding-top: 23px; margin-bottom: 13px; }
+  h2 { padding-top: 28px; margin-bottom: 13px; }
   .sp { margin-top: 28px; }
   .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 14px; }
   .wide { grid-column: 1 / -1; }

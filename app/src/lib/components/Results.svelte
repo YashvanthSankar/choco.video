@@ -5,17 +5,30 @@
 
   let { run = $bindable(), styles, presets, onNew }: { run: RunResult; styles: string[]; presets: string[]; onNew: () => void } = $props();
   const name = $derived(run.source.path.split("/").pop());
+  const dur = $derived(Math.max(1, run.source.duration_ms));
+  const pct = (ms: number) => `${Math.min(100, (ms / dur) * 100)}%`;
+  const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 </script>
 
 <div class="wrap">
   <div class="row head">
     <div class="grow">
-      <span class="eyebrow">YOUR CLIPS</span><h1>{run.clips.length} {run.clips.length === 1 ? "clip" : "clips"} from {name}</h1>
-      <p class="small">{run.picker.windows} moments considered · {run.picker.shortlisted} read by the picker · {run.picker.model_calls} model calls</p>
+      <h1>{run.clips.length} {run.clips.length === 1 ? "clip" : "clips"} ready</h1>
+      <p class="small">From {name}: {run.picker.windows.toLocaleString()} moments considered, {run.picker.shortlisted} read by the picker, {run.picker.model_calls} model calls</p>
     </div>
     <button onclick={() => revealItemInDir(run.summary_path)}>Open folder</button>
     <button class="primary" onclick={onNew}>New video</button>
   </div>
+  {#if run.clips.length}
+    <figure class="episode" aria-label="Where each clip sits in the episode">
+      <div class="track">
+        {#each run.clips as cl (cl.rank)}
+          <span class="seg" style:left={pct(cl.candidate.start_ms)} style:width={`max(6px, ${pct(cl.candidate.end_ms - cl.candidate.start_ms)})`} title={`${cl.rank}. ${cl.candidate.title}`}><b>{cl.rank}</b></span>
+        {/each}
+      </div>
+      <figcaption class="ticks tnum"><span>0:00</span><span>{mmss(dur)}</span></figcaption>
+    </figure>
+  {/if}
   {#if run.picker.errors.length}
     <p class="small muted">Notes: {run.picker.errors.slice(0, 3).join(" · ")}</p>
   {/if}
@@ -30,9 +43,12 @@
 <style>
   .wrap { max-width: 1220px; margin: 0 auto; padding: 38px 28px 48px; }
   .head { align-items: flex-start; margin-bottom: 24px; }
-  .head h1 { margin-top: 7px; overflow-wrap: anywhere; }
+  .head h1 { overflow-wrap: anywhere; }
   .head p { margin: 0; }
-  .eyebrow { font-size: 10px; font-weight: 750; letter-spacing: .13em; color: var(--accent); }
+  .episode { margin: 0 0 28px; }
+  .track { position: relative; height: 40px; border-radius: 8px; background: var(--panel); }
+  .seg { position: absolute; top: 6px; bottom: 6px; border-radius: 4px; background: var(--data); color: var(--invert-ink); display: grid; place-items: center; font-size: 12px; font-weight: 600; min-width: 18px; }
+  .ticks { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--meta); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 15px; }
   .empty { text-align: center; padding: 52px 22px; }
   @media (max-width: 680px) { .wrap { padding: 26px 18px; } .head { flex-wrap: wrap; } }

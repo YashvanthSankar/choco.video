@@ -72,7 +72,7 @@
 </script>
 
 <header class="bar drag" data-tauri-drag-region>
-  <span class="brand" data-tauri-drag-region><span class="mark" aria-hidden="true">c</span><span class="word">choco<span class="dot">.</span>video</span></span>
+  <span class="brand" data-tauri-drag-region><span class="word">choco<span class="dot">.</span>video</span></span>
   {#if status && view !== "onboarding" && view !== "loading"}
     <nav class="nodrag">
       {#if view === "results"}<button class="ghost" onclick={() => (view = "home")}>New video</button>{/if}
@@ -100,10 +100,9 @@
 </main>
 
 <style>
-  .bar { position: sticky; top: 0; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px 0 84px; background: var(--panel); z-index: 10; border-bottom: 1px solid var(--line); }
-  .brand { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 13px; letter-spacing: -.025em; user-select: none; }
-  .mark { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 3px; border-radius: 6px; background: var(--chocolate); color: var(--cream); font-size: 15px; font-weight: 750; line-height: 1; }
-  .dot { color: var(--caramel); }
+  .bar { position: sticky; top: 0; height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px 0 84px; background: var(--bg); z-index: 10; }
+  .brand { display: inline-flex; align-items: center; font-weight: 700; font-size: 15px; letter-spacing: -.03em; user-select: none; }
+  .dot { color: var(--data); }
   nav { display: flex; gap: 4px; }
   nav button { font-size: 12px; }
   main { min-height: calc(100vh - 52px); }
