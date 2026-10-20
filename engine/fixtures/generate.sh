@@ -19,8 +19,10 @@ say -v Samantha -o "$T/a.aiff" "$SCRIPT"
 D=$( ("$FF" -hide_banner -i "$T/a.aiff" 2>&1 || true) | sed -n 's/.*Duration: \([0-9:.]*\).*/\1/p')
 
 # 1. Landscape talk with speech: the standard case.
+# Cut every stream to the speech length explicitly: newer FFmpeg's -shortest leaves the video
+# track ~1.7 s longer than the audio, so the container no longer matches the speech.
 "$FF" -y -hide_banner -loglevel error -f lavfi -i "testsrc2=size=1920x1080:rate=30" -i "$T/a.aiff" \
-  -shortest -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac -b:a 128k media/speech.mp4
+  -t "$D" -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac -b:a 128k media/speech.mp4
 
 # 2. Phone footage: coded landscape, displayed portrait via a 90-degree display matrix.
 "$FF" -y -hide_banner -loglevel error -display_rotation 90 -i media/speech.mp4 -c copy media/rotated.mp4
@@ -36,8 +38,9 @@ say -v Samantha -o "$T/s3.aiff" "And when did it become a business?"
 say -v Daniel   -o "$T/s4.aiff" "The day someone offered to pay me for it."
 "$FF" -y -hide_banner -loglevel error -i "$T/s1.aiff" -i "$T/s2.aiff" -i "$T/s3.aiff" -i "$T/s4.aiff" \
   -filter_complex "[0][1][2][3]concat=n=4:v=0:a=1" "$T/two.wav"
+D2=$( ("$FF" -hide_banner -i "$T/two.wav" 2>&1 || true) | sed -n 's/.*Duration: \([0-9:.]*\).*/\1/p')
 "$FF" -y -hide_banner -loglevel error -f lavfi -i "smptebars=size=1920x1080:rate=30" -i "$T/two.wav" \
-  -shortest -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac media/two-voices.mp4
+  -t "$D2" -c:v libx264 -pix_fmt yuv420p -preset veryfast -c:a aac media/two-voices.mp4
 
 # 5. Audio only, stereo 44.1 kHz, to exercise downmix and resample.
 "$FF" -y -hide_banner -loglevel error -i "$T/a.aiff" -ac 2 -ar 44100 -c:a aac media/audio-only.m4a
