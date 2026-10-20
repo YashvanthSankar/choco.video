@@ -1,7 +1,7 @@
 //! Ingest: probe a source file, extract speech-ready audio, take thumbnails.
 
-use crate::model::{AudioStream, MediaAsset, Progress, VideoStream};
 use crate::ProgressFn;
+use crate::model::{AudioStream, MediaAsset, Progress, VideoStream};
 use ffmpeg_next as ff;
 use std::fs::File;
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
@@ -32,8 +32,15 @@ pub type Result<T> = std::result::Result<T, IngestError>;
 /// Read container and stream metadata. Does not decode.
 pub fn probe(path: &Path) -> Result<MediaAsset> {
     crate::init();
-    let ictx = ff::format::input(path).map_err(|source| IngestError::Open { path: path.into(), source })?;
-    let duration_ms = if ictx.duration() > 0 { (ictx.duration() as i128 * 1000 / ff::ffi::AV_TIME_BASE as i128) as u64 } else { 0 };
+    let ictx = ff::format::input(path).map_err(|source| IngestError::Open {
+        path: path.into(),
+        source,
+    })?;
+    let duration_ms = if ictx.duration() > 0 {
+        (ictx.duration() as i128 * 1000 / ff::ffi::AV_TIME_BASE as i128) as u64
+    } else {
+        0
+    };
 
     let video = match ictx.streams().best(ff::media::Type::Video) {
         Some(s) => {
@@ -73,9 +80,17 @@ pub fn probe(path: &Path) -> Result<MediaAsset> {
             // SAFETY: codecpar is valid for the lifetime of the stream.
             let (rate, channels) = unsafe {
                 let par = (*s.as_ptr()).codecpar;
-                ((*par).sample_rate.max(0) as u32, (*par).ch_layout.nb_channels.max(0) as u16)
+                (
+                    (*par).sample_rate.max(0) as u32,
+                    (*par).ch_layout.nb_channels.max(0) as u16,
+                )
             };
-            Some(AudioStream { index: s.index(), codec: codec_name(s.parameters().id()), sample_rate: rate, channels })
+            Some(AudioStream {
+                index: s.index(),
+                codec: codec_name(s.parameters().id()),
+                sample_rate: rate,
+                channels,
+            })
         }
         None => None,
     };
@@ -151,18 +166,27 @@ fn read_up_to(f: &mut File, buf: &mut [u8]) -> std::io::Result<usize> {
 /// Returns the number of samples written.
 pub fn extract_audio(asset: &MediaAsset, out: &Path, progress: ProgressFn) -> Result<u64> {
     crate::init();
-    let mut ictx = ff::format::input(&asset.path).map_err(|source| IngestError::Open { path: asset.path.clone(), source })?;
-    let stream = ictx
-        .streams()
-        .best(ff::media::Type::Audio)
-        .ok_or_else(|| IngestError::NoStream { path: asset.path.clone(), kind: "audio" })?;
+    let mut ictx = ff::format::input(&asset.path).map_err(|source| IngestError::Open {
+        path: asset.path.clone(),
+        source,
+    })?;
+    let stream =
+        ictx.streams()
+            .best(ff::media::Type::Audio)
+            .ok_or_else(|| IngestError::NoStream {
+                path: asset.path.clone(),
+                kind: "audio",
+            })?;
     let index = stream.index();
     let time_base = stream.time_base();
     let ctx = ff::codec::context::Context::from_parameters(stream.parameters())?;
     let mut decoder = ctx
         .decoder()
         .audio()
-        .map_err(|_| IngestError::Unsupported { codec: codec_name(stream.parameters().id()), kind: "audio" })?;
+        .map_err(|_| IngestError::Unsupported {
+            codec: codec_name(stream.parameters().id()),
+            kind: "audio",
+        })?;
     if decoder.channel_layout().is_empty() {
         decoder.set_channel_layout(ff::ChannelLayout::default(decoder.channels() as i32));
     }
@@ -202,7 +226,11 @@ pub fn extract_audio(asset: &MediaAsset, out: &Path, progress: ProgressFn) -> Re
                 && last_report.elapsed().as_millis() >= 500
             {
                 let ms = (pts as f64 * f64::from(time_base) * 1000.0) as u64;
-                progress(Progress::new(STAGE, (ms as f32 / duration as f32).min(1.0), "extracting audio"));
+                progress(Progress::new(
+                    STAGE,
+                    (ms as f32 / duration as f32).min(1.0),
+                    "extracting audio",
+                ));
                 last_report = std::time::Instant::now();
             }
         }
@@ -244,7 +272,11 @@ impl WavF32Writer {
     fn create(path: &Path, rate: u32) -> std::io::Result<Self> {
         let mut file = BufWriter::new(File::create(path)?);
         file.write_all(&[0u8; 44])?;
-        Ok(Self { file, samples: 0, rate })
+        Ok(Self {
+            file,
+            samples: 0,
+            rate,
+        })
     }
 
     fn write_frame(&mut self, f: &ff::frame::Audio) -> std::io::Result<()> {
@@ -286,7 +318,10 @@ impl WavF32Writer {
 pub fn read_wav_f32(path: &Path) -> std::io::Result<Vec<f32>> {
     let bytes = std::fs::read(path)?;
     if bytes.len() < 44 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "not a WAV file"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "not a WAV file",
+        ));
     }
     // Walk chunks to find "data"; our writer puts it at 36 but be tolerant.
     let mut pos = 12;
@@ -295,25 +330,47 @@ pub fn read_wav_f32(path: &Path) -> std::io::Result<Vec<f32>> {
         let len = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().unwrap()) as usize;
         if id == b"data" {
             let data = &bytes[pos + 8..(pos + 8 + len).min(bytes.len())];
-            return Ok(data.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect());
+            return Ok(data
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|c| f32::from_le_bytes(*c))
+                .collect());
         }
         pos += 8 + len + (len & 1);
     }
-    Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "WAV has no data chunk"))
+    Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "WAV has no data chunk",
+    ))
 }
 
 /// Decode the video frame nearest to `t_ms`, apply display rotation, scale to `max_width`, write PNG.
 pub fn thumbnail(asset: &MediaAsset, t_ms: u64, max_width: u32, out: &Path) -> Result<()> {
     crate::init();
-    let vinfo = asset.video.as_ref().ok_or_else(|| IngestError::NoStream { path: asset.path.clone(), kind: "video" })?;
-    let mut ictx = ff::format::input(&asset.path).map_err(|source| IngestError::Open { path: asset.path.clone(), source })?;
-    let stream = ictx.stream(vinfo.index).ok_or_else(|| IngestError::NoStream { path: asset.path.clone(), kind: "video" })?;
+    let vinfo = asset.video.as_ref().ok_or_else(|| IngestError::NoStream {
+        path: asset.path.clone(),
+        kind: "video",
+    })?;
+    let mut ictx = ff::format::input(&asset.path).map_err(|source| IngestError::Open {
+        path: asset.path.clone(),
+        source,
+    })?;
+    let stream = ictx
+        .stream(vinfo.index)
+        .ok_or_else(|| IngestError::NoStream {
+            path: asset.path.clone(),
+            kind: "video",
+        })?;
     let time_base = stream.time_base();
     let ctx = ff::codec::context::Context::from_parameters(stream.parameters())?;
     let mut decoder = ctx
         .decoder()
         .video()
-        .map_err(|_| IngestError::Unsupported { codec: codec_name(stream.parameters().id()), kind: "video" })?;
+        .map_err(|_| IngestError::Unsupported {
+            codec: codec_name(stream.parameters().id()),
+            kind: "video",
+        })?;
 
     let target_ts = (t_ms as i64) * ff::ffi::AV_TIME_BASE as i64 / 1000;
     let _ = ictx.seek(target_ts, ..target_ts);
@@ -340,7 +397,10 @@ pub fn thumbnail(asset: &MediaAsset, t_ms: u64, max_width: u32, out: &Path) -> R
             got = Some(decoded.clone());
         }
     }
-    let frame = got.ok_or_else(|| IngestError::NoStream { path: asset.path.clone(), kind: "decodable video" })?;
+    let frame = got.ok_or_else(|| IngestError::NoStream {
+        path: asset.path.clone(),
+        kind: "decodable video",
+    })?;
 
     let (sw, sh) = (frame.width(), frame.height());
     let rotated = vinfo.rotation_deg % 180 == 90;
@@ -348,9 +408,19 @@ pub fn thumbnail(asset: &MediaAsset, t_ms: u64, max_width: u32, out: &Path) -> R
     let out_w = disp_w.min(max_width).max(2) & !1;
     let out_h = ((disp_h as u64 * out_w as u64 / disp_w as u64) as u32).max(2) & !1;
     // Scale in source orientation, then rotate pixels.
-    let (scale_w, scale_h) = if rotated { (out_h, out_w) } else { (out_w, out_h) };
+    let (scale_w, scale_h) = if rotated {
+        (out_h, out_w)
+    } else {
+        (out_w, out_h)
+    };
     let mut scaler = ff::software::scaling::Context::get(
-        frame.format(), sw, sh, ff::format::Pixel::RGB24, scale_w, scale_h, ff::software::scaling::Flags::BILINEAR,
+        frame.format(),
+        sw,
+        sh,
+        ff::format::Pixel::RGB24,
+        scale_w,
+        scale_h,
+        ff::software::scaling::Flags::BILINEAR,
     )?;
     let mut rgb = ff::frame::Video::empty();
     scaler.run(&frame, &mut rgb)?;

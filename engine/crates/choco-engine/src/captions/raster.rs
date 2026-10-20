@@ -2,7 +2,10 @@
 //! machine and OS. Output is a premultiplied RGBA sprite placed in frame coordinates.
 
 use crate::model::{CaptionChunk, CaptionStyle};
-use cosmic_text::{Align, Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap, fontdb};
+use cosmic_text::{
+    Align, Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, SwashCache, Weight, Wrap,
+    fontdb,
+};
 
 const FONTS: &[&[u8]] = &[
     include_bytes!("../../assets/fonts/Inter-SemiBold.ttf"),
@@ -45,7 +48,11 @@ pub fn parse_color(s: &str) -> [u8; 4] {
 }
 
 fn case(s: &str, style: &CaptionStyle) -> String {
-    if style.uppercase { s.to_uppercase() } else { s.to_string() }
+    if style.uppercase {
+        s.to_uppercase()
+    } else {
+        s.to_string()
+    }
 }
 
 /// Source-over blend of a solid colour with `coverage` (0..255) into a premultiplied pixel.
@@ -67,7 +74,10 @@ impl Rasterizer {
         for f in FONTS {
             db.load_font_data(f.to_vec());
         }
-        Self { fs: FontSystem::new_with_locale_and_db("en-US".into(), db), cache: SwashCache::new() }
+        Self {
+            fs: FontSystem::new_with_locale_and_db("en-US".into(), db),
+            cache: SwashCache::new(),
+        }
     }
 
     fn px(style: &CaptionStyle, frame_h: u32) -> f32 {
@@ -75,7 +85,9 @@ impl Rasterizer {
     }
 
     fn attrs(style: &CaptionStyle) -> Attrs<'_> {
-        Attrs::new().family(Family::Name(&style.font_family)).weight(Weight(style.font_weight))
+        Attrs::new()
+            .family(Family::Name(&style.font_family))
+            .weight(Weight(style.font_weight))
     }
 
     /// Width in pixels of `text` on one line in `style` (active-word scaling included).
@@ -84,7 +96,12 @@ impl Rasterizer {
         let mut b = Buffer::new(&mut self.fs, Metrics::new(px, px * 1.15));
         b.set_wrap(Wrap::None);
         b.set_size(None, None);
-        b.set_text(&case(text, style), &Self::attrs(style), Shaping::Advanced, None);
+        b.set_text(
+            &case(text, style),
+            &Self::attrs(style),
+            Shaping::Advanced,
+            None,
+        );
         b.shape_until_scroll(&mut self.fs, false);
         let w = b.layout_runs().map(|r| r.line_w).fold(0.0, f32::max);
         // Leave room for the active word growing.
@@ -92,7 +109,14 @@ impl Rasterizer {
     }
 
     /// Rasterize `chunk` with `active` highlighted (per the style's highlight mode).
-    pub fn render(&mut self, chunk: &CaptionChunk, active: Option<usize>, style: &CaptionStyle, frame_w: u32, frame_h: u32) -> Sprite {
+    pub fn render(
+        &mut self,
+        chunk: &CaptionChunk,
+        active: Option<usize>,
+        style: &CaptionStyle,
+        frame_w: u32,
+        frame_h: u32,
+    ) -> Sprite {
         let px = Self::px(style, frame_h);
         let max_w = frame_w as f32 * 0.86;
         let fill = parse_color(&style.fill);
@@ -104,7 +128,11 @@ impl Rasterizer {
         };
 
         let base = Self::attrs(style).color(Color::rgba(fill[0], fill[1], fill[2], fill[3]));
-        let words: Vec<String> = chunk.words.iter().map(|w| case(w.text.trim(), style)).collect();
+        let words: Vec<String> = chunk
+            .words
+            .iter()
+            .map(|w| case(w.text.trim(), style))
+            .collect();
         let mut spans: Vec<(&str, Attrs)> = Vec::new();
         for (i, w) in words.iter().enumerate() {
             let mut a = base.clone().metadata(i + 1);
@@ -137,19 +165,42 @@ impl Rasterizer {
                 x0 = x0.min(g.x);
                 x1 = x1.max(g.x + g.w);
                 if active.is_some_and(|a| g.metadata == a + 1) {
-                    let b = word_box.get_or_insert((g.x, run.line_top, g.x + g.w, run.line_top + run.line_height));
+                    let b = word_box.get_or_insert((
+                        g.x,
+                        run.line_top,
+                        g.x + g.w,
+                        run.line_top + run.line_height,
+                    ));
                     b.0 = b.0.min(g.x);
                     b.2 = b.2.max(g.x + g.w);
                 }
             }
         }
         if x0 > x1 {
-            return Sprite { x: 0, y: 0, w: 0, h: 0, rgba: vec![] };
+            return Sprite {
+                x: 0,
+                y: 0,
+                w: 0,
+                h: 0,
+                rgba: vec![],
+            };
         }
 
-        let stroke_r = if style.stroke.is_some() { (px * 0.09).ceil() } else { 0.0 };
-        let shadow_d = if style.shadow { (px * 0.06).ceil() } else { 0.0 };
-        let pill_pad = if style.active_pill.is_some() { (px * 0.22).ceil() } else { 0.0 };
+        let stroke_r = if style.stroke.is_some() {
+            (px * 0.09).ceil()
+        } else {
+            0.0
+        };
+        let shadow_d = if style.shadow {
+            (px * 0.06).ceil()
+        } else {
+            0.0
+        };
+        let pill_pad = if style.active_pill.is_some() {
+            (px * 0.22).ceil()
+        } else {
+            0.0
+        };
         let pad = stroke_r + shadow_d + pill_pad + 2.0;
         let w = (x1 - x0 + 2.0 * pad).ceil() as u32;
         let h = (y1 + 2.0 * pad).ceil() as u32;
@@ -165,7 +216,12 @@ impl Rasterizer {
             };
             if let Some((a, b, c, d)) = rect {
                 let r = px * 0.25;
-                let (rx0, ry0, rx1, ry1) = (a + ox - pill_pad, b + oy - pill_pad * 0.4, c + ox + pill_pad, d + oy + pill_pad * 0.4);
+                let (rx0, ry0, rx1, ry1) = (
+                    a + ox - pill_pad,
+                    b + oy - pill_pad * 0.4,
+                    c + ox + pill_pad,
+                    d + oy + pill_pad * 0.4,
+                );
                 for y in ry0.max(0.0) as u32..(ry1.ceil() as u32).min(h) {
                     for x in rx0.max(0.0) as u32..(rx1.ceil() as u32).min(w) {
                         let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
@@ -173,38 +229,66 @@ impl Rasterizer {
                         let dy = (ry0 + r - fy).max(fy - (ry1 - r)).max(0.0);
                         let cov = (r - (dx * dx + dy * dy).sqrt() + 0.5).clamp(0.0, 1.0);
                         let i = ((y * w + x) * 4) as usize;
-                        blend(&mut canvas[i..i + 4], [pc[0], pc[1], pc[2]], (cov * pc[3] as f32) as u32);
+                        blend(
+                            &mut canvas[i..i + 4],
+                            [pc[0], pc[1], pc[2]],
+                            (cov * pc[3] as f32) as u32,
+                        );
                     }
                 }
             }
         }
 
-        let mut pass = |canvas: &mut Vec<u8>, dx: f32, dy: f32, solid: Option<[u8; 4]>, fs: &mut FontSystem, cache: &mut SwashCache| {
-            buf.draw(fs, cache, Color::rgba(fill[0], fill[1], fill[2], fill[3]), |x, y, gw, gh, c| {
-                let (rgb, a) = match solid {
-                    Some(s) => ([s[0], s[1], s[2]], c.a() as u32 * s[3] as u32 / 255),
-                    None => ([c.r(), c.g(), c.b()], c.a() as u32),
-                };
-                for yy in 0..gh as i32 {
-                    for xx in 0..gw as i32 {
-                        let px_ = (x + xx) as f32 + ox + dx;
-                        let py_ = (y + yy) as f32 + oy + dy;
-                        if px_ < 0.0 || py_ < 0.0 || px_ >= w as f32 || py_ >= h as f32 {
-                            continue;
+        let mut pass = |canvas: &mut Vec<u8>,
+                        dx: f32,
+                        dy: f32,
+                        solid: Option<[u8; 4]>,
+                        fs: &mut FontSystem,
+                        cache: &mut SwashCache| {
+            buf.draw(
+                fs,
+                cache,
+                Color::rgba(fill[0], fill[1], fill[2], fill[3]),
+                |x, y, gw, gh, c| {
+                    let (rgb, a) = match solid {
+                        Some(s) => ([s[0], s[1], s[2]], c.a() as u32 * s[3] as u32 / 255),
+                        None => ([c.r(), c.g(), c.b()], c.a() as u32),
+                    };
+                    for yy in 0..gh as i32 {
+                        for xx in 0..gw as i32 {
+                            let px_ = (x + xx) as f32 + ox + dx;
+                            let py_ = (y + yy) as f32 + oy + dy;
+                            if px_ < 0.0 || py_ < 0.0 || px_ >= w as f32 || py_ >= h as f32 {
+                                continue;
+                            }
+                            let i = ((py_ as u32 * w + px_ as u32) * 4) as usize;
+                            blend(&mut canvas[i..i + 4], rgb, a);
                         }
-                        let i = ((py_ as u32 * w + px_ as u32) * 4) as usize;
-                        blend(&mut canvas[i..i + 4], rgb, a);
                     }
-                }
-            });
+                },
+            );
         };
         if style.shadow {
-            pass(&mut canvas, shadow_d * 0.5, shadow_d, Some([0, 0, 0, 150]), &mut self.fs, &mut self.cache);
+            pass(
+                &mut canvas,
+                shadow_d * 0.5,
+                shadow_d,
+                Some([0, 0, 0, 150]),
+                &mut self.fs,
+                &mut self.cache,
+            );
         }
         if let Some(sc) = style.stroke.as_deref().map(parse_color) {
             for k in 0..16 {
                 let t = k as f32 * std::f32::consts::TAU / 16.0;
-                pass(&mut canvas, (stroke_r * t.cos()).round(), (stroke_r * t.sin()).round(), Some(sc), &mut self.fs, &mut self.cache);
+                pass(
+                    &mut canvas,
+                    (stroke_r * t.cos()).round(),
+                    (stroke_r * t.sin()).round(),
+                    Some(sc),
+                    &mut self.fs,
+                    &mut self.cache,
+                );
             }
         }
         pass(&mut canvas, 0.0, 0.0, None, &mut self.fs, &mut self.cache);
@@ -230,12 +314,26 @@ mod tests {
         CaptionChunk {
             start_ms: 0,
             end_ms: 1000,
-            words: words.iter().enumerate().map(|(i, t)| Word { start_ms: i as u64 * 200, end_ms: i as u64 * 200 + 180, text: t.to_string(), confidence: 1.0 }).collect(),
+            words: words
+                .iter()
+                .enumerate()
+                .map(|(i, t)| Word {
+                    start_ms: i as u64 * 200,
+                    end_ms: i as u64 * 200 + 180,
+                    text: t.to_string(),
+                    confidence: 1.0,
+                })
+                .collect(),
         }
     }
 
     fn colored(s: &Sprite, rgb: [u8; 3]) -> usize {
-        s.rgba.as_chunks::<4>().0.iter().filter(|p| p[3] > 200 && (0..3).all(|c| (p[c] as i32 - rgb[c] as i32).abs() < 40)).count()
+        s.rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[3] > 200 && (0..3).all(|c| (p[c] as i32 - rgb[c] as i32).abs() < 40))
+            .count()
     }
 
     #[test]
@@ -262,14 +360,28 @@ mod tests {
         let a = r.render(&chunk(&["one", "two"]), Some(0), &st, 1080, 1920);
         let b = r.render(&chunk(&["one", "two"]), Some(1), &st, 1080, 1920);
         assert_ne!(a.rgba, b.rgba);
-        assert!(r.measure("abc", &st, 1920) > r.measure("abc", &preset("clean").unwrap(), 1920) * 0.9);
+        assert!(
+            r.measure("abc", &st, 1920) > r.measure("abc", &preset("clean").unwrap(), 1920) * 0.9
+        );
     }
 
     #[test]
     fn minimal_style_draws_a_background_box() {
         let mut r = Rasterizer::new();
-        let s = r.render(&chunk(&["quiet", "words"]), None, &preset("minimal").unwrap(), 1080, 1920);
-        let translucent = s.rgba.as_chunks::<4>().0.iter().filter(|p| p[3] > 120 && p[3] < 220).count();
+        let s = r.render(
+            &chunk(&["quiet", "words"]),
+            None,
+            &preset("minimal").unwrap(),
+            1080,
+            1920,
+        );
+        let translucent = s
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[3] > 120 && p[3] < 220)
+            .count();
         assert!(translucent > 1000, "{translucent}");
     }
 

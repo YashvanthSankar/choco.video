@@ -80,7 +80,7 @@ Groundwork already in the repo: `backend/windows.rs` stub (CPU whisper, Media Fo
 ### Engine prep (platform-neutral, done and verified on the Mac first)
 
 - [ ] Whisper loop recovery: re-decode windows that `cleanup` collapsed, with temperature fallback (or VAD-split input). Windows has no other speech engine → on the 72-min podcast whisper keeps ≥ 97% of Apple's word count (today 89%), wall time ≤ +15%
-- [ ] Encoder choice leaves `render/`: `RenderSpec` carries the backend's ordered `hw_encoders()`; a table maps `HwCodec` → FFmpeg encoder name, input pixel format, options; the first that opens wins and `RenderReport.video_encoder` names it → Mac output unchanged (same encoder, same options), 7 render tests + 3 snapshots green
+- [x] Encoder choice leaves `render/` (`render/encoders.rs`: ordered candidates from `Backend::hw_encoders()`, Media Foundation hardware then software, `CHOCO_ENCODERS` override for CI; Mac output byte-identical, 10 render tests green). Original plan: `RenderSpec` carries the backend's ordered `hw_encoders()`; a table maps `HwCodec` → FFmpeg encoder name, input pixel format, options; the first that opens wins and `RenderReport.video_encoder` names it → Mac output unchanged (same encoder, same options), 7 render tests + 3 snapshots green
 - [ ] NV12 output from the compositor for encoders without planar input (`h264_qsv`) → unit test: NV12 ⇄ YUV420P round-trip is exact
 - [x] Target-safe Cargo features: whisper-rs `metal` moves to a macOS-only dependency table, `vulkan` stays an explicit feature; plain `cargo build --all` works on both OSes → `cargo tree -e features` for the Mac default build unchanged
 - [x] `-Wl,-rpath` link args in the four `build.rs` files emitted for macOS only (MSVC `link.exe` does not take them)

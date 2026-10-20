@@ -86,14 +86,28 @@ pub fn score_fixture(id: &str, picks: &[Candidate], golden: &[GoldenClip]) -> Fi
     let precision_at_5 = found as f32 / 5.0;
     let matched: Vec<f32> = g
         .iter()
-        .filter_map(|&y| top10.iter().filter(|&&x| hits(x, y)).map(|&x| iou(x, y)).reduce(f32::max))
+        .filter_map(|&y| {
+            top10
+                .iter()
+                .filter(|&&x| hits(x, y))
+                .map(|&x| iou(x, y))
+                .reduce(f32::max)
+        })
         .collect();
     FixtureScore {
         id: id.to_string(),
         picks: p.len(),
         precision_at_5,
-        recall_at_10: if g.is_empty() { 0.0 } else { matched.len() as f32 / g.len() as f32 },
-        mean_iou: if matched.is_empty() { 0.0 } else { matched.iter().sum::<f32>() / matched.len() as f32 },
+        recall_at_10: if g.is_empty() {
+            0.0
+        } else {
+            matched.len() as f32 / g.len() as f32
+        },
+        mean_iou: if matched.is_empty() {
+            0.0
+        } else {
+            matched.iter().sum::<f32>() / matched.len() as f32
+        },
     }
 }
 
@@ -123,11 +137,19 @@ mod tests {
             title: String::new(),
             description: String::new(),
             hashtags: vec![],
-            provenance: PickerProvenance { tier: "t".into(), model: "m".into(), prompt_hash: "h".into() },
+            provenance: PickerProvenance {
+                tier: "t".into(),
+                model: "m".into(),
+                prompt_hash: "h".into(),
+            },
         }
     }
     fn g(s: u64, e: u64) -> GoldenClip {
-        GoldenClip { start_ms: s, end_ms: e, why: String::new() }
+        GoldenClip {
+            start_ms: s,
+            end_ms: e,
+            why: String::new(),
+        }
     }
 
     #[test]
@@ -140,8 +162,20 @@ mod tests {
 
     #[test]
     fn precision_and_recall() {
-        let picks = vec![c(0, 30_000), c(100_000, 130_000), c(200_000, 230_000), c(300_000, 330_000), c(400_000, 430_000), c(500_000, 530_000)];
-        let gold = vec![g(0, 30_000), g(205_000, 240_000), g(900_000, 930_000), g(500_000, 520_000)];
+        let picks = vec![
+            c(0, 30_000),
+            c(100_000, 130_000),
+            c(200_000, 230_000),
+            c(300_000, 330_000),
+            c(400_000, 430_000),
+            c(500_000, 530_000),
+        ];
+        let gold = vec![
+            g(0, 30_000),
+            g(205_000, 240_000),
+            g(900_000, 930_000),
+            g(500_000, 520_000),
+        ];
         let s = score_fixture("x", &picks, &gold);
         assert!((s.precision_at_5 - 0.4).abs() < 1e-6, "{s:?}"); // 2 of top 5
         assert!((s.recall_at_10 - 0.75).abs() < 1e-6, "{s:?}"); // 3 of 4 golden found in top 10

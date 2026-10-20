@@ -13,7 +13,9 @@ impl CpuBackend {
                 os: std::env::consts::OS.to_string(),
                 os_version: String::new(),
                 arch: std::env::consts::ARCH.to_string(),
-                cpu_cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
+                cpu_cores: std::thread::available_parallelism()
+                    .map(|n| n.get())
+                    .unwrap_or(1),
                 memory_bytes: None,
                 gpu: None,
             },
@@ -26,7 +28,9 @@ impl Backend for CpuBackend {
         self.info.clone()
     }
     fn speech_engines(&self) -> Vec<SpeechEngine> {
-        vec![SpeechEngine::Whisper { device: Device::Cpu }]
+        vec![SpeechEngine::Whisper {
+            device: Device::Cpu,
+        }]
     }
     fn hw_decoders(&self) -> Vec<HwCodec> {
         vec![HwCodec::Software]

@@ -25,10 +25,34 @@ pub struct Recommended {
 /// others spend 5-7x the output tokens reasoning. GLM was not measured (summaries timed out
 /// before the fix, then the test key hit its budget).
 pub const OPENCODE_RECOMMENDED: &[Recommended] = &[
-    Recommended { id: "minimax-m3", label: "MiniMax M3", cents_per_source_hour: 2.0, precision_at_5: 0.44, note: "Cheapest and most accurate; recommended" },
-    Recommended { id: "qwen3.8-flash", label: "Qwen 3.8 Flash", cents_per_source_hour: 2.5, precision_at_5: 0.28, note: "Cheap but weaker picks and slow" },
-    Recommended { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", cents_per_source_hour: 6.0, precision_at_5: 0.32, note: "About 3x the cost for weaker picks" },
-    Recommended { id: "glm-5.3-flash", label: "GLM 5.3 Flash", cents_per_source_hour: 3.0, precision_at_5: 0.0, note: "Not measured yet" },
+    Recommended {
+        id: "minimax-m3",
+        label: "MiniMax M3",
+        cents_per_source_hour: 2.0,
+        precision_at_5: 0.44,
+        note: "Cheapest and most accurate; recommended",
+    },
+    Recommended {
+        id: "qwen3.8-flash",
+        label: "Qwen 3.8 Flash",
+        cents_per_source_hour: 2.5,
+        precision_at_5: 0.28,
+        note: "Cheap but weaker picks and slow",
+    },
+    Recommended {
+        id: "deepseek-v4.1-flash",
+        label: "DeepSeek V4.1 Flash",
+        cents_per_source_hour: 6.0,
+        precision_at_5: 0.32,
+        note: "About 3x the cost for weaker picks",
+    },
+    Recommended {
+        id: "glm-5.3-flash",
+        label: "GLM 5.3 Flash",
+        cents_per_source_hour: 3.0,
+        precision_at_5: 0.0,
+        note: "Not measured yet",
+    },
 ];
 
 #[derive(Debug, Clone)]
@@ -47,17 +71,26 @@ impl OpenAiCompatConfig {
     /// `CHOCO_LLM_SUMMARY_MODEL` and `CHOCO_LLM_CONTEXT_TOKENS`.
     pub fn from_env(tier: &'static str) -> Result<Self> {
         let get = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
-        let api_key = get("CHOCO_LLM_API_KEY").ok_or_else(|| PickerError::NotConfigured("set CHOCO_LLM_API_KEY".into()))?;
-        let score_model = get("CHOCO_LLM_MODEL").ok_or_else(|| PickerError::NotConfigured("set CHOCO_LLM_MODEL".into()))?;
+        let api_key = get("CHOCO_LLM_API_KEY")
+            .ok_or_else(|| PickerError::NotConfigured("set CHOCO_LLM_API_KEY".into()))?;
+        let score_model = get("CHOCO_LLM_MODEL")
+            .ok_or_else(|| PickerError::NotConfigured("set CHOCO_LLM_MODEL".into()))?;
         Ok(Self {
             tier,
             base_url: get("CHOCO_LLM_BASE_URL").unwrap_or_else(|| OPENCODE_ZEN_BASE_URL.into()),
             api_key,
             summarize_model: get("CHOCO_LLM_SUMMARY_MODEL").unwrap_or_else(|| score_model.clone()),
             score_model,
-            context_tokens: get("CHOCO_LLM_CONTEXT_TOKENS").and_then(|v| v.parse().ok()).unwrap_or(64_000).max(4_096),
+            context_tokens: get("CHOCO_LLM_CONTEXT_TOKENS")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(64_000)
+                .max(4_096),
             // Reasoning models can think for minutes on a full-episode summary.
-            timeout: Duration::from_secs(get("CHOCO_LLM_TIMEOUT_SECS").and_then(|v| v.parse().ok()).unwrap_or(420)),
+            timeout: Duration::from_secs(
+                get("CHOCO_LLM_TIMEOUT_SECS")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(420),
+            ),
         })
     }
 }
@@ -78,27 +111,47 @@ impl OpenAiCompat {
             .timeout_global(Some(cfg.timeout))
             .build()
             .into();
-        Self { cfg, agent, json_schema_ok: AtomicBool::new(true), tokens: Default::default() }
+        Self {
+            cfg,
+            agent,
+            json_schema_ok: AtomicBool::new(true),
+            tokens: Default::default(),
+        }
     }
 
     fn post(&self, body: &Value) -> Result<(u16, String)> {
-        let url = format!("{}/chat/completions", self.cfg.base_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/chat/completions",
+            self.cfg.base_url.trim_end_matches('/')
+        );
         let mut resp = self
             .agent
             .post(&url)
             .header("Authorization", &format!("Bearer {}", self.cfg.api_key))
             // OpenCode Zen sits behind Cloudflare, which rejects some default client signatures
             // (error 1010). Always identify ourselves.
-            .header("User-Agent", concat!("choco-video/", env!("CARGO_PKG_VERSION")))
+            .header(
+                "User-Agent",
+                concat!("choco-video/", env!("CARGO_PKG_VERSION")),
+            )
             .header("Content-Type", "application/json")
             .send(body.to_string().as_bytes())
             .map_err(|e| PickerError::Transport(e.to_string()))?;
         let status = resp.status().as_u16();
-        let text = resp.body_mut().read_to_string().map_err(|e| PickerError::Transport(e.to_string()))?;
+        let text = resp
+            .body_mut()
+            .read_to_string()
+            .map_err(|e| PickerError::Transport(e.to_string()))?;
         Ok((status, text))
     }
 
-    fn complete(&self, role: Role, system: &str, user: &str, format: Option<Value>) -> Result<String> {
+    fn complete(
+        &self,
+        role: Role,
+        system: &str,
+        user: &str,
+        format: Option<Value>,
+    ) -> Result<String> {
         let model = self.model(role);
         let mut body = json!({
             "model": model,
@@ -112,10 +165,17 @@ impl OpenAiCompat {
         loop {
             let (status, text) = self.post(&body)?;
             if status == 200 {
-                let v: Value = serde_json::from_str(&text).map_err(|e| PickerError::Transport(format!("bad response JSON: {e}")))?;
+                let v: Value = serde_json::from_str(&text)
+                    .map_err(|e| PickerError::Transport(format!("bad response JSON: {e}")))?;
                 let base = if role == Role::Score { 0 } else { 2 };
-                self.tokens[base].fetch_add(v["usage"]["prompt_tokens"].as_u64().unwrap_or(0), Ordering::Relaxed);
-                self.tokens[base + 1].fetch_add(v["usage"]["completion_tokens"].as_u64().unwrap_or(0), Ordering::Relaxed);
+                self.tokens[base].fetch_add(
+                    v["usage"]["prompt_tokens"].as_u64().unwrap_or(0),
+                    Ordering::Relaxed,
+                );
+                self.tokens[base + 1].fetch_add(
+                    v["usage"]["completion_tokens"].as_u64().unwrap_or(0),
+                    Ordering::Relaxed,
+                );
                 let msg = &v["choices"][0]["message"];
                 if let Some(r) = msg["refusal"].as_str().filter(|r| !r.is_empty()) {
                     return Err(PickerError::Declined(r.to_string()));
@@ -124,12 +184,26 @@ impl OpenAiCompat {
                 // `reasoning_content` only when they refuse to answer, which is a Declined.
                 let content = match &msg["content"] {
                     Value::String(s) => Some(s.clone()),
-                    Value::Array(parts) => Some(parts.iter().filter_map(|p| p["text"].as_str()).collect::<Vec<_>>().join("")),
+                    Value::Array(parts) => Some(
+                        parts
+                            .iter()
+                            .filter_map(|p| p["text"].as_str())
+                            .collect::<Vec<_>>()
+                            .join(""),
+                    ),
                     _ => None,
                 };
-                let content = content.filter(|c| !c.trim().is_empty()).ok_or_else(|| PickerError::Transport(format!("no message content in: {}", text.chars().take(300).collect::<String>())))?;
+                let content = content.filter(|c| !c.trim().is_empty()).ok_or_else(|| {
+                    PickerError::Transport(format!(
+                        "no message content in: {}",
+                        text.chars().take(300).collect::<String>()
+                    ))
+                })?;
                 if v["choices"][0]["finish_reason"].as_str() == Some("length") {
-                    return Err(PickerError::Parse(format!("reply was cut off at the provider's output limit ({} chars)", content.len())));
+                    return Err(PickerError::Parse(format!(
+                        "reply was cut off at the provider's output limit ({} chars)",
+                        content.len()
+                    )));
                 }
                 return Ok(content);
             }
@@ -138,28 +212,52 @@ impl OpenAiCompat {
                 std::thread::sleep(Duration::from_millis(1000 * 2u64.pow(attempt)));
                 continue;
             }
-            return Err(PickerError::Http { status, body: text.chars().take(500).collect() });
+            return Err(PickerError::Http {
+                status,
+                body: text.chars().take(500).collect(),
+            });
         }
     }
 }
 
 /// Model ids the endpoint offers (`GET {base_url}/models`), sorted. For onboarding pickers.
 pub fn list_models(base_url: &str, api_key: &str) -> Result<Vec<String>> {
-    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).timeout_global(Some(Duration::from_secs(20))).build().into();
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .timeout_global(Some(Duration::from_secs(20)))
+        .build()
+        .into();
     let mut resp = agent
         .get(&format!("{}/models", base_url.trim_end_matches('/')))
         .header("Authorization", &format!("Bearer {api_key}"))
-        .header("User-Agent", concat!("choco-video/", env!("CARGO_PKG_VERSION")))
+        .header(
+            "User-Agent",
+            concat!("choco-video/", env!("CARGO_PKG_VERSION")),
+        )
         .call()
         .map_err(|e| PickerError::Transport(e.to_string()))?;
     let status = resp.status().as_u16();
-    let text = resp.body_mut().read_to_string().map_err(|e| PickerError::Transport(e.to_string()))?;
+    let text = resp
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| PickerError::Transport(e.to_string()))?;
     if status != 200 {
-        return Err(PickerError::Http { status, body: text.chars().take(300).collect() });
+        return Err(PickerError::Http {
+            status,
+            body: text.chars().take(300).collect(),
+        });
     }
-    let v: Value = serde_json::from_str(&text).map_err(|e| PickerError::Transport(format!("bad /models JSON: {e}")))?;
-    let list = v["data"].as_array().or_else(|| v.as_array()).cloned().unwrap_or_default();
-    let mut ids: Vec<String> = list.iter().filter_map(|m| m["id"].as_str().map(str::to_string)).collect();
+    let v: Value = serde_json::from_str(&text)
+        .map_err(|e| PickerError::Transport(format!("bad /models JSON: {e}")))?;
+    let list = v["data"]
+        .as_array()
+        .or_else(|| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut ids: Vec<String> = list
+        .iter()
+        .filter_map(|m| m["id"].as_str().map(str::to_string))
+        .collect();
     ids.sort();
     Ok(ids)
 }
@@ -167,7 +265,10 @@ pub fn list_models(base_url: &str, api_key: &str) -> Result<Vec<String>> {
 /// One tiny scoring request: proves the key, the model and structured output all work.
 pub fn test_connection(cfg: OpenAiCompatConfig) -> Result<std::time::Duration> {
     let started = std::time::Instant::now();
-    let c = OpenAiCompat::new(OpenAiCompatConfig { timeout: Duration::from_secs(60), ..cfg });
+    let c = OpenAiCompat::new(OpenAiCompatConfig {
+        timeout: Duration::from_secs(60),
+        ..cfg
+    });
     let raw = c.scores_json(
         "Score each clip 0-100 for short-form appeal. Reply with JSON only.",
         "Candidates:\n[t1] Why does nobody tell you pricing is the biggest mistake? We tripled our price and sales went up.",
@@ -191,7 +292,12 @@ impl Llm for OpenAiCompat {
     }
     fn usage(&self) -> Usage {
         let t = |i: usize| self.tokens[i].load(Ordering::Relaxed);
-        Usage { score_input: t(0), score_output: t(1), summarize_input: t(2), summarize_output: t(3) }
+        Usage {
+            score_input: t(0),
+            score_output: t(1),
+            summarize_input: t(2),
+            summarize_output: t(3),
+        }
     }
     fn text(&self, role: Role, system: &str, user: &str) -> Result<String> {
         self.complete(role, system, user, None)
@@ -200,13 +306,21 @@ impl Llm for OpenAiCompat {
         if self.json_schema_ok.load(Ordering::Relaxed) {
             let fmt = json!({"type": "json_schema", "json_schema": {"name": "scores", "strict": true, "schema": scores_schema()}});
             match self.complete(Role::Score, system, user, Some(fmt)) {
-                Err(PickerError::Http { status: 400 | 422, body }) if body.contains("response_format") || body.contains("json_schema") => {
+                Err(PickerError::Http {
+                    status: 400 | 422,
+                    body,
+                }) if body.contains("response_format") || body.contains("json_schema") => {
                     self.json_schema_ok.store(false, Ordering::Relaxed);
                 }
                 other => return other,
             }
         }
-        self.complete(Role::Score, system, user, Some(json!({"type": "json_object"})))
+        self.complete(
+            Role::Score,
+            system,
+            user,
+            Some(json!({"type": "json_object"})),
+        )
     }
 }
 
@@ -241,7 +355,10 @@ mod tests {
                 let mut buf = vec![0u8; len];
                 reader.read_exact(&mut buf).unwrap();
                 seen2.lock().unwrap().push(String::from_utf8(buf).unwrap());
-                let reply = format!("HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+                let reply = format!(
+                    "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
                 stream.write_all(reply.as_bytes()).unwrap();
             }
         });
@@ -270,7 +387,15 @@ mod tests {
         let c = client(base);
         assert_eq!(c.scores_json("sys", "user").unwrap(), "{\"scores\":[]}");
         assert_eq!(c.text(Role::Summarize, "sys", "user").unwrap(), "a summary");
-        assert_eq!(c.usage(), Usage { score_input: 10, score_output: 3, summarize_input: 10, summarize_output: 3 });
+        assert_eq!(
+            c.usage(),
+            Usage {
+                score_input: 10,
+                score_output: 3,
+                summarize_input: 10,
+                summarize_output: 3
+            }
+        );
         let reqs = seen.lock().unwrap();
         let first: Value = serde_json::from_str(&reqs[0]).unwrap();
         assert_eq!(first["model"], "cheap");
@@ -283,7 +408,10 @@ mod tests {
     #[test]
     fn falls_back_to_json_object_once_and_remembers() {
         let (base, seen) = mock(vec![
-            (400, "{\"error\":{\"message\":\"response_format json_schema is not supported\"}}".into()),
+            (
+                400,
+                "{\"error\":{\"message\":\"response_format json_schema is not supported\"}}".into(),
+            ),
             ok("{\"scores\":[]}"),
             ok("{\"scores\":[]}"),
         ]);
@@ -291,7 +419,15 @@ mod tests {
         c.scores_json("s", "u").unwrap();
         c.scores_json("s", "u").unwrap();
         let reqs = seen.lock().unwrap();
-        let kinds: Vec<String> = reqs.iter().map(|r| serde_json::from_str::<Value>(r).unwrap()["response_format"]["type"].as_str().unwrap().to_string()).collect();
+        let kinds: Vec<String> = reqs
+            .iter()
+            .map(|r| {
+                serde_json::from_str::<Value>(r).unwrap()["response_format"]["type"]
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
         assert_eq!(kinds, vec!["json_schema", "json_object", "json_object"]);
     }
 
@@ -299,7 +435,10 @@ mod tests {
     fn surfaces_auth_errors_without_retrying() {
         let (base, seen) = mock(vec![(401, "{\"error\":\"bad key\"}".into())]);
         let err = client(base).text(Role::Score, "s", "u").unwrap_err();
-        assert!(matches!(err, PickerError::Http { status: 401, .. }), "{err}");
+        assert!(
+            matches!(err, PickerError::Http { status: 401, .. }),
+            "{err}"
+        );
         assert_eq!(seen.lock().unwrap().len(), 1);
     }
 }

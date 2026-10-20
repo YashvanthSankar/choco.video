@@ -1,9 +1,9 @@
 //! Apple SpeechAnalyzer (macOS 26+) through the `choco-apple` helper process.
 //! Protocol: progress and errors as JSON lines on stderr, the transcript as JSON on stdout.
 
-use super::{Result, TranscribeError, TranscribeOptions, STAGE};
-use crate::model::{Progress, Transcript};
+use super::{Result, STAGE, TranscribeError, TranscribeOptions};
 use crate::ProgressFn;
+use crate::model::{Progress, Transcript};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -21,7 +21,11 @@ pub fn helper_path() -> Option<PathBuf> {
     if let Ok(exe) = std::env::current_exe()
         && let Some(dir) = exe.parent()
     {
-        for cand in [dir.join(HELPER), dir.join("../Resources").join(HELPER), dir.join("../Helpers").join(HELPER)] {
+        for cand in [
+            dir.join(HELPER),
+            dir.join("../Resources").join(HELPER),
+            dir.join("../Helpers").join(HELPER),
+        ] {
             if cand.is_file() {
                 return Some(cand);
             }
@@ -56,8 +60,14 @@ struct HelperLine {
     error: Option<String>,
 }
 
-pub fn transcribe(wav: &Path, opts: &TranscribeOptions, progress: ProgressFn) -> Result<Transcript> {
-    let helper = helper_path().ok_or(TranscribeError::Unavailable(crate::backend::SpeechEngine::AppleSpeech))?;
+pub fn transcribe(
+    wav: &Path,
+    opts: &TranscribeOptions,
+    progress: ProgressFn,
+) -> Result<Transcript> {
+    let helper = helper_path().ok_or(TranscribeError::Unavailable(
+        crate::backend::SpeechEngine::AppleSpeech,
+    ))?;
     let locale = opts.language.clone().unwrap_or_else(|| "en-US".into());
     let mut child = Command::new(helper)
         .arg("transcribe")
@@ -79,17 +89,28 @@ pub fn transcribe(wav: &Path, opts: &TranscribeOptions, progress: ProgressFn) ->
         let line = line?;
         match serde_json::from_str::<HelperLine>(&line) {
             Ok(HelperLine { error: Some(e), .. }) => last_error = Some(e),
-            Ok(HelperLine { fraction, message, .. }) => {
-                progress(Progress::new(STAGE, fraction.unwrap_or(-1.0), message.unwrap_or_default()));
+            Ok(HelperLine {
+                fraction, message, ..
+            }) => {
+                progress(Progress::new(
+                    STAGE,
+                    fraction.unwrap_or(-1.0),
+                    message.unwrap_or_default(),
+                ));
             }
             Err(_) if !line.trim().is_empty() => last_error = Some(line),
             Err(_) => {}
         }
     }
     let status = child.wait()?;
-    let out = reader.join().map_err(|_| TranscribeError::Apple("stdout reader panicked".into()))??;
+    let out = reader
+        .join()
+        .map_err(|_| TranscribeError::Apple("stdout reader panicked".into()))??;
     if !status.success() {
-        return Err(TranscribeError::Apple(last_error.unwrap_or_else(|| format!("helper exited with {status}"))));
+        return Err(TranscribeError::Apple(
+            last_error.unwrap_or_else(|| format!("helper exited with {status}")),
+        ));
     }
-    serde_json::from_slice(&out).map_err(|e| TranscribeError::Apple(format!("bad helper output: {e}")))
+    serde_json::from_slice(&out)
+        .map_err(|e| TranscribeError::Apple(format!("bad helper output: {e}")))
 }

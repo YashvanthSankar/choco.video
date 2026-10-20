@@ -75,8 +75,14 @@ pub fn mouth_motion(face: &Face, cur: &Frame, prev: &Frame) -> f32 {
     let mx = (rm.0 + lm.0) / 2.0;
     let my = (rm.1 + lm.1) / 2.0;
     let half_w = ((lm.0 - rm.0).abs() * 0.75).max(face.w * 0.2);
-    let (x0, x1) = (((mx - half_w) * w).max(0.0) as usize, ((mx + half_w) * w).min(w - 1.0) as usize);
-    let (y0, y1) = (((my - face.h * 0.15) * h).max(0.0) as usize, ((my + face.h * 0.2) * h).min(h - 1.0) as usize);
+    let (x0, x1) = (
+        ((mx - half_w) * w).max(0.0) as usize,
+        ((mx + half_w) * w).min(w - 1.0) as usize,
+    );
+    let (y0, y1) = (
+        ((my - face.h * 0.15) * h).max(0.0) as usize,
+        ((my + face.h * 0.2) * h).min(h - 1.0) as usize,
+    );
     let (a, b) = (cur.data(0), prev.data(0));
     let mut sum = 0u64;
     let mut n = 0u64;
@@ -113,7 +119,11 @@ pub fn track(samples: &[Sample], max_gap_ms: u64, min_ms: u64) -> Vec<Track> {
                 .max_by(|a, b| a.1.total_cmp(&b.1).then(b.2.total_cmp(&a.2)));
             if let Some((i, _, _)) = best {
                 used[i] = true;
-                t.points.push(TrackPoint { t_ms: s.t_ms, face: s.faces[i], motion: s.motion.get(i).copied().unwrap_or(0.0) });
+                t.points.push(TrackPoint {
+                    t_ms: s.t_ms,
+                    face: s.faces[i],
+                    motion: s.motion.get(i).copied().unwrap_or(0.0),
+                });
                 keep.push(t);
             } else if s.t_ms.saturating_sub(t.end()) <= max_gap_ms {
                 keep.push(t);
@@ -123,7 +133,14 @@ pub fn track(samples: &[Sample], max_gap_ms: u64, min_ms: u64) -> Vec<Track> {
         }
         for (i, f) in s.faces.iter().enumerate() {
             if !used[i] {
-                keep.push(Track { id: next_id, points: vec![TrackPoint { t_ms: s.t_ms, face: *f, motion: s.motion.get(i).copied().unwrap_or(0.0) }] });
+                keep.push(Track {
+                    id: next_id,
+                    points: vec![TrackPoint {
+                        t_ms: s.t_ms,
+                        face: *f,
+                        motion: s.motion.get(i).copied().unwrap_or(0.0),
+                    }],
+                });
                 next_id += 1;
             }
         }
@@ -140,24 +157,56 @@ pub(crate) mod tests {
     use super::*;
 
     pub(crate) fn face(cx: f32, cy: f32) -> Face {
-        Face { x: cx - 0.05, y: cy - 0.1, w: 0.1, h: 0.2, score: 0.9, landmarks: [(cx - 0.02, cy - 0.03), (cx + 0.02, cy - 0.03), (cx, cy), (cx - 0.02, cy + 0.05), (cx + 0.02, cy + 0.05)] }
+        Face {
+            x: cx - 0.05,
+            y: cy - 0.1,
+            w: 0.1,
+            h: 0.2,
+            score: 0.9,
+            landmarks: [
+                (cx - 0.02, cy - 0.03),
+                (cx + 0.02, cy - 0.03),
+                (cx, cy),
+                (cx - 0.02, cy + 0.05),
+                (cx + 0.02, cy + 0.05),
+            ],
+        }
     }
 
     #[test]
     fn two_faces_two_tracks_and_cuts_split_tracks() {
         let mut samples = Vec::new();
         for k in 0..20u64 {
-            samples.push(Sample { t_ms: k * 200, faces: vec![face(0.3 + k as f32 * 0.002, 0.4), face(0.7, 0.4)], motion: vec![1.0, 0.0], cut: k == 10 });
+            samples.push(Sample {
+                t_ms: k * 200,
+                faces: vec![face(0.3 + k as f32 * 0.002, 0.4), face(0.7, 0.4)],
+                motion: vec![1.0, 0.0],
+                cut: k == 10,
+            });
         }
         let tr = track(&samples, 600, 1000);
         // Two people, split in two at the cut: four tracks.
-        assert_eq!(tr.len(), 4, "{:?}", tr.iter().map(|t| (t.start(), t.end(), t.mean_cx())).collect::<Vec<_>>());
+        assert_eq!(
+            tr.len(),
+            4,
+            "{:?}",
+            tr.iter()
+                .map(|t| (t.start(), t.end(), t.mean_cx()))
+                .collect::<Vec<_>>()
+        );
         assert!(tr.iter().all(|t| t.duration() >= 1000));
     }
 
     #[test]
     fn short_blips_are_dropped() {
-        let mut samples: Vec<Sample> = (0..10u64).map(|k| Sample { t_ms: k * 200, faces: vec![face(0.5, 0.4)], motion: vec![0.0], cut: false }).collect();
+        let mut samples: Vec<Sample> = (0..10u64)
+            .map(|k| Sample {
+                t_ms: k * 200,
+                faces: vec![face(0.5, 0.4)],
+                motion: vec![0.0],
+                cut: false,
+            })
+            .collect();
         samples[4].faces.push(face(0.1, 0.1));
         samples[4].motion.push(0.0);
         assert_eq!(track(&samples, 600, 1000).len(), 1);

@@ -50,11 +50,16 @@ impl Window {
 
 pub(crate) fn ends_thought(text: &str) -> bool {
     let t = text.trim_end_matches(['"', '\'', ')', '”', '’', ' ']);
-    matches!(t.chars().last(), Some('.' | '!' | '?' | '…' | '。' | '！' | '？'))
+    matches!(
+        t.chars().last(),
+        Some('.' | '!' | '?' | '…' | '。' | '！' | '？')
+    )
 }
 
 /// Disfluencies only. Pronouns and "mean"/"know" are real words ("I mean it.") and stay out.
-const FILLERS: &[&str] = &["um", "uh", "erm", "hmm", "mm", "like", "yeah", "okay", "ok", "so", "right", "well"];
+const FILLERS: &[&str] = &[
+    "um", "uh", "erm", "hmm", "mm", "like", "yeah", "okay", "ok", "so", "right", "well",
+];
 
 /// True when the first three seconds are nothing but filler words.
 fn filler_opening(segs: &[Segment], start_ms: u64) -> bool {
@@ -62,7 +67,11 @@ fn filler_opening(segs: &[Segment], start_ms: u64) -> bool {
         .iter()
         .flat_map(|s| s.words.iter())
         .take_while(|w| w.start_ms < start_ms + 3_000)
-        .map(|w| w.text.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
+        .map(|w| {
+            w.text
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase()
+        })
         .filter(|w| !w.is_empty())
         .collect();
     !words.is_empty() && words.iter().all(|w| FILLERS.contains(&w.as_str()))
@@ -73,12 +82,22 @@ pub fn windows(t: &Transcript, opts: &WindowOptions) -> Vec<Window> {
     let n = segs.len();
     // A boundary after segment i: punctuation, or a real pause before the next segment.
     let closes = |i: usize| -> bool {
-        ends_thought(&segs[i].text) || i + 1 == n || segs[i + 1].start_ms.saturating_sub(segs[i].end_ms) >= opts.boundary_gap_ms
+        ends_thought(&segs[i].text)
+            || i + 1 == n
+            || segs[i + 1].start_ms.saturating_sub(segs[i].end_ms) >= opts.boundary_gap_ms
     };
     let starts = |i: usize| i == 0 || closes(i - 1);
 
-    let targets: Vec<u64> = if opts.targets_ms.iter().any(|&t| t >= opts.min_ms && t <= opts.max_ms) {
-        opts.targets_ms.iter().copied().filter(|&t| t >= opts.min_ms && t <= opts.max_ms).collect()
+    let targets: Vec<u64> = if opts
+        .targets_ms
+        .iter()
+        .any(|&t| t >= opts.min_ms && t <= opts.max_ms)
+    {
+        opts.targets_ms
+            .iter()
+            .copied()
+            .filter(|&t| t >= opts.min_ms && t <= opts.max_ms)
+            .collect()
     } else {
         vec![opts.min_ms]
     };
@@ -140,8 +159,21 @@ fn build(segs: &[Segment], i: usize, j: usize, opts: &WindowOptions) -> Option<W
     if filler_opening(span, start_ms) {
         return None;
     }
-    let text = span.iter().map(|s| s.text.trim()).collect::<Vec<_>>().join(" ");
-    Some(Window { id: String::new(), start_ms, end_ms, first_seg: i, last_seg: j, text, word_count, silence_ratio })
+    let text = span
+        .iter()
+        .map(|s| s.text.trim())
+        .collect::<Vec<_>>()
+        .join(" ");
+    Some(Window {
+        id: String::new(),
+        start_ms,
+        end_ms,
+        first_seg: i,
+        last_seg: j,
+        text,
+        word_count,
+        silence_ratio,
+    })
 }
 
 #[cfg(test)]
@@ -159,15 +191,32 @@ pub(crate) mod tests {
                 .map(|k| Word {
                     start_ms: t + k as u64 * step,
                     end_ms: t + (k as u64 + 1) * step,
-                    text: if k + 1 == words { format!("end{s}.") } else { format!("w{s}x{k}") },
+                    text: if k + 1 == words {
+                        format!("end{s}.")
+                    } else {
+                        format!("w{s}x{k}")
+                    },
                     confidence: 1.0,
                 })
                 .collect();
-            let text = ws.iter().map(|w| w.text.clone()).collect::<Vec<_>>().join(" ");
-            segs.push(Segment { start_ms: t, end_ms: t + len_ms, text, words: ws });
+            let text = ws
+                .iter()
+                .map(|w| w.text.clone())
+                .collect::<Vec<_>>()
+                .join(" ");
+            segs.push(Segment {
+                start_ms: t,
+                end_ms: t + len_ms,
+                text,
+                words: ws,
+            });
             t += len_ms + gap_ms;
         }
-        Transcript { language: "en".into(), engine: "test".into(), segments: segs }
+        Transcript {
+            language: "en".into(),
+            engine: "test".into(),
+            segments: segs,
+        }
     }
 
     #[test]
@@ -176,7 +225,10 @@ pub(crate) mod tests {
         let ws = windows(&t, &WindowOptions::default());
         assert!(!ws.is_empty());
         for w in &ws {
-            assert!(w.duration_ms() >= 15_000 && w.duration_ms() <= 90_000, "{w:?}");
+            assert!(
+                w.duration_ms() >= 15_000 && w.duration_ms() <= 90_000,
+                "{w:?}"
+            );
             assert!(ends_thought(&t.segments[w.last_seg].text));
             assert_eq!(w.start_ms, t.segments[w.first_seg].start_ms);
             assert!(w.first_seg == 0 || ends_thought(&t.segments[w.first_seg - 1].text));

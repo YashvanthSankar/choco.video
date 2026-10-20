@@ -108,14 +108,22 @@ mod tests {
         let b = detect();
         let info = b.info();
         assert!(info.cpu_cores >= 1);
-        assert!(!b.speech_engines().is_empty(), "every machine has at least whisper on CPU");
+        assert!(
+            !b.speech_engines().is_empty(),
+            "every machine has at least whisper on CPU"
+        );
         assert!(b.hw_encoders().contains(&HwCodec::Software) || !b.hw_encoders().is_empty());
     }
 
     #[test]
     fn cpu_backend_always_works() {
         let b = CpuBackend::detect();
-        assert_eq!(b.speech_engines(), vec![SpeechEngine::Whisper { device: Device::Cpu }]);
+        assert_eq!(
+            b.speech_engines(),
+            vec![SpeechEngine::Whisper {
+                device: Device::Cpu
+            }]
+        );
         assert_eq!(b.hw_encoders(), vec![HwCodec::Software]);
     }
 }

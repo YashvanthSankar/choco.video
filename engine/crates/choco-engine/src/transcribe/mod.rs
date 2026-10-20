@@ -40,15 +40,27 @@ pub enum TranscribeError {
 pub type Result<T> = std::result::Result<T, TranscribeError>;
 
 /// Transcribe a 16 kHz mono f32 WAV produced by [`crate::ingest::extract_audio`].
-pub fn transcribe(audio_wav: &Path, engine: SpeechEngine, opts: &TranscribeOptions, progress: ProgressFn) -> Result<Transcript> {
+pub fn transcribe(
+    audio_wav: &Path,
+    engine: SpeechEngine,
+    opts: &TranscribeOptions,
+    progress: ProgressFn,
+) -> Result<Transcript> {
     // Apple speech returns Hindi in Latin transliteration (measured: every word correct, none in
     // Devanagari). Captions in the wrong script are useless, so prefer whisper there when it is
     // installed. Add locales here only after measuring.
     #[cfg(feature = "whisper")]
     let engine = match (engine, opts.language.as_deref()) {
         (SpeechEngine::AppleSpeech, Some(l)) if l.to_lowercase().starts_with("hi") => {
-            let installed = models_registry::find(&opts.whisper_model).is_some_and(|mf| models_registry::is_installed(&opts.models_dir, &mf));
-            if installed { SpeechEngine::Whisper { device: Device::Metal } } else { engine }
+            let installed = models_registry::find(&opts.whisper_model)
+                .is_some_and(|mf| models_registry::is_installed(&opts.models_dir, &mf));
+            if installed {
+                SpeechEngine::Whisper {
+                    device: Device::Metal,
+                }
+            } else {
+                engine
+            }
         }
         _ => engine,
     };
@@ -63,11 +75,19 @@ pub fn transcribe(audio_wav: &Path, engine: SpeechEngine, opts: &TranscribeOptio
                     progress(Progress::new(STAGE, 0.0, format!("{m}; using whisper")));
                     let raw = whisper::transcribe(audio_wav, Device::Metal, opts, progress)?;
                     let mut t = cleanup::clean(raw);
-                    calibrate(&mut t, SpeechEngine::Whisper { device: Device::Metal });
+                    calibrate(
+                        &mut t,
+                        SpeechEngine::Whisper {
+                            device: Device::Metal,
+                        },
+                    );
                     refine_onsets(&mut t, audio_wav);
                     return Ok(t);
                 }
-                return Err(TranscribeError::Apple(format!("{m}; download the whisper model to transcribe this language (`choco models pull {}`)", opts.whisper_model)));
+                return Err(TranscribeError::Apple(format!(
+                    "{m}; download the whisper model to transcribe this language (`choco models pull {}`)",
+                    opts.whisper_model
+                )));
             }
             r => r?,
         },
@@ -86,18 +106,31 @@ pub fn transcribe(audio_wav: &Path, engine: SpeechEngine, opts: &TranscribeOptio
 /// word within ~100 ms of where the voice actually starts; the energy rise says exactly where.
 /// Only words preceded by a dip in energy are moved (a word mid-phrase has no onset to find).
 fn refine_onsets(t: &mut Transcript, audio_wav: &Path) {
-    let Ok(audio) = crate::ingest::read_wav_f32(audio_wav) else { return };
+    let Ok(audio) = crate::ingest::read_wav_f32(audio_wav) else {
+        return;
+    };
     const HOP: usize = 80; // 5 ms frames at 16 kHz
     // Two 5 ms frame series: broadband RMS and the RMS of the first difference, which weights
     // the high band where consonant onsets live. An onset must rise in both.
-    let frames: Vec<f32> = audio.chunks(HOP).map(|c| (c.iter().map(|x| x * x).sum::<f32>() / c.len().max(1) as f32).sqrt()).collect();
+    let frames: Vec<f32> = audio
+        .chunks(HOP)
+        .map(|c| (c.iter().map(|x| x * x).sum::<f32>() / c.len().max(1) as f32).sqrt())
+        .collect();
     let hp: Vec<f32> = audio
         .chunks(HOP)
         .enumerate()
         .map(|(k, c)| {
             let prev = if k == 0 { 0.0 } else { audio[k * HOP - 1] };
             let mut last = prev;
-            let e = c.iter().map(|&x| { let d = x - last; last = x; d * d }).sum::<f32>() / c.len().max(1) as f32;
+            let e = c
+                .iter()
+                .map(|&x| {
+                    let d = x - last;
+                    last = x;
+                    d * d
+                })
+                .sum::<f32>()
+                / c.len().max(1) as f32;
             e.sqrt()
         })
         .collect();

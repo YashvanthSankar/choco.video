@@ -71,7 +71,11 @@ impl Transcript {
         self.segments.iter().map(|s| s.words.len()).sum()
     }
     pub fn text(&self) -> String {
-        self.segments.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" ")
+        self.segments
+            .iter()
+            .map(|s| s.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -229,7 +233,11 @@ pub struct Progress {
 
 impl Progress {
     pub fn new(stage: &str, fraction: f32, message: impl Into<String>) -> Self {
-        Self { stage: stage.to_string(), fraction, message: message.into() }
+        Self {
+            stage: stage.to_string(),
+            fraction,
+            message: message.into(),
+        }
     }
 }
 
@@ -244,7 +252,12 @@ mod tests {
     }
 
     fn word(s: u64, e: u64, t: &str) -> Word {
-        Word { start_ms: s, end_ms: e, text: t.into(), confidence: 0.9 }
+        Word {
+            start_ms: s,
+            end_ms: e,
+            text: t.into(),
+            confidence: 0.9,
+        }
     }
 
     #[test]
@@ -274,29 +287,65 @@ mod tests {
                 duration_ms: 1000,
                 container: "mov,mp4".into(),
                 video: Some(VideoStream {
-                    index: 0, codec: "h264".into(), width: 1920, height: 1080,
-                    display_width: 1920, display_height: 1080, fps_num: 30, fps_den: 1, rotation_deg: 0,
+                    index: 0,
+                    codec: "h264".into(),
+                    width: 1920,
+                    height: 1080,
+                    display_width: 1920,
+                    display_height: 1080,
+                    fps_num: 30,
+                    fps_den: 1,
+                    rotation_deg: 0,
                 }),
-                audio: Some(AudioStream { index: 1, codec: "aac".into(), sample_rate: 48000, channels: 2 }),
+                audio: Some(AudioStream {
+                    index: 1,
+                    codec: "aac".into(),
+                    sample_rate: 48000,
+                    channels: 2,
+                }),
             },
             transcript: None,
             candidates: vec![Candidate {
-                id: "c1".into(), start_ms: 0, end_ms: 1000, score: 80, reasons: vec!["hook".into()],
-                title: "t".into(), description: "d".into(), hashtags: vec!["#x".into()],
-                provenance: PickerProvenance { tier: "hosted".into(), model: "m".into(), prompt_hash: "h".into() },
+                id: "c1".into(),
+                start_ms: 0,
+                end_ms: 1000,
+                score: 80,
+                reasons: vec!["hook".into()],
+                title: "t".into(),
+                description: "d".into(),
+                hashtags: vec!["#x".into()],
+                provenance: PickerProvenance {
+                    tier: "hosted".into(),
+                    model: "m".into(),
+                    prompt_hash: "h".into(),
+                },
             }],
             clips: vec![Clip {
-                candidate_id: "c1".into(), start_ms: 0, end_ms: 1000,
+                candidate_id: "c1".into(),
+                start_ms: 0,
+                end_ms: 1000,
                 crop: Some(CropPlan {
                     layout: Layout::Split,
                     keyframes: vec![CropKeyframe {
                         t_ms: 0,
-                        rects: vec![Rect { x: 0.1, y: 0.0, w: 0.3, h: 0.5 }; 2],
+                        rects: vec![
+                            Rect {
+                                x: 0.1,
+                                y: 0.0,
+                                w: 0.3,
+                                h: 0.5
+                            };
+                            2
+                        ],
                         easing: Easing::EaseInOut,
                     }],
-                    source_size: (1920, 1080), target_size: (1080, 1920),
+                    source_size: (1920, 1080),
+                    target_size: (1080, 1920),
                 }),
-                style: None, rejected: false, status: RenderStatus::Pending, output: None,
+                style: None,
+                rejected: false,
+                status: RenderStatus::Pending,
+                output: None,
             }],
         };
         roundtrip(&p);

@@ -15,19 +15,24 @@ pub fn tokens(s: &str) -> Vec<String> {
 }
 
 const STOP: &[&str] = &[
-    "the", "a", "an", "and", "or", "but", "so", "to", "of", "in", "on", "for", "with", "is", "it", "that", "this", "was",
-    "are", "be", "i", "you", "we", "they", "he", "she", "at", "as", "by", "do", "not", "have", "has", "just", "like",
-    "um", "uh", "yeah", "know", "my", "me", "your", "our", "if", "what", "there", "their", "about",
+    "the", "a", "an", "and", "or", "but", "so", "to", "of", "in", "on", "for", "with", "is", "it",
+    "that", "this", "was", "are", "be", "i", "you", "we", "they", "he", "she", "at", "as", "by",
+    "do", "not", "have", "has", "just", "like", "um", "uh", "yeah", "know", "my", "me", "your",
+    "our", "if", "what", "there", "their", "about",
 ];
 
 fn content_tokens(s: &str) -> HashSet<String> {
-    tokens(s).into_iter().filter(|t| !STOP.contains(&t.as_str()) && t.len() > 2).collect()
+    tokens(s)
+        .into_iter()
+        .filter(|t| !STOP.contains(&t.as_str()) && t.len() > 2)
+        .collect()
 }
 
 /// Words that tend to open a clip people keep watching.
 const HOOK_WORDS: &[&str] = &[
-    "secret", "mistake", "never", "always", "nobody", "everyone", "truth", "wrong", "why", "how", "biggest", "worst",
-    "best", "crazy", "insane", "actually", "honestly", "imagine", "problem", "lesson", "stop", "realized", "changed",
+    "secret", "mistake", "never", "always", "nobody", "everyone", "truth", "wrong", "why", "how",
+    "biggest", "worst", "best", "crazy", "insane", "actually", "honestly", "imagine", "problem",
+    "lesson", "stop", "realized", "changed",
 ];
 const WEAK_OPENERS: &[&str] = &["and", "but", "so", "because", "which", "or", "then", "also"];
 
@@ -43,13 +48,24 @@ pub fn prior(w: &Window, audio: Option<&WindowAudio>) -> f32 {
     let pace = (1.0 - ((wpm - 170.0) / 90.0).abs()).clamp(0.0, 1.0);
 
     let opening: Vec<&String> = toks.iter().take(12).collect();
-    let hook = opening.iter().filter(|t| HOOK_WORDS.contains(&t.as_str())).count().min(2) as f32 / 2.0;
+    let hook = opening
+        .iter()
+        .filter(|t| HOOK_WORDS.contains(&t.as_str()))
+        .count()
+        .min(2) as f32
+        / 2.0;
     let first_sentence_end = w.text.find(['.', '?', '!']).unwrap_or(w.text.len());
     let opens_with_question = w.text[..first_sentence_end.min(w.text.len())].len() < w.text.len()
         && w.text.as_bytes().get(first_sentence_end) == Some(&b'?');
     let weak_open = WEAK_OPENERS.contains(&toks[0].as_str());
     let has_number = toks.iter().any(|t| t.chars().any(|c| c.is_ascii_digit()))
-        || toks.iter().any(|t| ["one", "two", "three", "four", "five", "ten", "hundred", "thousand", "million", "percent"].contains(&t.as_str()));
+        || toks.iter().any(|t| {
+            [
+                "one", "two", "three", "four", "five", "ten", "hundred", "thousand", "million",
+                "percent",
+            ]
+            .contains(&t.as_str())
+        });
     let questions = w.text.matches('?').count().min(3) as f32 / 3.0;
     // Mid-length clips perform best; very short and very long are penalised gently.
     let secs = w.duration_ms() as f32 / 1000.0;
@@ -108,15 +124,41 @@ pub fn bm25(windows: &[Window], query: &str) -> Vec<f32> {
 /// Tiny built-in synonym and inflection expansion so "pricing" also finds "price" and "cost".
 fn expand(q: &[String]) -> Vec<String> {
     const GROUPS: &[&[&str]] = &[
-        &["price", "prices", "pricing", "priced", "cost", "costs", "charge", "charging", "expensive", "cheap"],
-        &["money", "revenue", "income", "profit", "paid", "pay", "earn", "earning"],
+        &[
+            "price",
+            "prices",
+            "pricing",
+            "priced",
+            "cost",
+            "costs",
+            "charge",
+            "charging",
+            "expensive",
+            "cheap",
+        ],
+        &[
+            "money", "revenue", "income", "profit", "paid", "pay", "earn", "earning",
+        ],
         &["funny", "laugh", "laughing", "joke", "hilarious"],
         &["advice", "tip", "tips", "lesson", "lessons", "learned"],
-        &["mistake", "mistakes", "failure", "failed", "wrong", "regret"],
-        &["ai", "artificial", "intelligence", "model", "models", "machine"],
+        &[
+            "mistake", "mistakes", "failure", "failed", "wrong", "regret",
+        ],
+        &[
+            "ai",
+            "artificial",
+            "intelligence",
+            "model",
+            "models",
+            "machine",
+        ],
         &["start", "started", "beginning", "began", "founded"],
     ];
-    let content: Vec<String> = q.iter().filter(|t| !STOP.contains(&t.as_str())).cloned().collect();
+    let content: Vec<String> = q
+        .iter()
+        .filter(|t| !STOP.contains(&t.as_str()))
+        .cloned()
+        .collect();
     let mut out: Vec<String> = content.clone();
     for t in &content {
         for g in GROUPS {
@@ -151,7 +193,10 @@ pub fn jaccard(a: &str, b: &str) -> f32 {
 }
 
 fn overlap_frac(a: &Window, b: &Window) -> f32 {
-    let inter = a.end_ms.min(b.end_ms).saturating_sub(a.start_ms.max(b.start_ms));
+    let inter = a
+        .end_ms
+        .min(b.end_ms)
+        .saturating_sub(a.start_ms.max(b.start_ms));
     inter as f32 / a.duration_ms().min(b.duration_ms()).max(1) as f32
 }
 
@@ -206,9 +251,24 @@ mod tests {
     #[test]
     fn bm25_finds_the_topic_with_synonyms() {
         let ws = vec![
-            win("a", 0, 30_000, "We talked about our dog and the weather in the park today."),
-            win("b", 30_000, 60_000, "Charge more than you think. The price you set tells customers what it is worth."),
-            win("c", 60_000, 90_000, "Distribution means posting every single day on every channel."),
+            win(
+                "a",
+                0,
+                30_000,
+                "We talked about our dog and the weather in the park today.",
+            ),
+            win(
+                "b",
+                30_000,
+                60_000,
+                "Charge more than you think. The price you set tells customers what it is worth.",
+            ),
+            win(
+                "c",
+                60_000,
+                90_000,
+                "Distribution means posting every single day on every channel.",
+            ),
         ];
         let s = bm25(&ws, "pricing");
         assert!(s[1] > s[0] && s[1] > s[2], "{s:?}");
@@ -218,7 +278,10 @@ mod tests {
     #[test]
     fn stop_words_never_become_query_terms() {
         let q = expand(&tokens("what is pricing"));
-        assert!(!q.iter().any(|t| t == "i" || t == "is" || t == "what"), "{q:?}");
+        assert!(
+            !q.iter().any(|t| t == "i" || t == "is" || t == "what"),
+            "{q:?}"
+        );
         assert!(q.iter().any(|t| t == "price"));
         let ws = vec![win("a", 0, 30_000, "I think I will go, is it fine")];
         assert_eq!(bm25(&ws, "what is pricing")[0], 0.0);
@@ -227,15 +290,37 @@ mod tests {
     #[test]
     fn prior_prefers_hooks_over_weak_openers() {
         let words = |n| "word ".repeat(n);
-        let strong = win("s", 0, 40_000, &format!("Why does nobody talk about the biggest mistake? {}", words(100)));
-        let weak = win("w", 0, 40_000, &format!("And then we went there and did a thing. {}", words(100)));
+        let strong = win(
+            "s",
+            0,
+            40_000,
+            &format!(
+                "Why does nobody talk about the biggest mistake? {}",
+                words(100)
+            ),
+        );
+        let weak = win(
+            "w",
+            0,
+            40_000,
+            &format!("And then we went there and did a thing. {}", words(100)),
+        );
         assert!(prior(&strong, None) > prior(&weak, None));
     }
 
     #[test]
     fn shortlist_drops_near_duplicates() {
         let t = "pricing matters more than features for every creator who sells anything online";
-        let ws = vec![win("a", 0, 30_000, t), win("b", 500, 30_500, t), win("c", 60_000, 90_000, "something else entirely different here")];
+        let ws = vec![
+            win("a", 0, 30_000, t),
+            win("b", 500, 30_500, t),
+            win(
+                "c",
+                60_000,
+                90_000,
+                "something else entirely different here",
+            ),
+        ];
         let kept = shortlist(&ws, &[0.9, 0.8, 0.5], 3);
         assert_eq!(kept, vec![0, 2]);
     }

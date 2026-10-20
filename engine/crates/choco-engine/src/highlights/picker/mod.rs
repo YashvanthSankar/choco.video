@@ -70,7 +70,9 @@ pub struct Usage {
 impl Usage {
     /// Dollar cost given per-million-token prices for the scoring and summarizing models.
     pub fn cost(&self, score: (f64, f64), summarize: (f64, f64)) -> f64 {
-        (self.score_input as f64 * score.0 + self.score_output as f64 * score.1 + self.summarize_input as f64 * summarize.0
+        (self.score_input as f64 * score.0
+            + self.score_output as f64 * score.1
+            + self.summarize_input as f64 * summarize.0
             + self.summarize_output as f64 * summarize.1)
             / 1e6
     }
@@ -142,7 +144,15 @@ pub(crate) fn extract_json(raw: &str) -> &str {
 /// Quote our own field names when a model leaves them bare or half-quoted
 /// (`{score:72` or `,reasons":`). Only touches the schema's keys, never values.
 pub(crate) fn repair_keys(s: &str) -> String {
-    const KEYS: &[&str] = &["scores", "id", "score", "reasons", "title", "description", "hashtags"];
+    const KEYS: &[&str] = &[
+        "scores",
+        "id",
+        "score",
+        "reasons",
+        "title",
+        "description",
+        "hashtags",
+    ];
     // Work on bytes but copy them through untouched, so multi-byte UTF-8 (dashes, accents,
     // Devanagari, emoji) survives. Only ASCII structure characters are ever inspected.
     let b = s.as_bytes();
@@ -179,7 +189,12 @@ pub(crate) fn repair_keys(s: &str) -> String {
             if k < b.len() && b[k] == b'"' {
                 k += 1; // half-quoted: reasons":
             }
-            if KEYS.contains(&ident) && k < b.len() && b[k] == b':' && ident_start < b.len() && b[ident_start] != b'"' {
+            if KEYS.contains(&ident)
+                && k < b.len()
+                && b[k] == b':'
+                && ident_start < b.len()
+                && b[ident_start] != b'"'
+            {
                 out.push(b'"');
                 out.extend_from_slice(ident.as_bytes());
                 out.push(b'"');
@@ -205,9 +220,17 @@ pub fn parse_scores(raw: &str, expected_ids: &[String]) -> Result<Vec<ScoreOut>>
     let body = repaired.as_str();
     // Parse loosely first, then convert entries one by one so a single malformed entry
     // (score as a string, missing field) drops that entry instead of the whole batch.
-    let value: Value = serde_json::from_str(body).map_err(|e| PickerError::Parse(format!("{e}; output began: {}", raw.chars().take(200).collect::<String>())))?;
+    let value: Value = serde_json::from_str(body).map_err(|e| {
+        PickerError::Parse(format!(
+            "{e}; output began: {}",
+            raw.chars().take(200).collect::<String>()
+        ))
+    })?;
     let entries: Vec<Value> = match value {
-        Value::Object(mut m) => m.remove("scores").and_then(|v| v.as_array().cloned()).unwrap_or_default(),
+        Value::Object(mut m) => m
+            .remove("scores")
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default(),
         Value::Array(a) => a,
         _ => Vec::new(),
     };
@@ -215,7 +238,11 @@ pub fn parse_scores(raw: &str, expected_ids: &[String]) -> Result<Vec<ScoreOut>>
         .into_iter()
         .filter_map(|mut e| {
             // Tolerate numeric strings and float ids.
-            if let Some(s) = e.get("score").and_then(|v| v.as_str()).and_then(|s| s.trim().parse::<f32>().ok()) {
+            if let Some(s) = e
+                .get("score")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.trim().parse::<f32>().ok())
+            {
                 e["score"] = Value::from(s);
             }
             if let Some(n) = e.get("id").and_then(|v| v.as_u64()) {
@@ -262,7 +289,11 @@ pub fn prompt_hash() -> String {
 }
 
 pub fn provenance(llm: &dyn Llm) -> PickerProvenance {
-    PickerProvenance { tier: llm.tier().into(), model: llm.model(Role::Score), prompt_hash: prompt_hash() }
+    PickerProvenance {
+        tier: llm.tier().into(),
+        model: llm.model(Role::Score),
+        prompt_hash: prompt_hash(),
+    }
 }
 
 #[cfg(test)]
@@ -304,7 +335,13 @@ mod tests {
         let s = parse_scores(raw, &ids).unwrap();
         assert_eq!(s.len(), 1);
         assert_eq!(s[0].score, 77.0);
-        assert_eq!(trim_title("A very long title that goes on and on and on past sixty characters for sure", 60), "A very long title that goes on and on and on past sixty");
+        assert_eq!(
+            trim_title(
+                "A very long title that goes on and on and on past sixty characters for sure",
+                60
+            ),
+            "A very long title that goes on and on and on past sixty"
+        );
     }
 
     #[test]
@@ -315,6 +352,9 @@ mod tests {
     #[test]
     fn schema_is_strict() {
         let s = scores_schema();
-        assert_eq!(s["properties"]["scores"]["items"]["additionalProperties"], false);
+        assert_eq!(
+            s["properties"]["scores"]["items"]["additionalProperties"],
+            false
+        );
     }
 }

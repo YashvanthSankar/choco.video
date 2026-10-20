@@ -17,13 +17,29 @@ fn sysctl_bytes(name: &str) -> Option<Vec<u8>> {
     let cname = CString::new(name).ok()?;
     let mut len: usize = 0;
     // SAFETY: first call queries the size; pointers are valid for the duration of the call.
-    let rc = unsafe { sysctlbyname(cname.as_ptr(), std::ptr::null_mut(), &mut len, std::ptr::null_mut(), 0) };
+    let rc = unsafe {
+        sysctlbyname(
+            cname.as_ptr(),
+            std::ptr::null_mut(),
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
     if rc != 0 || len == 0 {
         return None;
     }
     let mut buf = vec![0u8; len];
     // SAFETY: buf has `len` bytes of writable storage.
-    let rc = unsafe { sysctlbyname(cname.as_ptr(), buf.as_mut_ptr().cast(), &mut len, std::ptr::null_mut(), 0) };
+    let rc = unsafe {
+        sysctlbyname(
+            cname.as_ptr(),
+            buf.as_mut_ptr().cast(),
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
     if rc != 0 {
         return None;
     }
@@ -33,7 +49,9 @@ fn sysctl_bytes(name: &str) -> Option<Vec<u8>> {
 
 fn sysctl_string(name: &str) -> Option<String> {
     let bytes = sysctl_bytes(name)?;
-    CStr::from_bytes_until_nul(&bytes).ok().map(|c| c.to_string_lossy().into_owned())
+    CStr::from_bytes_until_nul(&bytes)
+        .ok()
+        .map(|c| c.to_string_lossy().into_owned())
 }
 
 fn sysctl_u64(name: &str) -> Option<u64> {
@@ -43,7 +61,10 @@ fn sysctl_u64(name: &str) -> Option<u64> {
 
 /// Parse "26.1.2" into 26.
 pub(crate) fn major_version(v: &str) -> u32 {
-    v.split('.').next().and_then(|m| m.parse().ok()).unwrap_or(0)
+    v.split('.')
+        .next()
+        .and_then(|m| m.parse().ok())
+        .unwrap_or(0)
 }
 
 pub struct MacBackend {
@@ -58,12 +79,15 @@ impl MacBackend {
             os: "macos".into(),
             os_version: os_version.clone(),
             arch: std::env::consts::ARCH.into(),
-            cpu_cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
+            cpu_cores: std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1),
             memory_bytes: sysctl_u64("hw.memsize"),
             gpu: sysctl_string("machdep.cpu.brand_string"),
         };
-        let apple_speech =
-            cfg!(feature = "apple-speech") && major_version(&os_version) >= 26 && crate::transcribe::apple::helper_path().is_some();
+        let apple_speech = cfg!(feature = "apple-speech")
+            && major_version(&os_version) >= 26
+            && crate::transcribe::apple::helper_path().is_some();
         Self { info, apple_speech }
     }
 }
@@ -77,7 +101,13 @@ impl Backend for MacBackend {
         if self.apple_speech {
             v.push(SpeechEngine::AppleSpeech);
         }
-        v.push(SpeechEngine::Whisper { device: if self.info.arch == "aarch64" { Device::Metal } else { Device::Cpu } });
+        v.push(SpeechEngine::Whisper {
+            device: if self.info.arch == "aarch64" {
+                Device::Metal
+            } else {
+                Device::Cpu
+            },
+        });
         v
     }
     fn hw_decoders(&self) -> Vec<HwCodec> {

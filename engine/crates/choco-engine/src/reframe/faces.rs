@@ -56,16 +56,32 @@ impl FaceDetector {
             .with_input_fact(0, f32::fact([1, 3, SIZE, SIZE]).into())?
             .into_optimized()?
             .into_runnable()?;
-        Ok(Self { model, scaler: None, scaler_key: (0, 0), min_score: 0.6 })
+        Ok(Self {
+            model,
+            scaler: None,
+            scaler_key: (0, 0),
+            min_score: 0.6,
+        })
     }
 
     /// Faces in a YUV420P display-orientation frame, best first.
     pub fn detect(&mut self, f: &Frame) -> TractResult<Vec<Face>> {
         let (w, h) = (f.width(), f.height());
         let scale = SIZE as f32 / w.max(h) as f32;
-        let (sw, sh) = (((w as f32 * scale) as u32).max(2) & !1, ((h as f32 * scale) as u32).max(2) & !1);
+        let (sw, sh) = (
+            ((w as f32 * scale) as u32).max(2) & !1,
+            ((h as f32 * scale) as u32).max(2) & !1,
+        );
         if self.scaler.is_none() || self.scaler_key != (w, h) {
-            self.scaler = Some(ff::software::scaling::Context::get(ff::format::Pixel::YUV420P, w, h, ff::format::Pixel::BGR24, sw, sh, ff::software::scaling::Flags::BILINEAR)?);
+            self.scaler = Some(ff::software::scaling::Context::get(
+                ff::format::Pixel::YUV420P,
+                w,
+                h,
+                ff::format::Pixel::BGR24,
+                sw,
+                sh,
+                ff::software::scaling::Flags::BILINEAR,
+            )?);
             self.scaler_key = (w, h);
         }
         let mut bgr = Frame::new(ff::format::Pixel::BGR24, sw, sh);
@@ -91,7 +107,8 @@ impl FaceDetector {
             let kps = out[9 + si].to_plain_array_view::<f32>()?;
             let n = cls.shape()[1];
             for i in 0..n {
-                let score = (cls[[0, i, 0]].clamp(0.0, 1.0) * obj[[0, i, 0]].clamp(0.0, 1.0)).sqrt();
+                let score =
+                    (cls[[0, i, 0]].clamp(0.0, 1.0) * obj[[0, i, 0]].clamp(0.0, 1.0)).sqrt();
                 if score < self.min_score {
                     continue;
                 }
@@ -103,7 +120,10 @@ impl FaceDetector {
                 let bh = bbox[[0, i, 3]].exp() * s;
                 let mut lm = [(0.0f32, 0.0f32); 5];
                 for (k, p) in lm.iter_mut().enumerate() {
-                    *p = (((kps[[0, i, 2 * k]] + c) * s) / scale / w as f32, ((kps[[0, i, 2 * k + 1]] + r) * s) / scale / h as f32);
+                    *p = (
+                        ((kps[[0, i, 2 * k]] + c) * s) / scale / w as f32,
+                        ((kps[[0, i, 2 * k + 1]] + r) * s) / scale / h as f32,
+                    );
                 }
                 faces.push(Face {
                     x: (cx - bw / 2.0) / scale / w as f32,
@@ -145,7 +165,14 @@ mod tests {
 
     #[test]
     fn iou_basics() {
-        let a = Face { x: 0.0, y: 0.0, w: 0.2, h: 0.2, score: 1.0, landmarks: [(0.0, 0.0); 5] };
+        let a = Face {
+            x: 0.0,
+            y: 0.0,
+            w: 0.2,
+            h: 0.2,
+            score: 1.0,
+            landmarks: [(0.0, 0.0); 5],
+        };
         let b = Face { x: 0.1, ..a };
         assert!((iou(&a, &a) - 1.0).abs() < 1e-6);
         assert!(iou(&a, &b) > 0.3 && iou(&a, &b) < 0.4);

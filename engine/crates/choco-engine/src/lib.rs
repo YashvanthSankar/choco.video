@@ -44,10 +44,20 @@ pub fn media_library_info() -> MediaLibraryInfo {
     init();
     let v = ffmpeg_next::util::version();
     // SAFETY: avutil_license returns a static NUL-terminated string.
-    let license = unsafe { std::ffi::CStr::from_ptr(ffmpeg_next::ffi::avutil_license()) }.to_string_lossy().into_owned();
+    let license = unsafe { std::ffi::CStr::from_ptr(ffmpeg_next::ffi::avutil_license()) }
+        .to_string_lossy()
+        .into_owned();
     let c = ffmpeg_next::codec::version();
     MediaLibraryInfo {
-        avcodec_version: format!("{}.{}.{} (avutil {}.{}.{})", c >> 16, (c >> 8) & 0xff, c & 0xff, v >> 16, (v >> 8) & 0xff, v & 0xff),
+        avcodec_version: format!(
+            "{}.{}.{} (avutil {}.{}.{})",
+            c >> 16,
+            (c >> 8) & 0xff,
+            c & 0xff,
+            v >> 16,
+            (v >> 8) & 0xff,
+            v & 0xff
+        ),
         is_lgpl: license.starts_with("LGPL"),
         license,
     }

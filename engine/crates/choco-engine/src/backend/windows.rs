@@ -19,7 +19,9 @@ impl Backend for WindowsBackend {
         self.info.clone()
     }
     fn speech_engines(&self) -> Vec<SpeechEngine> {
-        vec![SpeechEngine::Whisper { device: Device::Cpu }]
+        vec![SpeechEngine::Whisper {
+            device: Device::Cpu,
+        }]
     }
     fn hw_decoders(&self) -> Vec<HwCodec> {
         vec![HwCodec::Software]

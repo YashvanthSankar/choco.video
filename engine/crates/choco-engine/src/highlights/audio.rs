@@ -50,13 +50,24 @@ pub fn from_samples(samples: &[f32]) -> AudioFeatures {
     let pct = |p: usize| sorted.get(sorted.len() * p / 100).copied().unwrap_or(-90.0);
     let silence_db = (pct(10) + 6.0).max(-50.0).min(pct(50) - 15.0);
     let voiced: Vec<f32> = db.iter().copied().filter(|&d| d > silence_db).collect();
-    let mean_db = if voiced.is_empty() { -90.0 } else { voiced.iter().sum::<f32>() / voiced.len() as f32 };
+    let mean_db = if voiced.is_empty() {
+        -90.0
+    } else {
+        voiced.iter().sum::<f32>() / voiced.len() as f32
+    };
     let std_db = if voiced.len() < 2 {
         1.0
     } else {
-        (voiced.iter().map(|d| (d - mean_db).powi(2)).sum::<f32>() / voiced.len() as f32).sqrt().max(0.5)
+        (voiced.iter().map(|d| (d - mean_db).powi(2)).sum::<f32>() / voiced.len() as f32)
+            .sqrt()
+            .max(0.5)
     };
-    AudioFeatures { db, mean_db, std_db, silence_db }
+    AudioFeatures {
+        db,
+        mean_db,
+        std_db,
+        silence_db,
+    }
 }
 
 impl AudioFeatures {
@@ -67,13 +78,20 @@ impl AudioFeatures {
             return WindowAudio::default();
         }
         let frames = &self.db[a..b];
-        let voiced: Vec<f32> = frames.iter().copied().filter(|&d| d > self.silence_db).collect();
+        let voiced: Vec<f32> = frames
+            .iter()
+            .copied()
+            .filter(|&d| d > self.silence_db)
+            .collect();
         let loudness_z = if voiced.is_empty() {
             -3.0
         } else {
             (voiced.iter().sum::<f32>() / voiced.len() as f32 - self.mean_db) / self.std_db
         };
-        let spikes = voiced.iter().filter(|&&d| d > self.mean_db + 2.0 * self.std_db).count();
+        let spikes = voiced
+            .iter()
+            .filter(|&&d| d > self.mean_db + 2.0 * self.std_db)
+            .count();
         let minutes = (end_ms - start_ms) as f32 / 60_000.0;
         let silent = frames.len() - voiced.len();
         let mut longest = 0u64;
@@ -100,7 +118,9 @@ mod tests {
     use super::*;
 
     fn tone(secs: f32, amp: f32) -> Vec<f32> {
-        (0..(secs * SPEECH_SAMPLE_RATE as f32) as usize).map(|i| amp * (i as f32 * 0.07).sin()).collect()
+        (0..(secs * SPEECH_SAMPLE_RATE as f32) as usize)
+            .map(|i| amp * (i as f32 * 0.07).sin())
+            .collect()
     }
 
     #[test]
@@ -112,7 +132,10 @@ mod tests {
         let quiet = f.window(0, 20_000);
         let loud = f.window(23_000, 33_000);
         let pause = f.window(15_000, 25_000);
-        assert!(loud.loudness_z > quiet.loudness_z + 1.0, "{loud:?} vs {quiet:?}");
+        assert!(
+            loud.loudness_z > quiet.loudness_z + 1.0,
+            "{loud:?} vs {quiet:?}"
+        );
         assert!(pause.longest_pause_ms >= 2_900, "{pause:?}");
         assert!(quiet.pause_ratio < 0.05);
     }

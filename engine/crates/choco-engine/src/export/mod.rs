@@ -2,10 +2,10 @@
 //! title, description, hashtags, score and source timecodes. Names are
 //! `<source>-<rank>-<title-slug>.*` so a folder of exports sorts in rank order.
 
+use crate::ProgressFn;
 use crate::captions::{self, ChunkOptions, Rasterizer, subtitles};
 use crate::model::{Candidate, CaptionStyle, Layout, MediaAsset, Transcript};
 use crate::render::{self, RenderError, RenderReport, RenderSpec};
-use crate::ProgressFn;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -134,33 +134,71 @@ pub struct Job<'a> {
     pub cancel: &'a AtomicBool,
 }
 
-pub fn export_clip(asset: &MediaAsset, transcript: &Transcript, cand: &Candidate, rank: usize, opts: &ExportOptions, job: &mut Job) -> Result<ExportedClip, ExportError> {
+pub fn export_clip(
+    asset: &MediaAsset,
+    transcript: &Transcript,
+    cand: &Candidate,
+    rank: usize,
+    opts: &ExportOptions,
+    job: &mut Job,
+) -> Result<ExportedClip, ExportError> {
     let raster = &mut *job.raster;
     let size = preset_size(&opts.preset).ok_or_else(|| ExportError::Preset(opts.preset.clone()))?;
     let v = asset.video.as_ref().ok_or(ExportError::NoVideo)?;
     std::fs::create_dir_all(&opts.out_dir)?;
-    let stem_src = asset.path.file_stem().map(|s| slug(&s.to_string_lossy())).unwrap_or_else(|| "video".into());
+    let stem_src = asset
+        .path
+        .file_stem()
+        .map(|s| slug(&s.to_string_lossy()))
+        .unwrap_or_else(|| "video".into());
     let stem = format!("{stem_src}-{rank:02}-{}", slug(&cand.title));
     let path = |ext: &str| opts.out_dir.join(format!("{stem}.{ext}"));
-    let (mp4, poster, srt, vtt, json) = (path("mp4"), path("png"), path("srt"), path("vtt"), path("json"));
+    let (mp4, poster, srt, vtt, json) = (
+        path("mp4"),
+        path("png"),
+        path("srt"),
+        path("vtt"),
+        path("json"),
+    );
 
     let (plan, reframe) = if opts.auto_reframe {
-        let po = crate::reframe::PlanOptions { target: size, ..Default::default() };
-        let (p, r) = crate::reframe::auto_plan(asset, transcript, cand.start_ms, cand.end_ms, &po, job.cancel)?;
+        let po = crate::reframe::PlanOptions {
+            target: size,
+            ..Default::default()
+        };
+        let (p, r) = crate::reframe::auto_plan(
+            asset,
+            transcript,
+            cand.start_ms,
+            cand.end_ms,
+            &po,
+            job.cancel,
+        )?;
         (p, Some(r))
     } else {
-        let mut p = render::center_crop_plan((v.display_width, v.display_height), size, cand.start_ms);
+        let mut p =
+            render::center_crop_plan((v.display_width, v.display_height), size, cand.start_ms);
         p.layout = opts.layout;
         (p, None)
     };
 
     // Sidecar captions always exist; burned-in captions only when a style is chosen. In a split
     // the captions sit on the seam between the two people, not over the lower face.
-    let mut sidecar_style = opts.style.clone().unwrap_or_else(|| captions::preset("clean").expect("built-in"));
+    let mut sidecar_style = opts
+        .style
+        .clone()
+        .unwrap_or_else(|| captions::preset("clean").expect("built-in"));
     if plan.layout == Layout::Split {
         sidecar_style.position_pct = 46.0;
     }
-    let track = captions::chunk(transcript, (cand.start_ms, cand.end_ms), &sidecar_style, size, raster, &ChunkOptions::default());
+    let track = captions::chunk(
+        transcript,
+        (cand.start_ms, cand.end_ms),
+        &sidecar_style,
+        size,
+        raster,
+        &ChunkOptions::default(),
+    );
     std::fs::write(&srt, subtitles::srt(&track, cand.start_ms))?;
     std::fs::write(&vtt, subtitles::vtt(&track, cand.start_ms))?;
 
@@ -177,7 +215,11 @@ pub fn export_clip(asset: &MediaAsset, transcript: &Transcript, cand: &Candidate
     };
     let report = render::render_clip(asset, &spec, &mp4, raster, job.progress, job.cancel)?;
 
-    let name = |p: &Path| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let name = |p: &Path| {
+        p.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
     let (vn, pn, sn, tn) = (name(&mp4), name(&poster), name(&srt), name(&vtt));
     let side = Sidecar {
         title: &cand.title,
@@ -194,10 +236,25 @@ pub fn export_clip(asset: &MediaAsset, transcript: &Transcript, cand: &Candidate
         caption_style: opts.style.as_ref().map(|s| s.name.as_str()),
         picker: &cand.provenance,
         transcript_engine: &transcript.engine,
-        files: Files { video: &vn, poster: &pn, srt: &sn, vtt: &tn },
+        files: Files {
+            video: &vn,
+            poster: &pn,
+            srt: &sn,
+            vtt: &tn,
+        },
     };
     std::fs::write(&json, serde_json::to_string_pretty(&side)?)?;
-    Ok(ExportedClip { rank, candidate: cand.clone(), mp4, poster, srt, vtt, json, render: report, reframe })
+    Ok(ExportedClip {
+        rank,
+        candidate: cand.clone(),
+        mp4,
+        poster,
+        srt,
+        vtt,
+        json,
+        render: report,
+        reframe,
+    })
 }
 
 #[cfg(test)]
@@ -206,7 +263,10 @@ mod tests {
 
     #[test]
     fn slugs_are_safe_and_bounded() {
-        assert_eq!(slug("That's not leadership — that's hypocrisy!"), "that-s-not-leadership-that-s-hypocrisy");
+        assert_eq!(
+            slug("That's not leadership — that's hypocrisy!"),
+            "that-s-not-leadership-that-s-hypocrisy"
+        );
         assert_eq!(slug("🎯🎯"), "clip");
         assert!(slug(&"a".repeat(100)).len() <= 40);
         assert_eq!(slug("  --Hello  World-- "), "hello-world");

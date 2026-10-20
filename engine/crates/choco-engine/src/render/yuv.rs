@@ -2,9 +2,9 @@
 //! and blend caption sprites. BT.709 limited range throughout.
 
 use crate::captions::Sprite;
-use ffmpeg_next as ff;
 use ff::format::Pixel;
 use ff::software::scaling::{Context as Scaler, Flags};
+use ffmpeg_next as ff;
 use std::collections::HashMap;
 
 pub type Frame = ff::frame::Video;
@@ -23,14 +23,30 @@ pub struct Scalers {
 }
 
 impl Scalers {
-    fn get(&mut self, src: Pixel, sw: u32, sh: u32, dst: Pixel, dw: u32, dh: u32) -> Result<&mut Scaler, ff::Error> {
-        let key = (ff::ffi::AVPixelFormat::from(src) as i32 * 1000 + ff::ffi::AVPixelFormat::from(dst) as i32, sw, sh, dw, dh);
+    fn get(
+        &mut self,
+        src: Pixel,
+        sw: u32,
+        sh: u32,
+        dst: Pixel,
+        dw: u32,
+        dh: u32,
+    ) -> Result<&mut Scaler, ff::Error> {
+        let key = (
+            ff::ffi::AVPixelFormat::from(src) as i32 * 1000
+                + ff::ffi::AVPixelFormat::from(dst) as i32,
+            sw,
+            sh,
+            dw,
+            dh,
+        );
         if !self.map.contains_key(&key) {
             // Keep the cache bounded when crop sizes vary frame to frame.
             if self.map.len() > 32 {
                 self.map.clear();
             }
-            self.map.insert(key, Scaler::get(src, sw, sh, dst, dw, dh, Flags::BICUBIC)?);
+            self.map
+                .insert(key, Scaler::get(src, sw, sh, dst, dw, dh, Flags::BICUBIC)?);
         }
         Ok(self.map.get_mut(&key).expect("just inserted"))
     }
@@ -49,13 +65,27 @@ impl Scalers {
             }
             return Ok(out);
         }
-        self.get(src.format(), src.width(), src.height(), Pixel::YUV420P, src.width(), src.height())?.run(src, &mut out)?;
+        self.get(
+            src.format(),
+            src.width(),
+            src.height(),
+            Pixel::YUV420P,
+            src.width(),
+            src.height(),
+        )?
+        .run(src, &mut out)?;
         Ok(out)
     }
 
     /// Scale the even-aligned rectangle `(x, y, w, h)` of `src` into the rectangle `(dx, dy, dw, dh)` of `dst`.
     #[allow(clippy::too_many_arguments)]
-    pub fn crop_scale_into(&mut self, src: &Frame, rect: (u32, u32, u32, u32), dst: &mut Frame, dst_rect: (u32, u32, u32, u32)) -> Result<(), ff::Error> {
+    pub fn crop_scale_into(
+        &mut self,
+        src: &Frame,
+        rect: (u32, u32, u32, u32),
+        dst: &mut Frame,
+        dst_rect: (u32, u32, u32, u32),
+    ) -> Result<(), ff::Error> {
         let (x, y, w, h) = rect;
         let (dx, dy, dw, dh) = dst_rect;
         let (x, y, w, h) = (x & !1, y & !1, (w & !1).max(2), (h & !1).max(2));
@@ -80,7 +110,15 @@ impl Scalers {
             ];
             let ss: [i32; 4] = [(*s).linesize[0], (*s).linesize[1], (*s).linesize[2], 0];
             let ds: [i32; 4] = [(*d).linesize[0], (*d).linesize[1], (*d).linesize[2], 0];
-            let r = ff::ffi::sws_scale(scaler.as_mut_ptr(), src_ptrs.as_ptr(), ss.as_ptr(), 0, h as i32, dst_ptrs.as_ptr(), ds.as_ptr());
+            let r = ff::ffi::sws_scale(
+                scaler.as_mut_ptr(),
+                src_ptrs.as_ptr(),
+                ss.as_ptr(),
+                0,
+                h as i32,
+                dst_ptrs.as_ptr(),
+                ds.as_ptr(),
+            );
             if r <= 0 {
                 return Err(ff::Error::InvalidData);
             }
@@ -120,7 +158,11 @@ pub fn rotate(src: &Frame, deg: u16) -> Frame {
 /// Three-pass box blur of every plane, in place. Cheap enough on a downscaled frame.
 pub fn blur(f: &mut Frame, radius: usize) {
     for p in 0..3 {
-        let (w, h, s) = (f.plane_width(p) as usize, f.plane_height(p) as usize, f.stride(p));
+        let (w, h, s) = (
+            f.plane_width(p) as usize,
+            f.plane_height(p) as usize,
+            f.stride(p),
+        );
         let r = if p == 0 { radius } else { (radius / 2).max(1) };
         let data = f.data_mut(p);
         for _ in 0..3 {
@@ -129,7 +171,8 @@ pub fn blur(f: &mut Frame, radius: usize) {
                 let row = &data[y * s..y * s + w];
                 for (x, t) in tmp.iter_mut().enumerate() {
                     let (a, b) = (x.saturating_sub(r), (x + r).min(w - 1));
-                    *t = (row[a..=b].iter().map(|&v| v as u32).sum::<u32>() / (b - a + 1) as u32) as u8;
+                    *t = (row[a..=b].iter().map(|&v| v as u32).sum::<u32>() / (b - a + 1) as u32)
+                        as u8;
                 }
                 data[y * s..y * s + w].copy_from_slice(&tmp);
             }
@@ -137,7 +180,8 @@ pub fn blur(f: &mut Frame, radius: usize) {
             for x in 0..w {
                 for (y, c) in col.iter_mut().enumerate() {
                     let (a, b) = (y.saturating_sub(r), (y + r).min(h - 1));
-                    *c = ((a..=b).map(|yy| data[yy * s + x] as u32).sum::<u32>() / (b - a + 1) as u32) as u8;
+                    *c = ((a..=b).map(|yy| data[yy * s + x] as u32).sum::<u32>()
+                        / (b - a + 1) as u32) as u8;
                 }
                 for y in 0..h {
                     data[y * s + x] = col[y];
@@ -170,7 +214,12 @@ impl YuvSprite {
                 return [0; 4];
             }
             let i = (yy * s.w as usize + xx) * 4;
-            [s.rgba[i] as u32, s.rgba[i + 1] as u32, s.rgba[i + 2] as u32, s.rgba[i + 3] as u32]
+            [
+                s.rgba[i] as u32,
+                s.rgba[i + 1] as u32,
+                s.rgba[i + 2] as u32,
+                s.rgba[i + 3] as u32,
+            ]
         };
         // Premultiplied RGB -> premultiplied limited-range YUV (BT.709). Offsets scale with alpha.
         let to_yuv = |[r, g, b, a]: [u32; 4]| -> (f32, f32, f32, f32) {
@@ -190,7 +239,11 @@ impl YuvSprite {
             }
         }
         let (cw, ch) = (w / 2, h / 2);
-        let (mut pu, mut pv, mut ac) = (vec![0u16; cw * ch], vec![0u16; cw * ch], vec![0u16; cw * ch]);
+        let (mut pu, mut pv, mut ac) = (
+            vec![0u16; cw * ch],
+            vec![0u16; cw * ch],
+            vec![0u16; cw * ch],
+        );
         for cy in 0..ch {
             for cx in 0..cw {
                 let mut acc = (0.0f32, 0.0f32, 0.0f32);
@@ -205,7 +258,17 @@ impl YuvSprite {
                 ac[cy * cw + cx] = (acc.2 / 4.0).round() as u16;
             }
         }
-        Self { x, y, w, h, py, a, pu, pv, ac }
+        Self {
+            x,
+            y,
+            w,
+            h,
+            py,
+            a,
+            pu,
+            pv,
+            ac,
+        }
     }
 
     /// dst = src + dst * (1 - alpha), clipped to the frame.
@@ -271,7 +334,16 @@ pub fn fill(f: &mut Frame, y: u8, u: u8, v: u8) {
 /// YUV420P -> packed RGB24 for posters and snapshot tests.
 pub fn to_rgb(scalers: &mut Scalers, f: &Frame) -> Result<(u32, u32, Vec<u8>), ff::Error> {
     let mut out = Frame::new(Pixel::RGB24, f.width(), f.height());
-    scalers.get(Pixel::YUV420P, f.width(), f.height(), Pixel::RGB24, f.width(), f.height())?.run(f, &mut out)?;
+    scalers
+        .get(
+            Pixel::YUV420P,
+            f.width(),
+            f.height(),
+            Pixel::RGB24,
+            f.width(),
+            f.height(),
+        )?
+        .run(f, &mut out)?;
     let (w, h, s) = (f.width() as usize, f.height() as usize, out.stride(0));
     let mut rgb = Vec::with_capacity(w * h * 3);
     for y in 0..h {
@@ -309,11 +381,18 @@ mod tests {
         let mut sc = Scalers::default();
         let src = solid(64, 64, 200);
         let mut dst = solid(32, 32, 16);
-        sc.crop_scale_into(&src, (8, 8, 32, 32), &mut dst, (0, 0, 32, 32)).unwrap();
+        sc.crop_scale_into(&src, (8, 8, 32, 32), &mut dst, (0, 0, 32, 32))
+            .unwrap();
         assert!((dst.data(0)[16 * dst.stride(0) + 16] as i32 - 200).abs() <= 2);
 
         // An opaque white sprite becomes limited-range white (235) in luma, neutral chroma.
-        let sprite = Sprite { x: 4, y: 4, w: 4, h: 4, rgba: vec![255; 64] };
+        let sprite = Sprite {
+            x: 4,
+            y: 4,
+            w: 4,
+            h: 4,
+            rgba: vec![255; 64],
+        };
         let mut f = solid(16, 16, 16);
         YuvSprite::from_sprite(&sprite).blend(&mut f);
         let s = f.stride(0);

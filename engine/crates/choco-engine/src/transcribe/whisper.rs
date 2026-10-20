@@ -2,23 +2,32 @@
 //! whisper.cpp windows long audio internally (30 s with context carry-over), so we feed
 //! the whole file and rebuild words from sub-word tokens.
 
-use super::{Result, TranscribeError, TranscribeOptions, STAGE};
+use super::{Result, STAGE, TranscribeError, TranscribeOptions};
+use crate::ProgressFn;
 use crate::backend::Device;
 use crate::model::{Progress, Segment, Transcript, Word};
 use crate::models_registry;
-use crate::ProgressFn;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::Duration;
-use whisper_rs::{DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{
+    DtwMode, DtwModelPreset, DtwParameters, FullParams, SamplingStrategy, WhisperContext,
+    WhisperContextParameters,
+};
 
 fn werr(e: impl std::fmt::Display) -> TranscribeError {
     TranscribeError::Whisper(e.to_string())
 }
 
-pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress: ProgressFn) -> Result<Transcript> {
-    let manifest = models_registry::find(&opts.whisper_model).ok_or_else(|| TranscribeError::ModelMissing(opts.whisper_model.clone()))?;
+pub fn transcribe(
+    wav: &Path,
+    device: Device,
+    opts: &TranscribeOptions,
+    progress: ProgressFn,
+) -> Result<Transcript> {
+    let manifest = models_registry::find(&opts.whisper_model)
+        .ok_or_else(|| TranscribeError::ModelMissing(opts.whisper_model.clone()))?;
     if !models_registry::is_installed(&opts.models_dir, &manifest) {
         return Err(TranscribeError::ModelMissing(opts.whisper_model.clone()));
     }
@@ -26,23 +35,38 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
     let audio = crate::ingest::read_wav_f32(wav)?;
 
     whisper_rs::install_logging_hooks();
-    progress(Progress::new(STAGE, 0.0, format!("loading {}", opts.whisper_model)));
+    progress(Progress::new(
+        STAGE,
+        0.0,
+        format!("loading {}", opts.whisper_model),
+    ));
     let mut cparams = WhisperContextParameters::default();
     cparams.use_gpu(device != Device::Cpu);
     // Dynamic-time-warping token timestamps from the cross-attention heads: far tighter word
     // onsets than the default energy heuristic (measured in fixtures/timing.py). Needs the
     // preset that matches the model; unknown models keep the heuristic times.
     if let Some(preset) = dtw_preset(&opts.whisper_model) {
-        cparams.dtw_parameters(DtwParameters { mode: DtwMode::ModelPreset { model_preset: preset }, ..Default::default() });
+        cparams.dtw_parameters(DtwParameters {
+            mode: DtwMode::ModelPreset {
+                model_preset: preset,
+            },
+            ..Default::default()
+        });
     }
     let ctx = WhisperContext::new_with_params(&model_path, cparams).map_err(werr)?;
     let mut state = ctx.create_state().map_err(werr)?;
 
     // whisper.cpp wants a two-letter code or "auto".
-    let lang = opts.language.as_deref().map(|l| l.split(['-', '_']).next().unwrap_or(l).to_lowercase());
+    let lang = opts
+        .language
+        .as_deref()
+        .map(|l| l.split(['-', '_']).next().unwrap_or(l).to_lowercase());
     let lang_ref = lang.as_deref().unwrap_or("auto");
 
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8) as i32;
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .clamp(1, 8) as i32;
     // whisper-rs leaks the boxed progress closure (no Drop on FullParams), so anything it
     // captures lives forever. A channel sender inside it would never close; a shared atomic
     // polled until the worker finishes cannot deadlock and leaks only one small Arc.
@@ -79,7 +103,9 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
         Err(_) => return Err(werr("whisper worker panicked")),
     }
 
-    let language = whisper_rs::get_lang_str(state.full_lang_id_from_state()).unwrap_or(lang_ref).to_string();
+    let language = whisper_rs::get_lang_str(state.full_lang_id_from_state())
+        .unwrap_or(lang_ref)
+        .to_string();
     let mut segments = Vec::new();
     for seg in state.as_iter() {
         let mut words: Vec<Word> = Vec::new();
@@ -91,12 +117,19 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
         let flush = |cur: &mut Vec<u8>, start: u64, end: u64, conf: f32, words: &mut Vec<Word>| {
             let text = String::from_utf8_lossy(cur).trim().to_string();
             if !text.is_empty() {
-                words.push(Word { start_ms: start, end_ms: end.max(start + 1), text, confidence: conf });
+                words.push(Word {
+                    start_ms: start,
+                    end_ms: end.max(start + 1),
+                    text,
+                    confidence: conf,
+                });
             }
             cur.clear();
         };
         for t in 0..seg.n_tokens() {
-            let Some(tok) = seg.get_token(t) else { continue };
+            let Some(tok) = seg.get_token(t) else {
+                continue;
+            };
             let Ok(bytes) = tok.to_bytes() else { continue };
             if bytes.starts_with(b"[_") || bytes.starts_with(b"<|") {
                 continue; // special token
@@ -121,7 +154,10 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
             cur.extend_from_slice(bytes);
         }
         flush(&mut cur, cur_start, cur_end, cur_conf, &mut words);
-        let text = seg.to_str_lossy().map(|s| s.trim().to_string()).unwrap_or_default();
+        let text = seg
+            .to_str_lossy()
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
         if words.is_empty() && text.is_empty() {
             continue;
         }
@@ -133,7 +169,11 @@ pub fn transcribe(wav: &Path, device: Device, opts: &TranscribeOptions, progress
         });
     }
     progress(Progress::new(STAGE, 1.0, "transcribed"));
-    Ok(Transcript { language, engine: format!("whisper:{}", manifest.id.trim_start_matches("whisper-")), segments })
+    Ok(Transcript {
+        language,
+        engine: format!("whisper:{}", manifest.id.trim_start_matches("whisper-")),
+        segments,
+    })
 }
 
 /// The whisper.cpp DTW alignment-head preset for a registry model id, if it is a standard model.

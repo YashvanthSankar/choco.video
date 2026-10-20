@@ -54,13 +54,26 @@ pub struct RunResult {
 }
 
 fn check(cancel: &AtomicBool) -> Result<(), PipelineError> {
-    if cancel.load(Ordering::Relaxed) { Err(PipelineError::Cancelled) } else { Ok(()) }
+    if cancel.load(Ordering::Relaxed) {
+        Err(PipelineError::Cancelled)
+    } else {
+        Ok(())
+    }
 }
 
-pub fn run(file: &Path, opts: &RunOptions, llm: &dyn Llm, progress: ProgressFn, cancel: &AtomicBool) -> Result<RunResult, PipelineError> {
+pub fn run(
+    file: &Path,
+    opts: &RunOptions,
+    llm: &dyn Llm,
+    progress: ProgressFn,
+    cancel: &AtomicBool,
+) -> Result<RunResult, PipelineError> {
     let asset = ingest::probe(file)?;
     std::fs::create_dir_all(&opts.export.out_dir)?;
-    let stem = file.file_stem().map(|s| export::slug(&s.to_string_lossy())).unwrap_or_else(|| "video".into());
+    let stem = file
+        .file_stem()
+        .map(|s| export::slug(&s.to_string_lossy()))
+        .unwrap_or_else(|| "video".into());
     let tmp = TempDir::new()?;
     let wav = tmp.path.join("audio.wav");
     ingest::extract_audio(&asset, &wav, progress)?;
@@ -75,7 +88,10 @@ pub fn run(file: &Path, opts: &RunOptions, llm: &dyn Llm, progress: ProgressFn, 
             let engine = opts.speech.unwrap_or(b.speech_engines()[0]);
             let topts = TranscribeOptions {
                 language: opts.language.clone(),
-                whisper_model: b.recommended_models().whisper_model.unwrap_or_else(|| models_registry::WHISPER_DEFAULT.into()),
+                whisper_model: b
+                    .recommended_models()
+                    .whisper_model
+                    .unwrap_or_else(|| models_registry::WHISPER_DEFAULT.into()),
                 models_dir: models_registry::default_dir(),
             };
             transcribe::transcribe(&wav, engine, &topts, progress)?
@@ -85,22 +101,54 @@ pub fn run(file: &Path, opts: &RunOptions, llm: &dyn Llm, progress: ProgressFn, 
     drop(tmp);
     check(cancel)?;
 
-    let (cands, report) = highlights::highlights(&t, Some(&feats), llm, &opts.highlights, progress, Some(cancel))?;
+    let (cands, report) = highlights::highlights(
+        &t,
+        Some(&feats),
+        llm,
+        &opts.highlights,
+        progress,
+        Some(cancel),
+    )?;
     if cands.is_empty() {
         return Err(PipelineError::NoClips(opts.highlights.rank.min_score));
     }
     let mut raster = Rasterizer::new();
-    let mut job = Job { raster: &mut raster, progress, cancel };
+    let mut job = Job {
+        raster: &mut raster,
+        progress,
+        cancel,
+    };
     let mut clips = Vec::new();
     for (i, c) in cands.iter().enumerate() {
         check(cancel)?;
-        progress(Progress::new("export", i as f32 / cands.len() as f32, format!("clip {} of {}: {}", i + 1, cands.len(), c.title)));
-        clips.push(export::export_clip(&asset, &t, c, i + 1, &opts.export, &mut job)?);
+        progress(Progress::new(
+            "export",
+            i as f32 / cands.len() as f32,
+            format!("clip {} of {}: {}", i + 1, cands.len(), c.title),
+        ));
+        clips.push(export::export_clip(
+            &asset,
+            &t,
+            c,
+            i + 1,
+            &opts.export,
+            &mut job,
+        )?);
     }
     let summary_path = opts.export.out_dir.join(format!("{stem}.run.json"));
-    let result = RunResult { source: asset, transcript_path, picker: report, clips, summary_path: summary_path.clone() };
+    let result = RunResult {
+        source: asset,
+        transcript_path,
+        picker: report,
+        clips,
+        summary_path: summary_path.clone(),
+    };
     std::fs::write(&summary_path, serde_json::to_string_pretty(&result)?)?;
-    progress(Progress::new("export", 1.0, format!("{} clips", result.clips.len())));
+    progress(Progress::new(
+        "export",
+        1.0,
+        format!("{} clips", result.clips.len()),
+    ));
     Ok(result)
 }
 
@@ -114,7 +162,10 @@ impl TempDir {
         let path = std::env::temp_dir().join(format!(
             "choco-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
         ));
         std::fs::create_dir_all(&path)?;
         Ok(Self { path })

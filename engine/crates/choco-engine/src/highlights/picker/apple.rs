@@ -14,9 +14,12 @@ pub fn available() -> bool {
 
 impl AppleLlm {
     fn run(&self, mode: &str, system: &str, user: &str) -> Result<String> {
-        let helper = crate::transcribe::apple::helper_path()
-            .ok_or(PickerError::Unavailable { tier: "apple", msg: "choco-apple helper not found".into() })?;
-        let req = serde_json::json!({"mode": mode, "instructions": system, "prompt": user}).to_string();
+        let helper = crate::transcribe::apple::helper_path().ok_or(PickerError::Unavailable {
+            tier: "apple",
+            msg: "choco-apple helper not found".into(),
+        })?;
+        let req =
+            serde_json::json!({"mode": mode, "instructions": system, "prompt": user}).to_string();
         let mut child = Command::new(helper)
             .arg("generate")
             .stdin(Stdio::piped())
@@ -35,8 +38,15 @@ impl AppleLlm {
             err
         });
         let mut out = String::new();
-        child.stdout.take().expect("piped").read_to_string(&mut out).map_err(|e| PickerError::Transport(e.to_string()))?;
-        let status = child.wait().map_err(|e| PickerError::Transport(e.to_string()))?;
+        child
+            .stdout
+            .take()
+            .expect("piped")
+            .read_to_string(&mut out)
+            .map_err(|e| PickerError::Transport(e.to_string()))?;
+        let status = child
+            .wait()
+            .map_err(|e| PickerError::Transport(e.to_string()))?;
         let err = err_reader.join().unwrap_or_default();
         if status.success() {
             return Ok(out);
@@ -49,17 +59,28 @@ impl AppleLlm {
             .filter_map(|v| v["error"].as_str().map(str::to_string))
             .next_back()
             .unwrap_or_else(|| err.trim().to_string());
-        Err(if let Some(m) = msg.strip_prefix("declined: ").or_else(|| msg.contains("sensitive content").then_some(msg.as_str())) {
-            PickerError::Declined(m.into())
-        } else if let Some(m) = msg.strip_prefix("context: ").or_else(|| msg.contains("exceeds the maximum allowed context").then_some(msg.as_str())) {
-            // Measured on a 14-minute video: a 4-candidate batch plus summary overran the
-            // 8,192-token window. The caller splits the batch and retries.
-            PickerError::ContextTooLong(m.into())
-        } else if let Some(m) = msg.strip_prefix("unavailable: ") {
-            PickerError::Unavailable { tier: "apple", msg: m.into() }
-        } else {
-            PickerError::Transport(msg)
-        })
+        Err(
+            if let Some(m) = msg
+                .strip_prefix("declined: ")
+                .or_else(|| msg.contains("sensitive content").then_some(msg.as_str()))
+            {
+                PickerError::Declined(m.into())
+            } else if let Some(m) = msg.strip_prefix("context: ").or_else(|| {
+                msg.contains("exceeds the maximum allowed context")
+                    .then_some(msg.as_str())
+            }) {
+                // Measured on a 14-minute video: a 4-candidate batch plus summary overran the
+                // 8,192-token window. The caller splits the batch and retries.
+                PickerError::ContextTooLong(m.into())
+            } else if let Some(m) = msg.strip_prefix("unavailable: ") {
+                PickerError::Unavailable {
+                    tier: "apple",
+                    msg: m.into(),
+                }
+            } else {
+                PickerError::Transport(msg)
+            },
+        )
     }
 }
 
@@ -78,7 +99,8 @@ impl Llm for AppleLlm {
     }
     fn text(&self, _role: Role, system: &str, user: &str) -> Result<String> {
         let out = self.run("text", system, user)?;
-        let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| PickerError::Parse(e.to_string()))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&out).map_err(|e| PickerError::Parse(e.to_string()))?;
         Ok(v["text"].as_str().unwrap_or_default().to_string())
     }
     /// Guided generation first (always schema-valid). If the default guardrails decline the
@@ -87,8 +109,13 @@ impl Llm for AppleLlm {
     fn scores_json(&self, system: &str, user: &str) -> Result<String> {
         match self.run("scores", system, user) {
             Err(PickerError::Declined(_)) => {
-                let out = self.run("text", system, &format!("{user}\nReply with the JSON object only."))?;
-                let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| PickerError::Parse(e.to_string()))?;
+                let out = self.run(
+                    "text",
+                    system,
+                    &format!("{user}\nReply with the JSON object only."),
+                )?;
+                let v: serde_json::Value =
+                    serde_json::from_str(&out).map_err(|e| PickerError::Parse(e.to_string()))?;
                 Ok(v["text"].as_str().unwrap_or_default().to_string())
             }
             other => other,

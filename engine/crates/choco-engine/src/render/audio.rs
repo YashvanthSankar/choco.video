@@ -3,8 +3,8 @@
 
 use super::RenderError;
 use crate::model::MediaAsset;
-use ffmpeg_next as ff;
 use ff::{ChannelLayout, Dictionary, Packet, Rational, codec, filter, format};
+use ffmpeg_next as ff;
 
 pub const SAMPLE_RATE: i32 = 48_000;
 
@@ -18,26 +18,42 @@ pub struct EncodedAudio {
 /// (which start at the first decoded audio sample).
 pub(crate) fn stream_start_secs(s: &ff::format::stream::Stream) -> f64 {
     let st = s.start_time();
-    if st == ff::ffi::AV_NOPTS_VALUE { 0.0 } else { st as f64 * f64::from(s.time_base()) }
+    if st == ff::ffi::AV_NOPTS_VALUE {
+        0.0
+    } else {
+        st as f64 * f64::from(s.time_base())
+    }
 }
 
-pub fn encode(asset: &MediaAsset, start_ms: u64, end_ms: u64, normalize: bool) -> Result<Option<EncodedAudio>, RenderError> {
+pub fn encode(
+    asset: &MediaAsset,
+    start_ms: u64,
+    end_ms: u64,
+    normalize: bool,
+) -> Result<Option<EncodedAudio>, RenderError> {
     crate::init();
     let mut ictx = ff::format::input(&asset.path)?;
-    let Some(stream) = ictx.streams().best(ff::media::Type::Audio) else { return Ok(None) };
+    let Some(stream) = ictx.streams().best(ff::media::Type::Audio) else {
+        return Ok(None);
+    };
     let index = stream.index();
     let tb = stream.time_base();
     let base = stream_start_secs(&stream);
     let mut decoder = codec::context::Context::from_parameters(stream.parameters())?
         .decoder()
         .audio()
-        .map_err(|_| RenderError::Unsupported(format!("audio codec {:?}", stream.parameters().id())))?;
+        .map_err(|_| {
+            RenderError::Unsupported(format!("audio codec {:?}", stream.parameters().id()))
+        })?;
     if decoder.channel_layout().is_empty() {
         decoder.set_channel_layout(ChannelLayout::default(decoder.channels() as i32));
     }
 
-    let codec = ff::encoder::find_by_name("aac").ok_or_else(|| RenderError::Unsupported("aac encoder missing".into()))?;
-    let mut enc = codec::context::Context::new_with_codec(codec).encoder().audio()?;
+    let codec = ff::encoder::find_by_name("aac")
+        .ok_or_else(|| RenderError::Unsupported("aac encoder missing".into()))?;
+    let mut enc = codec::context::Context::new_with_codec(codec)
+        .encoder()
+        .audio()?;
     enc.set_rate(SAMPLE_RATE);
     enc.set_channel_layout(ChannelLayout::STEREO);
     enc.set_format(format::Sample::F32(format::sample::Type::Planar));
@@ -46,7 +62,10 @@ pub fn encode(asset: &MediaAsset, start_ms: u64, end_ms: u64, normalize: bool) -
     enc.set_flags(codec::Flags::GLOBAL_HEADER);
     let mut encoder = enc.open_with(Dictionary::new())?;
 
-    let (s, e) = (base + start_ms as f64 / 1000.0, base + end_ms as f64 / 1000.0);
+    let (s, e) = (
+        base + start_ms as f64 / 1000.0,
+        base + end_ms as f64 / 1000.0,
+    );
     let mut spec = format!("atrim=start={s:.6}:end={e:.6},asetpts=PTS-STARTPTS");
     if normalize {
         // Single-pass dynamic loudnorm; it upsamples internally, so resample after it.
@@ -61,13 +80,26 @@ pub fn encode(asset: &MediaAsset, start_ms: u64, end_ms: u64, normalize: bool) -
         decoder.format().name(),
         decoder.channel_layout().bits()
     );
-    graph.add(&filter::find("abuffer").ok_or(ff::Error::FilterNotFound)?, "in", &args)?;
-    graph.add(&filter::find("abuffersink").ok_or(ff::Error::FilterNotFound)?, "out", "")?;
+    graph.add(
+        &filter::find("abuffer").ok_or(ff::Error::FilterNotFound)?,
+        "in",
+        &args,
+    )?;
+    graph.add(
+        &filter::find("abuffersink").ok_or(ff::Error::FilterNotFound)?,
+        "out",
+        "",
+    )?;
     graph.output("in", 0)?.input("out", 0)?.parse(&spec)?;
     graph.validate()?;
-    graph.get("out").expect("sink").sink().set_frame_size(encoder.frame_size());
+    graph
+        .get("out")
+        .expect("sink")
+        .sink()
+        .set_frame_size(encoder.frame_size());
 
-    let seek_to = ((start_ms as f64 / 1000.0 + base - 2.0).max(0.0) * ff::ffi::AV_TIME_BASE as f64) as i64;
+    let seek_to =
+        ((start_ms as f64 / 1000.0 + base - 2.0).max(0.0) * ff::ffi::AV_TIME_BASE as f64) as i64;
     let _ = ictx.seek(seek_to, ..seek_to);
 
     let mut packets = Vec::new();
@@ -81,16 +113,32 @@ pub fn encode(asset: &MediaAsset, start_ms: u64, end_ms: u64, normalize: bool) -
         }
     };
     // Send one frame, collecting packets whenever the encoder asks for room (EAGAIN).
-    let send = |encoder: &mut ff::encoder::Audio, frame: &ff::frame::Audio, packets: &mut Vec<Packet>| -> Result<(), ff::Error> {
+    let send = |encoder: &mut ff::encoder::Audio,
+                frame: &ff::frame::Audio,
+                packets: &mut Vec<Packet>|
+     -> Result<(), ff::Error> {
         loop {
             match encoder.send_frame(frame) {
-                Err(ff::Error::Other { errno }) if errno == ff::util::error::EAGAIN => drain_encoder(encoder, packets),
+                Err(ff::Error::Other { errno }) if errno == ff::util::error::EAGAIN => {
+                    drain_encoder(encoder, packets)
+                }
                 other => return other,
             }
         }
     };
-    let pull = |graph: &mut filter::Graph, encoder: &mut ff::encoder::Audio, filtered: &mut ff::frame::Audio, samples: &mut i64, packets: &mut Vec<Packet>| -> Result<(), ff::Error> {
-        while graph.get("out").expect("sink").sink().frame(filtered).is_ok() {
+    let pull = |graph: &mut filter::Graph,
+                encoder: &mut ff::encoder::Audio,
+                filtered: &mut ff::frame::Audio,
+                samples: &mut i64,
+                packets: &mut Vec<Packet>|
+     -> Result<(), ff::Error> {
+        while graph
+            .get("out")
+            .expect("sink")
+            .sink()
+            .frame(filtered)
+            .is_ok()
+        {
             filtered.set_pts(Some(*samples));
             *samples += filtered.samples() as i64;
             send(encoder, filtered, packets)?;
@@ -123,7 +171,13 @@ pub fn encode(asset: &MediaAsset, start_ms: u64, end_ms: u64, normalize: bool) -
                 }
                 other => other?,
             }
-            pull(&mut graph, &mut encoder, &mut filtered, &mut samples, &mut packets)?;
+            pull(
+                &mut graph,
+                &mut encoder,
+                &mut filtered,
+                &mut samples,
+                &mut packets,
+            )?;
         }
     }
     if !graph_done {
@@ -138,8 +192,18 @@ pub fn encode(asset: &MediaAsset, start_ms: u64, end_ms: u64, normalize: bool) -
             Err(e) => return Err(e.into()),
         }
     }
-    pull(&mut graph, &mut encoder, &mut filtered, &mut samples, &mut packets)?;
+    pull(
+        &mut graph,
+        &mut encoder,
+        &mut filtered,
+        &mut samples,
+        &mut packets,
+    )?;
     encoder.send_eof()?;
     drain_encoder(&mut encoder, &mut packets);
-    Ok(Some(EncodedAudio { encoder, packets, time_base: Rational(1, SAMPLE_RATE) }))
+    Ok(Some(EncodedAudio {
+        encoder,
+        packets,
+        time_base: Rational(1, SAMPLE_RATE),
+    }))
 }
