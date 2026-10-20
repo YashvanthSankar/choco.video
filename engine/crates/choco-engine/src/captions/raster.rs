@@ -385,6 +385,42 @@ mod tests {
         assert!(translucent > 1000, "{translucent}");
     }
 
+    /// Pixel hashes of every preset, recorded on macOS arm64. The Windows x64 runner must produce
+    /// the same bytes: captions use only the bundled fonts, so nothing may differ by OS. After a
+    /// deliberate style change, copy the table from the failure message.
+    const RASTER_HASHES: &[(&str, &str)] = &[
+        ("clean", "5281d2e8f490e05c"),
+        ("bold", "1bf4c80b1a306d85"),
+        ("karaoke", "cc85fac3925513de"),
+        ("minimal", "77c9cbba15611abe"),
+    ];
+
+    #[test]
+    fn every_preset_rasterizes_identically_on_every_os() {
+        let mut r = Rasterizer::new();
+        let got: Vec<(String, String)> = crate::captions::presets()
+            .iter()
+            .map(|st| {
+                let s = r.render(&chunk(&["Charge", "more", "now"]), Some(1), st, 1080, 1920);
+                let mut h = blake3::Hasher::new();
+                for v in [s.x as i64, s.y as i64, s.w as i64, s.h as i64] {
+                    h.update(&v.to_le_bytes());
+                }
+                h.update(&s.rgba);
+                (st.name.clone(), h.finalize().to_hex()[..16].to_string())
+            })
+            .collect();
+        let want: Vec<(String, String)> = RASTER_HASHES
+            .iter()
+            .map(|(n, h)| (n.to_string(), h.to_string()))
+            .collect();
+        let table: String = got
+            .iter()
+            .map(|(n, h)| format!("        (\"{n}\", \"{h}\"),\n"))
+            .collect();
+        assert_eq!(got, want, "caption pixels changed; new table:\n{table}");
+    }
+
     #[test]
     fn parses_colours() {
         assert_eq!(parse_color("#FFE14D"), [255, 225, 77, 255]);

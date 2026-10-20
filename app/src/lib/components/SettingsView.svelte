@@ -81,7 +81,7 @@
   </div>
 
   <h2 class="sp">About</h2>
-  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · {words.osName} {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, system fonts.</p>
+  <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · {words.osName} {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, and the Inter and Montserrat fonts (SIL OFL).</p>
   <div class="row diag">
     <button class="small" onclick={copyDiagnostics}>Copy diagnostics</button>
     <span class="small muted">{copied || "For bug reports: hardware, encoders and settings. Never your key, videos or transcripts."}</span>
