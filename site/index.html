@@ -81,7 +81,14 @@ button, input { font: inherit; color: inherit; }
 /* film */
 .film { margin-top: var(--gap); display: grid; grid-template-columns: 4fr 8fr; gap: 12px 40px; align-items: end; }
 .film .text { display: grid; gap: 20px; align-self: start; }
-.film video { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r); background: var(--surface); }
+.film video { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r); background: var(--surface); }
+.film-frame { position: relative; min-width: 0; }
+.sound { position: absolute; left: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 12px; border: 0; border-radius: 999px; background: var(--ink); color: var(--on-choc); font: 600 var(--step-small) "General Sans", sans-serif; cursor: pointer; transition: transform .15s; }
+.sound:hover { transform: translateY(-1px); }
+.sound svg { width: 18px; height: 18px; }
+.sound .wave { display: none; }
+.sound[aria-pressed="true"] .wave { display: block; }
+.sound[aria-pressed="true"] .mute { display: none; }
 .film figcaption { grid-column: 2; color: var(--muted); font-size: var(--step-small); }
 
 /* showcase: the 9:16 slab instead of a disc; choosing a name swaps the clip */
@@ -342,7 +349,10 @@ button, input { font: inherit; color: inherit; }
       <h2 class="head">One episode, four clips.</h2>
       <p>A 47-minute interview went in. Four minutes later, four captioned clips came out, each framed on whoever was talking. Thirty seconds, no sound needed.</p>
     </div>
-    <video autoplay muted loop playsinline preload="metadata" poster="media/choco-launch-poster.jpg" src="media/choco-launch.mp4" aria-label="30-second product film: the app turns a long episode into four captioned vertical clips"></video>
+    <div class="film-frame">
+      <video id="film-v" autoplay muted loop playsinline preload="metadata" poster="media/choco-launch-poster.jpg" src="media/choco-launch.mp4" aria-label="30-second product film: the app turns a long episode into four captioned vertical clips"></video>
+      <button class="sound" id="sound" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/><path class="mute" d="m17 9 5 6M22 9l-5 6"/></svg><span>Sound on</span></button>
+    </div>
     <figcaption>The real app and real output: a 47:52 episode became four captioned clips in 226 seconds on an M3 Pro.</figcaption>
   </figure>
 
@@ -466,6 +476,16 @@ button, input { font: inherit; color: inherit; }
   const stripe = document.getElementById("stripe");
   const picks = [284, 327, 586, 784].map((s) => Math.floor(s / 120));
   for (let i = 0; i < 24; i++) { const b = document.createElement("span"); if (picks.includes(i)) b.className = "pick"; stripe.appendChild(b); }
+
+  // Film: muted autoplay (browsers require it); one button turns the sound on from the start.
+  const fv = document.getElementById("film-v"), sb = document.getElementById("sound");
+  sb.addEventListener("click", () => {
+    const on = fv.muted;
+    fv.muted = !on;
+    if (on) { fv.currentTime = 0; fv.play().catch(() => {}); }
+    sb.setAttribute("aria-pressed", String(on));
+    sb.querySelector("span").textContent = on ? "Sound off" : "Sound on";
+  });
 
   // Hero: the clip slowly crossfades between the real clips (signature move).
   const slab = document.getElementById("slab").querySelectorAll("video");

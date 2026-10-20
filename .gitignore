@@ -22,3 +22,4 @@ videos/*/.hyperframes/artifacts/
 videos/*/.hyperframes/frame-packets/
 videos/*/.hyperframes/*.json
 videos/*/.hyperframes/history-id
+videos/*/audio/*.wav

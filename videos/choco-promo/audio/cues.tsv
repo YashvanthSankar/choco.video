@@ -1,0 +1,17 @@
+# sfx	target_s	peak_s	volume	moment
+sfx_010	1.00	0.42	0.55	icon resolves
+sfx_006	3.90	0.16	0.70	window swings up
+sfx_003	5.20	0.12	0.55	file chip appears
+sfx_005	7.15	2.07	0.55	file dropped
+sfx_002	8.20	0.00	0.95	click Find clips
+sfx_009	8.75	0.29	0.30	screen changes to the job
+sfx_006	9.60	0.16	0.40	camera pushes in
+sfx_001	17.00	2.59	0.50	phones lift out
+sfx_003	17.80	0.12	0.30	phone lands
+sfx_003	17.95	0.12	0.30	phone lands
+sfx_003	18.10	0.12	0.30	phone lands
+sfx_003	18.25	0.12	0.30	phone lands
+sfx_006	23.46	0.16	0.50	statement one
+sfx_006	24.81	0.16	0.50	statement two
+sfx_006	26.16	0.16	0.50	statement three
+sfx_004	27.60	0.23	0.60	end card
