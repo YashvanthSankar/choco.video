@@ -58,10 +58,10 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [x] Tauri 2 + Svelte 5 app over the engine: onboarding (privacy line → picker with live key test and pre-selected models showing cents per hour → speech setup), home (drop or choose a file, prompt, count, style, size, framing, output folder), job progress with cancel, results grid (poster, inline playback, Show in Finder, copy caption, restyle), settings → used for a real run by the project owner
 - [x] Keychain-only key storage; key saved only after the model list succeeds; strict CSP; scoped asset protocol; capabilities limited to dialogs, reveal, and OpenCode/GitHub links; app `deny.toml` passes
 - [x] Release bundle: `scripts/build-app.sh` (Apple helper sidecar, six FFmpeg dylibs in `Contents/Frameworks`, no build-machine rpath in release) → `choco.video.app` 20 MB, DMG 9.9 MB, launches and stays up
-- [x] README, CONTRIBUTING (DCO), `llms.txt`; landing page in `site/` with a live canvas demo
+- [x] README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, LICENSE, issue and PR templates; landing page redesigned (taste-skill, 0 FAIL), live at https://chocovideo.vercel.app with a 30 s animated film
 - [x] UI redesign (macOS-native, light/dark, stage list, results grid), reviewed screen by screen
 - [x] Release workflow (`release.yml`): tag → build → DMG on GitHub Releases, signing/notarization when the Apple secrets exist
-- [x] **v0.1.0 released** (ad-hoc signed, sealed bundle, 9.9 MB DMG): https://github.com/YashvanthSankar/choco.video/releases/tag/v0.1.0 — the repo is private, so only collaborators can download it until it is made public
+- [x] **v0.1.1 released**: https://github.com/YashvanthSankar/choco.video/releases/tag/v0.1.1 (10 MB DMG, verified to launch from a fresh download once opened via right-click → Open). v0.1.0 is marked superseded: hardened runtime refused its own FFmpeg dylibs, so it died at launch. The build script now launches the app and fails if it exits. The repo is still private, so the website's download link returns 404 until it is made public
 - [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`; then rerun `choco eval` per model and freeze `OPENCODE_RECOMMENDED`
 - [x] Pushed; first CI runs found two real gaps (the bundled face model was gitignored, fixtures never generated) and an unmaintained-crate advisory → fixed
 - [ ] Developer ID signing + notarization (needs your Apple Developer account); without it the DMG only runs after right-click → Open
