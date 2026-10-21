@@ -354,55 +354,75 @@ pub fn highlights(
     let mut consecutive_failures = 0usize;
     let mut last_error = String::new();
     let mut skipped: Vec<String> = Vec::new();
-    for (bi, batch) in batches.iter().enumerate() {
+    // Batches go out in waves of `concurrency`: a 72-min episode is ten batches, and waiting on
+    // each in turn was most of the picker's wall time. Results are handled in batch order.
+    let wave = llm.concurrency().max(1);
+    'waves: for (wi, group) in batches.chunks(wave).enumerate() {
         if cancelled() {
             return Err(HighlightError::Cancelled);
         }
+        let first = wi * wave;
         progress(Progress::new(
             STAGE,
-            0.1 + 0.85 * bi as f32 / batches.len() as f32,
+            0.1 + 0.85 * first as f32 / batches.len() as f32,
             format!(
                 "scoring batch {}/{} with {}",
-                bi + 1,
+                first + group.len(),
                 batches.len(),
                 llm.model(Role::Score)
             ),
         ));
-        match score_batch(
-            llm,
-            &summary,
-            batch,
-            opts.prompt.as_deref(),
-            &mut calls,
-            &mut skipped,
-        ) {
-            Ok(s) => {
-                consecutive_failures = 0;
-                s.into_iter().for_each(|x| {
-                    by_id.insert(x.id.clone(), x);
+        let summary = summary.as_str();
+        let prompt = opts.prompt.as_deref();
+        let results: Vec<_> = std::thread::scope(|s| {
+            let handles: Vec<_> = group
+                .iter()
+                .map(|batch| {
+                    s.spawn(move || {
+                        let (mut c, mut sk) = (0, Vec::new());
+                        let r = score_batch(llm, summary, batch, prompt, &mut c, &mut sk);
+                        (r, c, sk)
+                    })
                 })
-            }
-            Err(PickerError::Declined(m)) => {
-                consecutive_failures = 0;
-                report.declined_batches += 1;
-                if report.errors.len() < 8 {
-                    report
-                        .errors
-                        .push(format!("batch {}: declined: {m}", bi + 1));
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().expect("scoring thread panicked"))
+                .collect()
+        });
+        for (j, (result, c, sk)) in results.into_iter().enumerate() {
+            let bi = first + j;
+            calls += c;
+            skipped.extend(sk);
+            match result {
+                Ok(s) => {
+                    consecutive_failures = 0;
+                    s.into_iter().for_each(|x| {
+                        by_id.insert(x.id.clone(), x);
+                    })
                 }
-            }
-            Err(e) if is_fatal(&e) => return Err(e.into()),
-            Err(e) => {
-                report.failed_batches += 1;
-                consecutive_failures += 1;
-                last_error = e.to_string();
-                if report.errors.len() < 8 {
-                    report.errors.push(format!("batch {}: {e}", bi + 1));
+                Err(PickerError::Declined(m)) => {
+                    consecutive_failures = 0;
+                    report.declined_batches += 1;
+                    if report.errors.len() < 8 {
+                        report
+                            .errors
+                            .push(format!("batch {}: declined: {m}", bi + 1));
+                    }
                 }
-                // Two failures in a row with nothing scored yet means the provider is not
-                // working for this job; stop before paying for every remaining batch.
-                if consecutive_failures >= 2 && by_id.is_empty() {
-                    break;
+                Err(e) if is_fatal(&e) => return Err(e.into()),
+                Err(e) => {
+                    report.failed_batches += 1;
+                    consecutive_failures += 1;
+                    last_error = e.to_string();
+                    if report.errors.len() < 8 {
+                        report.errors.push(format!("batch {}: {e}", bi + 1));
+                    }
+                    // Two failures in a row with nothing scored yet means the provider is not
+                    // working for this job; stop before paying for every remaining batch.
+                    if consecutive_failures >= 2 && by_id.is_empty() {
+                        break 'waves;
+                    }
                 }
             }
         }
@@ -550,6 +570,64 @@ mod tests {
             "expected map-reduce, got {text_calls} summary calls"
         );
         // Skipped ids were re-asked: every shortlisted window ended up scored.
+        assert_eq!(report.scored, report.shortlisted);
+    }
+
+    /// Scores like FakeLlm, four batches at a time, recording how many calls overlap.
+    struct Parallel {
+        inner: FakeLlm,
+        in_flight: std::sync::atomic::AtomicUsize,
+        peak: std::sync::atomic::AtomicUsize,
+    }
+    impl Llm for Parallel {
+        fn tier(&self) -> &'static str {
+            "fake"
+        }
+        fn model(&self, r: Role) -> String {
+            self.inner.model(r)
+        }
+        fn context_tokens(&self) -> usize {
+            100_000
+        }
+        fn batch_size(&self) -> usize {
+            3
+        }
+        fn concurrency(&self) -> usize {
+            4
+        }
+        fn text(&self, r: Role, s: &str, u: &str) -> Result<String, PickerError> {
+            self.inner.text(r, s, u)
+        }
+        fn scores_json(&self, s: &str, u: &str) -> Result<String, PickerError> {
+            use std::sync::atomic::Ordering::SeqCst;
+            let now = self.in_flight.fetch_add(1, SeqCst) + 1;
+            self.peak.fetch_max(now, SeqCst);
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            let out = self.inner.scores_json(s, u);
+            self.in_flight.fetch_sub(1, SeqCst);
+            out
+        }
+    }
+
+    #[test]
+    fn hosted_batches_are_scored_side_by_side() {
+        let t = windows::tests::synthetic(60, 6_000, 16, 200);
+        let ws = windows::windows(&t, &windows::WindowOptions::default());
+        let llm = Parallel {
+            inner: FakeLlm {
+                calls: Mutex::new(vec![]),
+                texts: ws.iter().map(|w| (w.id.clone(), w.text.clone())).collect(),
+            },
+            in_flight: Default::default(),
+            peak: Default::default(),
+        };
+        let opts = HighlightOptions {
+            shortlist: 24,
+            ..Default::default()
+        };
+        let (_, report) = highlights(&t, None, &llm, &opts, &|_| {}, None).unwrap();
+        let peak = llm.peak.load(std::sync::atomic::Ordering::SeqCst);
+        assert!((2..=4).contains(&peak), "peak {peak}");
         assert_eq!(report.scored, report.shortlisted);
     }
 

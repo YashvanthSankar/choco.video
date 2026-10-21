@@ -50,6 +50,11 @@ pub trait Llm: Send + Sync {
     fn batch_size(&self) -> usize {
         8
     }
+    /// Scoring calls in flight at once. A hosted endpoint answers several side by side; the
+    /// on-device model runs one at a time.
+    fn concurrency(&self) -> usize {
+        1
+    }
     /// Tokens consumed so far, per role, when the backend reports them.
     fn usage(&self) -> Usage {
         Usage::default()

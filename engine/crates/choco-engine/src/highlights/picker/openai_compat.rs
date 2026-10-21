@@ -301,6 +301,9 @@ impl Llm for OpenAiCompat {
             Role::Summarize => self.cfg.summarize_model.clone(),
         }
     }
+    fn concurrency(&self) -> usize {
+        4
+    }
     fn context_tokens(&self) -> usize {
         self.cfg.context_tokens
     }
@@ -393,14 +396,32 @@ mod tests {
 
     #[test]
     fn hides_zen_models_we_cannot_call_only_on_zen() {
-        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "glm-5.3-flash-free"));
+        assert!(!usable_outside_opencode(
+            OPENCODE_ZEN_BASE_URL,
+            "glm-5.3-flash-free"
+        ));
         assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "test"));
-        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "claude-haiku-5-5"));
-        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "gpt-5.4-nano"));
-        assert!(usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "glm-5.3-flash"));
+        assert!(!usable_outside_opencode(
+            OPENCODE_ZEN_BASE_URL,
+            "claude-haiku-5-5"
+        ));
+        assert!(!usable_outside_opencode(
+            OPENCODE_ZEN_BASE_URL,
+            "gpt-5.4-nano"
+        ));
+        assert!(usable_outside_opencode(
+            OPENCODE_ZEN_BASE_URL,
+            "glm-5.3-flash"
+        ));
         assert!(usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "minimax-m3"));
-        assert!(usable_outside_opencode("https://openrouter.ai/api/v1", "claude-haiku-5-5"));
-        assert!(usable_outside_opencode("https://openrouter.ai/api/v1", "glm-5.3-flash-free"));
+        assert!(usable_outside_opencode(
+            "https://openrouter.ai/api/v1",
+            "claude-haiku-5-5"
+        ));
+        assert!(usable_outside_opencode(
+            "https://openrouter.ai/api/v1",
+            "glm-5.3-flash-free"
+        ));
     }
 
     fn ok(content: &str) -> (u16, String) {
