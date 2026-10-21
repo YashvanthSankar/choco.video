@@ -73,6 +73,17 @@ export interface ExportedClip {
   reframe: { layout: string; switches: number; moves: number } | null;
 }
 
+/** A transcript word of one clip; `index` is its position among the clip's words. */
+export interface CaptionWord {
+  index: number;
+  text: string;
+}
+
+export interface WordEdit {
+  index: number;
+  text: string;
+}
+
 export interface RunResult {
   source: { path: string; duration_ms: number };
   picker: { windows: number; shortlisted: number; scored: number; model_calls: number; errors: string[] };
@@ -115,6 +126,9 @@ export const api = {
   cancelJob: (job: number) => invoke<void>("cancel_job", { job }),
   reexportClip: (summaryPath: string, rank: number, style: string, preset: string, layout: string) =>
     invoke<ExportedClip>("reexport_clip", { summaryPath, rank, style, preset, layout }),
+  clipWords: (summaryPath: string, rank: number) => invoke<CaptionWord[][]>("clip_words", { summaryPath, rank }),
+  updateCaptionWords: (summaryPath: string, rank: number, edits: WordEdit[], layout: string | null) =>
+    invoke<ExportedClip>("update_caption_words", { summaryPath, rank, edits, layout }),
   loadRun: (summaryPath: string) => invoke<RunResult>("load_run", { summaryPath }),
   downloadSpeechModel: () => invoke<void>("download_speech_model"),
 };
