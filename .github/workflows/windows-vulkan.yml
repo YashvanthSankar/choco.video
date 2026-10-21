@@ -19,6 +19,9 @@ jobs:
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
       GGML_NATIVE: "OFF"
       VULKAN_VERSION: 1.4.321.1
+      # ggml-vulkan builds its shader generator as a nested CMake project; under engine\target its
+      # MSBuild tracking paths pass 260 characters (FTK1011). A short target dir keeps them under.
+      CARGO_TARGET_DIR: C:\t
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
@@ -44,7 +47,7 @@ jobs:
       - name: CPU-only build (size reference)
         run: |
           cargo build --release -p choco
-          cp target/release/choco.exe "$RUNNER_TEMP/choco-cpu.exe"
+          cp /c/t/release/choco.exe "$RUNNER_TEMP/choco-cpu.exe"
       - name: Vulkan build, vulkan-1.dll delay-loaded
         # RUSTFLAGS replaces the cargo config's rustflags, so they are repeated here.
         env:
@@ -52,11 +55,11 @@ jobs:
         run: cargo build --release -p choco --features choco-engine/vulkan
       - name: Size and imports
         run: |
-          cpu=$(stat -c%s "$RUNNER_TEMP/choco-cpu.exe"); vk=$(stat -c%s target/release/choco.exe)
+          cpu=$(stat -c%s "$RUNNER_TEMP/choco-cpu.exe"); vk=$(stat -c%s /c/t/release/choco.exe)
           line="choco.exe CPU $((cpu/1000)) kB · Vulkan $((vk/1000)) kB · delta $(((vk-cpu)/1000)) kB"
           echo "$line"; echo "$line" >> "$GITHUB_STEP_SUMMARY"
-          IMPORTS_LOG=/dev/stdout ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin target/release/choco.exe | grep -i "vulkan\|imports ok\|FAIL" || true
-          ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin target/release/choco.exe
+          IMPORTS_LOG=/dev/stdout ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin /c/t/release/choco.exe | grep -i "vulkan\|imports ok\|FAIL" || true
+          ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin /c/t/release/choco.exe
       - name: Is there a Vulkan driver on this runner?
         run: ls /c/Windows/System32/vulkan-1.dll 2>/dev/null && echo "vulkan-1.dll present" || echo "no vulkan-1.dll (expected on a GPU-less runner)"
       - name: Vulkan build transcribes on the CPU without a Vulkan driver
@@ -66,7 +69,7 @@ jobs:
           w = wave.open('tone.wav', 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
           w.writeframes(b''.join(struct.pack('<h', int(8000 * math.sin(2 * math.pi * 220 * i / 16000))) for i in range(16000 * 5)))
           "
-          ./target/release/choco.exe doctor
-          ./target/release/choco.exe models pull whisper-base-q5_1
-          ./target/release/choco.exe transcribe tone.wav --engine whisper --model whisper-base-q5_1 --language en -o t.json
+          /c/t/release/choco.exe doctor
+          /c/t/release/choco.exe models pull whisper-base-q5_1
+          /c/t/release/choco.exe transcribe tone.wav --engine whisper --model whisper-base-q5_1 --language en -o t.json
           echo "transcribe exit 0"; head -c 400 t.json
