@@ -1,0 +1,72 @@
+# Whisper on Vulkan for Windows (docs/TODO.md M6, transcription): does the `vulkan` build compile
+# against the pinned LunarG SDK, what does it add to choco.exe, is vulkan-1.dll delay-loaded, and
+# does a Vulkan build still transcribe on the CPU on a machine without a Vulkan driver (the
+# runner has no GPU)? Manual for now; it joins the main jobs once the answers are known.
+name: windows-vulkan
+on:
+  workflow_dispatch:
+
+jobs:
+  vulkan:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: engine
+    env:
+      FFMPEG_DIR: ${{ github.workspace }}\vendor\ffmpeg\8.1.3-windows-x64
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      GGML_NATIVE: "OFF"
+      VULKAN_VERSION: 1.4.321.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Minimal LGPL FFmpeg (ours, pinned, sha256-checked)
+        working-directory: .
+        run: ./scripts/ffmpeg/fetch-windows.sh
+      - name: FFmpeg DLLs on PATH
+        working-directory: .
+        run: echo "$(cygpath -w "$PWD/vendor/ffmpeg/8.1.3-windows-x64/bin")" >> "$GITHUB_PATH"
+      - name: Vulkan SDK (build-time only; headers, loader import library, glslc)
+        shell: pwsh
+        working-directory: .
+        run: |
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\vk.exe" "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\vk.exe" --root "C:\VulkanSDK\$env:VULKAN_VERSION" --accept-licenses --default-answer --confirm-command install
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\Bin"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+          key: vulkan
+      - name: CPU-only build (size reference)
+        run: |
+          cargo build --release -p choco
+          cp target/release/choco.exe "$RUNNER_TEMP/choco-cpu.exe"
+      - name: Vulkan build, vulkan-1.dll delay-loaded
+        # RUSTFLAGS replaces the cargo config's rustflags, so they are repeated here.
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static -C link-arg=/STACK:8388608 -C link-arg=/DELAYLOAD:vulkan-1.dll -C link-arg=delayimp.lib
+        run: cargo build --release -p choco --features choco-engine/vulkan
+      - name: Size and imports
+        run: |
+          cpu=$(stat -c%s "$RUNNER_TEMP/choco-cpu.exe"); vk=$(stat -c%s target/release/choco.exe)
+          line="choco.exe CPU $((cpu/1000)) kB · Vulkan $((vk/1000)) kB · delta $(((vk-cpu)/1000)) kB"
+          echo "$line"; echo "$line" >> "$GITHUB_STEP_SUMMARY"
+          IMPORTS_LOG=/dev/stdout ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin target/release/choco.exe | grep -i "vulkan\|imports ok\|FAIL" || true
+          ../scripts/check-imports.sh ../vendor/ffmpeg/8.1.3-windows-x64/bin target/release/choco.exe
+      - name: Is there a Vulkan driver on this runner?
+        run: ls /c/Windows/System32/vulkan-1.dll 2>/dev/null && echo "vulkan-1.dll present" || echo "no vulkan-1.dll (expected on a GPU-less runner)"
+      - name: Vulkan build transcribes on the CPU without a Vulkan driver
+        run: |
+          python -c "
+          import math, struct, wave
+          w = wave.open('tone.wav', 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+          w.writeframes(b''.join(struct.pack('<h', int(8000 * math.sin(2 * math.pi * 220 * i / 16000))) for i in range(16000 * 5)))
+          "
+          ./target/release/choco.exe doctor
+          ./target/release/choco.exe models pull whisper-base-q5_1
+          ./target/release/choco.exe transcribe tone.wav --engine whisper --model whisper-base-q5_1 --language en -o t.json
+          echo "transcribe exit 0"; head -c 400 t.json
