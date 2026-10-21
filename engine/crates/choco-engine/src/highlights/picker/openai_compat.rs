@@ -22,8 +22,8 @@ pub struct Recommended {
 
 /// Measured on the five-podcast golden set (5.2 h of source, not yet human-reviewed) at
 /// OpenCode Zen list prices. MiniMax is cheapest and best: it writes short JSON, while the
-/// others spend 5-7x the output tokens reasoning. GLM was not measured (summaries timed out
-/// before the fix, then the test key hit its budget).
+/// others spend 5-7x the output tokens reasoning. GLM is measured on one 72-min episode only
+/// (2026-10-21): 2.3¢ per hour, but 294 s against MiniMax's 91 s; its precision is not scored.
 pub const OPENCODE_RECOMMENDED: &[Recommended] = &[
     Recommended {
         id: "minimax-m3",
@@ -49,9 +49,9 @@ pub const OPENCODE_RECOMMENDED: &[Recommended] = &[
     Recommended {
         id: "glm-5.3-flash",
         label: "GLM 5.3 Flash",
-        cents_per_source_hour: 3.0,
+        cents_per_source_hour: 2.3,
         precision_at_5: 0.0,
-        note: "Not measured yet",
+        note: "Cheap but about 3x slower than MiniMax; picks not scored yet",
     },
 ];
 
@@ -263,10 +263,17 @@ pub fn list_models(base_url: &str, api_key: &str) -> Result<Vec<String>> {
     Ok(ids)
 }
 
-/// Zen's `-free` models (and its `test` id) answer 403 FreeTierError to anything but OpenCode
-/// itself, so onboarding never offers them.
+/// Model families Zen serves only on its OpenAI Responses, Anthropic Messages, Google or SystemOne
+/// endpoints; on `/chat/completions` they answer 400 ModelProtocolUnsupported.
+const ZEN_OTHER_PROTOCOLS: [&str; 6] = ["gpt-", "claude-", "gemini-", "grok-", "muse-", "jev-"];
+
+/// Onboarding offers only what answers us on Zen: not the `-free` models (403 FreeTierError
+/// anywhere but OpenCode itself), not `test`, not the families on other protocols.
 fn usable_outside_opencode(base_url: &str, id: &str) -> bool {
-    !base_url.starts_with(OPENCODE_ZEN_BASE_URL) || !(id.ends_with("-free") || id == "test")
+    !base_url.starts_with(OPENCODE_ZEN_BASE_URL)
+        || !(id.ends_with("-free")
+            || id == "test"
+            || ZEN_OTHER_PROTOCOLS.iter().any(|p| id.starts_with(p)))
 }
 
 /// One tiny scoring request: proves the key, the model and structured output all work.
@@ -385,10 +392,14 @@ mod tests {
     }
 
     #[test]
-    fn hides_zen_free_models_only_on_zen() {
+    fn hides_zen_models_we_cannot_call_only_on_zen() {
         assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "glm-5.3-flash-free"));
         assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "test"));
+        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "claude-haiku-5-5"));
+        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "gpt-5.4-nano"));
         assert!(usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "glm-5.3-flash"));
+        assert!(usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "minimax-m3"));
+        assert!(usable_outside_opencode("https://openrouter.ai/api/v1", "claude-haiku-5-5"));
         assert!(usable_outside_opencode("https://openrouter.ai/api/v1", "glm-5.3-flash-free"));
     }
 

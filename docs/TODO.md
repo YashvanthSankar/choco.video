@@ -231,7 +231,7 @@ Each row records: encoder that opened, whisper device and verdict, 72-min transc
 
 Already ahead: 11 MB install vs Python + CUDA + build tools, native Mac, hardware encoders on every platform (theirs writes 0-byte files without an NVIDIA GPU, issue #6), four export sizes vs 9:16 only, speaker follow across camera cuts. Where they lead, in order:
 
-- [ ] Picker speed: a 72-min episode took 12 min on qwen3.8-flash, 4.9 min on glm-5.3-flash, 2.8 min on deepseek-v4.1-flash, mostly hidden reasoning → default model chosen by measured speed and quality, low reasoning effort sent where the endpoint accepts it → picks in under 90 s per hour of video
+- [~] Picker speed: on the 72-min danaylov episode, minimax-m3 (the default) picks in 91 s for 2¢; deepseek-v4.1-flash 169 s, glm-5.3-flash 294 s, qwen3.8-flash 12 min, the gap being hidden reasoning (7-49k output tokens). Zen's GPT, Claude, Gemini, Grok, Muse and Jev models answer 400 on `/chat/completions` and its `-free` models 403 outside OpenCode, so onboarding hides them. Left: send low reasoning effort where the endpoint accepts it → under 75 s per hour of video
 - [ ] Offline picker on Windows (Mac has Apple on-device): optional downloaded GGUF on llama.cpp, sharing ggml with whisper.cpp → a no-key Windows user gets clips; installer grows < 2 MB
 - [ ] Caption translation through the user's picker or Apple on-device, word timing kept per segment
 - [ ] YouTube ingest (above) with a clear fix for cookie and captcha blocks, their two open issues
