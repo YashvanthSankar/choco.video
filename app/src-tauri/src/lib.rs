@@ -13,7 +13,7 @@ use choco_engine::{Layout, Progress, Transcript, models_registry};
 use serde::Serialize;
 use settings::Settings;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -374,6 +374,61 @@ fn cancel_job(jobs: State<'_, Arc<Jobs>>, job: u64) -> Result<(), String> {
     Ok(())
 }
 
+fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
+    serde_json::from_str(&std::fs::read_to_string(path).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())
+}
+
+/// One clip of a finished run, with what re-rendering it needs.
+struct RunClip {
+    asset: choco_engine::MediaAsset,
+    transcript_path: PathBuf,
+    transcript: Transcript,
+    clip: serde_json::Value,
+    cand: choco_engine::Candidate,
+}
+
+fn run_clip(summary_path: &str, rank: usize) -> Result<RunClip, String> {
+    let run: serde_json::Value = read_json(Path::new(summary_path))?;
+    let transcript_path = PathBuf::from(run["transcript_path"].as_str().unwrap_or_default());
+    let clip = run["clips"]
+        .as_array()
+        .and_then(|c| c.iter().find(|c| c["rank"].as_u64() == Some(rank as u64)))
+        .ok_or("Clip not found in this run")?
+        .clone();
+    Ok(RunClip {
+        asset: serde_json::from_value(run["source"].clone()).map_err(|e| e.to_string())?,
+        transcript: read_json(&transcript_path)?,
+        transcript_path,
+        cand: serde_json::from_value(clip["candidate"].clone()).map_err(|e| e.to_string())?,
+        clip,
+    })
+}
+
+fn rerender(
+    summary_path: &str,
+    rc: &RunClip,
+    rank: usize,
+    style: &str,
+    preset: &str,
+    layout: &str,
+) -> Result<ExportedClip, String> {
+    let out = Path::new(summary_path)
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_default();
+    let opts = export_options(style, preset, layout, out)?;
+    let mut raster = captions::Rasterizer::new();
+    let cancel = AtomicBool::new(false);
+    let mut job = Job {
+        raster: &mut raster,
+        progress: &|_| {},
+        cancel: &cancel,
+    };
+    export::export_clip(&rc.asset, &rc.transcript, &rc.cand, rank, &opts, &mut job)
+        .map_err(|e| e.to_string())
+}
+
 /// Re-render one clip of a finished run with a different style, size or layout.
 #[tauri::command]
 async fn reexport_clip(
@@ -384,39 +439,108 @@ async fn reexport_clip(
     layout: String,
 ) -> Result<ExportedClip, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let run: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(&summary_path).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        let asset: choco_engine::MediaAsset =
-            serde_json::from_value(run["source"].clone()).map_err(|e| e.to_string())?;
-        let t: Transcript = serde_json::from_str(
-            &std::fs::read_to_string(run["transcript_path"].as_str().unwrap_or_default())
-                .map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        let clip = run["clips"]
-            .as_array()
-            .and_then(|c| c.iter().find(|c| c["rank"].as_u64() == Some(rank as u64)))
-            .ok_or("Clip not found in this run")?;
-        let cand: choco_engine::Candidate =
-            serde_json::from_value(clip["candidate"].clone()).map_err(|e| e.to_string())?;
-        let out = PathBuf::from(&summary_path)
-            .parent()
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        let opts = export_options(&style, &preset, &layout, out)?;
-        let mut raster = captions::Rasterizer::new();
-        let cancel = AtomicBool::new(false);
-        let mut job = Job {
-            raster: &mut raster,
-            progress: &|_| {},
-            cancel: &cancel,
-        };
-        export::export_clip(&asset, &t, &cand, rank, &opts, &mut job).map_err(|e| e.to_string())
+        let rc = run_clip(&summary_path, rank)?;
+        rerender(&summary_path, &rc, rank, &style, &preset, &layout)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+struct CaptionWord {
+    index: usize,
+    text: String,
+}
+
+/// The clip's transcript words for the caption editor, one group per transcript segment.
+#[tauri::command]
+fn clip_words(summary_path: String, rank: usize) -> Result<Vec<Vec<CaptionWord>>, String> {
+    let rc = run_clip(&summary_path, rank)?;
+    let range = (rc.cand.start_ms, rc.cand.end_ms);
+    Ok(captions::edit::clip_words(&rc.transcript, range)
+        .into_iter()
+        .map(|g| {
+            g.into_iter()
+                .map(|(index, w)| CaptionWord {
+                    index,
+                    text: w.text.trim().into(),
+                })
+                .collect()
+        })
+        .collect())
+}
+
+/// Serializes read-edit-write of transcripts: the clips of a run share one transcript file.
+#[derive(Default)]
+struct TranscriptWrites(Mutex<()>);
+
+/// Replace `path` in one step, so a crash never leaves half a transcript.
+fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let tmp = path.with_extension("json.tmp");
+    let res = std::fs::File::create(&tmp)
+        .and_then(|mut f| f.write_all(bytes).and_then(|_| f.sync_all()))
+        .and_then(|_| std::fs::rename(&tmp, path));
+    if res.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    res
+}
+
+/// Save caption corrections to the run's transcript, then re-render the clip (MP4, poster, SRT,
+/// VTT) in its current style and size. Overlapping clips of the same run pick the corrections up
+/// the next time they are rendered. `layout` is "auto" for a speaker-following clip, the card's
+/// fixed layout after a restyle, or None to use the default fixed layout from Settings.
+#[tauri::command]
+async fn update_caption_words(
+    app: AppHandle,
+    writes: State<'_, Arc<TranscriptWrites>>,
+    summary_path: String,
+    rank: usize,
+    edits: Vec<captions::edit::WordEdit>,
+    layout: Option<String>,
+) -> Result<ExportedClip, String> {
+    let fixed = Settings::load(&config_dir(&app)?).defaults.layout;
+    let layout = layout.unwrap_or_else(|| if fixed == "fit" { "fit" } else { "static" }.into());
+    let writes = writes.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        save_caption_words(&writes, &summary_path, rank, &edits, &layout)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn save_caption_words(
+    writes: &TranscriptWrites,
+    summary_path: &str,
+    rank: usize,
+    edits: &[captions::edit::WordEdit],
+    layout: &str,
+) -> Result<ExportedClip, String> {
+    let rc = {
+        let _lock = writes.0.lock().map_err(|e| e.to_string())?;
+        let mut rc = run_clip(summary_path, rank)?;
+        // Only ever rewrite the pipeline's own transcript, next to the summary.
+        let name = rc.transcript_path.to_string_lossy();
+        if rc.transcript_path.parent() != Path::new(summary_path).parent()
+            || !name.ends_with(".transcript.json")
+        {
+            return Err("This run's transcript is not in its folder".into());
+        }
+        let range = (rc.cand.start_ms, rc.cand.end_ms);
+        let changed = captions::edit::edit_words(&mut rc.transcript, range, edits)
+            .map_err(|e| e.to_string())?;
+        if changed > 0 {
+            let json = serde_json::to_vec(&rc.transcript).map_err(|e| e.to_string())?;
+            write_atomic(&rc.transcript_path, &json).map_err(|e| e.to_string())?;
+        }
+        rc
+    };
+    // Style and size come from the clip's sidecar, which every render rewrites.
+    let side: serde_json::Value = read_json(Path::new(rc.clip["json"].as_str().unwrap_or("")))?;
+    let style = side["caption_style"].as_str().unwrap_or("none");
+    let preset = side["preset"].as_str().unwrap_or("shorts");
+    rerender(summary_path, &rc, rank, style, preset, layout)
 }
 
 /// The webview plays the source and the clips through the asset protocol. Its static scope is the
@@ -479,6 +603,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Arc::new(Jobs::default()))
+        .manage(Arc::new(TranscriptWrites::default()))
         .invoke_handler(tauri::generate_handler![
             status,
             diagnostics,
@@ -491,9 +616,28 @@ pub fn run() {
             start_job,
             cancel_job,
             reexport_clip,
+            clip_words,
+            update_caption_words,
             load_run,
             download_speech_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running choco.video");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn atomic_write_replaces_and_leaves_no_temp_file() {
+        let dir = std::env::temp_dir().join(format!("choco-atomic-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("talk.transcript.json");
+        std::fs::write(&path, "old").unwrap();
+        write_atomic(&path, b"new").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+        assert!(!dir.join("talk.transcript.json.tmp").exists());
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

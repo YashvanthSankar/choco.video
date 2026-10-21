@@ -101,7 +101,7 @@ fn ends_sentence(text: &str) -> bool {
     )
 }
 
-fn join_words(words: &[Word]) -> String {
+pub(crate) fn join_words(words: &[Word]) -> String {
     let mut s = String::new();
     for w in words {
         let attach = w

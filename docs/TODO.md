@@ -236,7 +236,7 @@ Already ahead: 11 MB install vs Python + CUDA + build tools, native Mac, hardwar
 - [ ] Caption translation through the user's picker or Apple on-device, word timing kept per segment
 - [ ] YouTube ingest (above) with a clear fix for cookie and captcha blocks, their two open issues
 - [ ] NLE export (above): Final Cut Pro XML first, then Premiere
-- [ ] Caption editing in the app (fix a word, add an emoji)
+- [~] Caption editing in the app: "Edit captions" on a clip lists its words by segment, a word is fixed inline (Enter keeps, Escape cancels), and Save writes the run's transcript (text only, timings untouched, atomic) and re-renders the clip, poster, SRT and VTT in its current look (`captions::edit`, `update_caption_words`). Left: emoji, refused for now because the bundled caption fonts are a Latin subset with no emoji glyphs and an emoji font costs megabytes; deleting or splitting a word; re-rendering other clips that overlap the edited words
 - [ ] Active speaker from voice activity plus mouth movement for two-person podcasts (with diarization, above)
 - [ ] Head-to-head on the five golden videos once the set is human-reviewed; publish the numbers
 

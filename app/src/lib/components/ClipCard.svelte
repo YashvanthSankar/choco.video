@@ -3,11 +3,13 @@
   import { api, fmtTime, type ExportedClip } from "$lib/api";
   import { convertFileSrc } from "@tauri-apps/api/core";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
+  import CaptionEditor from "./CaptionEditor.svelte";
 
   let { clip = $bindable(), summaryPath, styles, presets }: { clip: ExportedClip; summaryPath: string; styles: string[]; presets: string[] } = $props();
 
   let playing = $state(false);
   let editing = $state(false);
+  let captioning = $state(false);
   let busy = $state(false);
   let error = $state("");
   let copied = $state(false);
@@ -61,7 +63,12 @@
       <button onclick={() => revealItemInDir(clip.mp4)}>{words.reveal}</button>
       <button onclick={copyCaption}>{copied ? "Copied" : "Copy caption"}</button>
       <button class="ghost" onclick={() => (editing = !editing)}>Restyle</button>
+      <button class="ghost" aria-expanded={captioning} onclick={() => (captioning = !captioning)}>Edit captions</button>
     </div>
+    {#if captioning}
+      <!-- A clip that follows the speaker has a reframe report; otherwise keep the fixed layout. -->
+      <CaptionEditor {summaryPath} rank={clip.rank} layout={clip.reframe ? "auto" : layout === "auto" ? null : layout} onClose={() => (captioning = false)} onSaved={(c) => { clip = c; bust++; captioning = false; playing = false; }} />
+    {/if}
     {#if editing}
       <div class="edit">
         <select bind:value={style}>{#each styles as s}<option value={s}>{s}</option>{/each}<option value="none">no captions</option></select>

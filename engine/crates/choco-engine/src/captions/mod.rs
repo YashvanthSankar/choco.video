@@ -3,6 +3,7 @@
 
 use crate::model::{CaptionChunk, CaptionStyle, CaptionTrack, Transcript, Word};
 
+pub mod edit;
 pub mod raster;
 pub mod subtitles;
 
