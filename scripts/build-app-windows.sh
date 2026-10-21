@@ -37,17 +37,20 @@ echo "installer $(mb "$installer") (budget 25 MB) · installed $(mb "$installed"
 (( installed <= 50000000 )) || { echo "installed size over budget" >&2; exit 1; }
 
 echo "== install, launch, uninstall"
+# Git Bash rewrites arguments that start with "/" into Windows paths, so "/S" would reach NSIS as
+# a path and the installer would open its window and wait for a click (CI hung for 6 h).
+export MSYS_NO_PATHCONV=1
 DEST="$LOCALAPPDATA\\choco.video"
-"$SETUP" /S
+timeout 300 "$SETUP" /S || { echo "silent install failed or hung" >&2; exit 1; }
 APP="$(cygpath -u "$DEST")/choco-app.exe"
 [[ -f "$APP" ]] || { echo "installer did not put choco-app.exe in $DEST" >&2; exit 1; }
 ls "$(dirname "$APP")"
 "$APP" > "$TAURI/target/smoke.log" 2>&1 & PID=$!
 sleep 8
 if ! kill -0 $PID 2>/dev/null; then echo "app exited at launch:" >&2; head -20 "$TAURI/target/smoke.log" >&2; exit 1; fi
-taskkill //F //IM choco-app.exe >/dev/null 2>&1 || kill $PID || true
+taskkill /F /IM choco-app.exe >/dev/null 2>&1 || kill $PID || true
 echo "launch smoke test passed"
-"$(cygpath -u "$DEST")/uninstall.exe" /S
+timeout 300 "$(cygpath -u "$DEST")/uninstall.exe" /S || { echo "silent uninstall failed or hung" >&2; exit 1; }
 sleep 3
 [[ ! -f "$APP" ]] || { echo "uninstall left choco-app.exe behind" >&2; exit 1; }
 echo "uninstall removed the app"
