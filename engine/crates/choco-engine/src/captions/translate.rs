@@ -27,6 +27,8 @@ use std::ops::Range;
 pub enum TranslateError {
     #[error("translate: no target language given")]
     NoLanguage,
+    #[error("translate: the model sent every line back unchanged instead of in {0}")]
+    Unchanged(String),
     #[error("translate: {0}")]
     Picker(#[from] PickerError),
 }
@@ -76,12 +78,26 @@ pub fn translate_range(
         return Err(TranslateError::NoLanguage);
     }
     let source = clip_segments(t, range_ms);
-    let system = picker::TRANSLATE_PROMPT.replace("{language}", to);
+    let system = picker::TRANSLATE_PROMPT.replace("{language}", &language_name(to));
     let mut lines: Vec<Option<String>> = vec![None; source.len()];
     let mut calls = 0;
     for batch in batches(&source, budget(llm, &system)) {
         translate_batch(llm, &system, &source, batch, &mut lines, &mut calls)?;
     }
+    // Apple's on-device model answered a bare "es" with the English, numbered as asked.
+    let echoed = source
+        .iter()
+        .zip(&lines)
+        .filter(|(s, l)| l.as_deref().is_some_and(|l| echo(&s.text, l)))
+        .count();
+    if echoed > 0 && echoed == source.len() {
+        return Err(TranslateError::Unchanged(to.to_string()));
+    }
+    let lines: Vec<Option<String>> = source
+        .iter()
+        .zip(lines)
+        .map(|(s, l)| l.filter(|l| !echo(&s.text, l)))
+        .collect();
     let mut untranslated = Vec::new();
     let segments = source
         .into_iter()
@@ -305,6 +321,72 @@ fn plausible(src: &str, tr: &str) -> bool {
     tr.chars().count() <= 4 * src.chars().count() + 40
 }
 
+/// The source line sent back as is, punctuation aside. Short lines ("OK.", a name) legitimately
+/// survive translation.
+fn echo(src: &str, tr: &str) -> bool {
+    let norm = |s: &str| {
+        s.chars()
+            .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    src.split_whitespace().count() >= 3 && norm(src) == norm(tr)
+}
+
+/// English name for a BCP-47 tag, for the prompt: models follow "Spanish" where some (Apple's
+/// on-device model among them) ignore a bare "es". Anything else is passed through as written.
+fn language_name(to: &str) -> String {
+    let name = match to.to_ascii_lowercase().replace('_', "-").as_str() {
+        "en" => "English",
+        "en-us" => "American English",
+        "en-gb" => "British English",
+        "es" | "es-es" => "Spanish",
+        "es-419" | "es-mx" => "Latin American Spanish",
+        "pt" | "pt-pt" => "European Portuguese",
+        "pt-br" => "Brazilian Portuguese",
+        "fr" | "fr-fr" => "French",
+        "fr-ca" => "Canadian French",
+        "de" => "German",
+        "it" => "Italian",
+        "nl" => "Dutch",
+        "sv" => "Swedish",
+        "da" => "Danish",
+        "no" | "nb" => "Norwegian",
+        "fi" => "Finnish",
+        "pl" => "Polish",
+        "cs" => "Czech",
+        "ro" => "Romanian",
+        "hu" => "Hungarian",
+        "tr" => "Turkish",
+        "id" => "Indonesian",
+        "ms" => "Malay",
+        "vi" => "Vietnamese",
+        "tl" | "fil" => "Filipino",
+        "sw" => "Swahili",
+        "ru" => "Russian",
+        "uk" => "Ukrainian",
+        "el" => "Greek",
+        "ar" => "Arabic",
+        "he" => "Hebrew",
+        "fa" => "Persian",
+        "ur" => "Urdu",
+        "hi" => "Hindi",
+        "bn" => "Bengali",
+        "ta" => "Tamil",
+        "te" => "Telugu",
+        "mr" => "Marathi",
+        "th" => "Thai",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        "zh" | "zh-hans" | "zh-cn" => "Simplified Chinese",
+        "zh-hant" | "zh-tw" | "zh-hk" => "Traditional Chinese",
+        _ => return to.to_string(),
+    };
+    format!("{name} ({to})")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Class {
     Han,
@@ -445,6 +527,23 @@ mod tests {
     use crate::captions::{self, ChunkOptions, Rasterizer};
     use std::sync::Mutex;
 
+    #[test]
+    fn tags_become_names_the_model_follows() {
+        assert_eq!(language_name("es"), "Spanish (es)");
+        assert_eq!(language_name("pt_BR"), "Brazilian Portuguese (pt_BR)");
+        assert_eq!(language_name("Klingon"), "Klingon");
+    }
+
+    #[test]
+    fn echoes_are_caught_but_short_lines_may_survive() {
+        assert!(echo("It's not what we pursue.", "Its not what we pursue"));
+        assert!(!echo("OK.", "OK."));
+        assert!(!echo(
+            "It's not what we pursue.",
+            "No es lo que perseguimos."
+        ));
+    }
+
     /// Answers each numbered line with a fixed rewrite, logging every request.
     struct FakeLlm {
         context: usize,
@@ -579,6 +678,21 @@ mod tests {
         // Fallbacks keep the original text and the original word timings.
         assert_eq!(t.segments[1], src.segments[1]);
         assert_eq!(t.segments[2], src.segments[2]);
+    }
+
+    #[test]
+    fn a_model_that_echoes_every_line_is_an_error() {
+        let mut t = transcript();
+        for s in &mut t.segments {
+            s.text = format!("{} and more", s.text);
+        }
+        let same = |lines: &[(usize, String)]| -> String {
+            lines.iter().map(|(k, t)| format!("{k}. {t}\n")).collect()
+        };
+        assert!(matches!(
+            translate_range(&t, (0, 10_000), "es", &FakeLlm::new(4_096, same)),
+            Err(TranslateError::Unchanged(l)) if l == "es"
+        ));
     }
 
     #[test]
