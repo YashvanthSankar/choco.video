@@ -220,7 +220,7 @@ Each row records: encoder that opened, whisper device and verdict, 72-min transc
 ## M7 After launch
 
 - [ ] Tighten cuts (filler words + dead air removed, captions retimed)
-- [ ] NLE export (Premiere XML, Resolve EDL, CapCut draft)
+- [~] NLE export: `<source>.fcpxml` (FCPXML 1.10) with every clip as a project cut on whole source frames from the original media, for Final Cut Pro and DaVinci Resolve; "Editor XML" in the results view. Left: open it in Final Cut once by hand, Premiere XML (xmeml), CapCut draft
 - [ ] Gaming / reaction layout; profanity bleep; highlights reel
 - [ ] Audio diarization replacing the mouth heuristic
 - [ ] YouTube ingest via optional `yt-dlp` download
@@ -231,11 +231,11 @@ Each row records: encoder that opened, whisper device and verdict, 72-min transc
 
 Already ahead: 11 MB install vs Python + CUDA + build tools, native Mac, hardware encoders on every platform (theirs writes 0-byte files without an NVIDIA GPU, issue #6), four export sizes vs 9:16 only, speaker follow across camera cuts. Where they lead, in order:
 
-- [~] Picker speed: on the 72-min danaylov episode, minimax-m3 (the default) picks in 91 s for 2¢; deepseek-v4.1-flash 169 s, glm-5.3-flash 294 s, qwen3.8-flash 12 min, the gap being hidden reasoning (7-49k output tokens). Zen's GPT, Claude, Gemini, Grok, Muse and Jev models answer 400 on `/chat/completions` and its `-free` models 403 outside OpenCode, so onboarding hides them. Left: send low reasoning effort where the endpoint accepts it → under 75 s per hour of video
+- [x] Picker speed: on the 72-min danaylov episode, minimax-m3 (the default) picked in 91 s for 2¢, and 58 s once hosted batches went four at a time (same tokens, same cost); deepseek-v4.1-flash 169 s, glm-5.3-flash 294 s, qwen3.8-flash 12 min, the gap being hidden reasoning (7-49k output tokens). Zen's GPT, Claude, Gemini, Grok, Muse and Jev models answer 400 on `/chat/completions` and its `-free` models 403 outside OpenCode, so onboarding hides them. → 48 s per hour of video, under the 75 s target. Next, if a slower model is ever the default: low reasoning effort where the endpoint accepts it
 - [ ] Offline picker on Windows (Mac has Apple on-device): optional downloaded GGUF on llama.cpp, sharing ggml with whisper.cpp → a no-key Windows user gets clips; installer grows < 2 MB
 - [ ] Caption translation through the user's picker or Apple on-device, word timing kept per segment
 - [ ] YouTube ingest (above) with a clear fix for cookie and captcha blocks, their two open issues
-- [ ] NLE export (above): Final Cut Pro XML first, then Premiere
+- [~] NLE export (above): Final Cut Pro XML done, Premiere next
 - [ ] Caption editing in the app (fix a word, add an emoji)
 - [ ] Active speaker from voice activity plus mouth movement for two-person podcasts (with diarization, above)
 - [ ] Head-to-head on the five golden videos once the set is human-reviewed; publish the numbers

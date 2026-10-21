@@ -77,6 +77,8 @@ export interface RunResult {
   source: { path: string; duration_ms: number };
   picker: { windows: number; shortlisted: number; scored: number; model_calls: number; errors: string[] };
   clips: ExportedClip[];
+  /** Final Cut Pro / DaVinci Resolve project; absent on runs made before it existed. */
+  fcpxml_path?: string | null;
   summary_path: string;
 }
 

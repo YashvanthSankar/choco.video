@@ -5,7 +5,7 @@ use crate::backend::{self, SpeechEngine};
 use crate::captions::Rasterizer;
 use crate::export::{self, ExportOptions, ExportedClip, Job};
 use crate::highlights::{self, HighlightOptions, HighlightReport, audio, picker::Llm};
-use crate::model::{MediaAsset, Progress, Transcript};
+use crate::model::{Candidate, MediaAsset, Progress, Transcript};
 use crate::transcribe::{self, TranscribeOptions};
 use crate::{ProgressFn, ingest, models_registry};
 use serde::Serialize;
@@ -50,6 +50,8 @@ pub struct RunResult {
     pub transcript_path: PathBuf,
     pub picker: HighlightReport,
     pub clips: Vec<ExportedClip>,
+    /// Final Cut Pro XML cutting every clip from the source; None for a source without video.
+    pub fcpxml_path: Option<PathBuf>,
     pub summary_path: PathBuf,
 }
 
@@ -135,12 +137,22 @@ pub fn run(
             &mut job,
         )?);
     }
+    let ranked: Vec<(usize, &Candidate)> = clips.iter().map(|c| (c.rank, &c.candidate)).collect();
+    let fcpxml_path = match export::fcpxml::fcpxml(&asset, &ranked) {
+        Some(doc) => {
+            let p = opts.export.out_dir.join(format!("{stem}.fcpxml"));
+            std::fs::write(&p, doc)?;
+            Some(p)
+        }
+        None => None,
+    };
     let summary_path = opts.export.out_dir.join(format!("{stem}.run.json"));
     let result = RunResult {
         source: asset,
         transcript_path,
         picker: report,
         clips,
+        fcpxml_path,
         summary_path: summary_path.clone(),
     };
     std::fs::write(&summary_path, serde_json::to_string_pretty(&result)?)?;

@@ -1,6 +1,9 @@
 //! Export a picked clip: MP4, poster PNG, SRT and VTT captions, and a metadata sidecar with
 //! title, description, hashtags, score and source timecodes. Names are
-//! `<source>-<rank>-<title-slug>.*` so a folder of exports sorts in rank order.
+//! `<source>-<rank>-<title-slug>.*` so a folder of exports sorts in rank order. A finished job
+//! also gets `<source>.fcpxml` ([`fcpxml`]) for Final Cut Pro and DaVinci Resolve.
+
+pub mod fcpxml;
 
 use crate::ProgressFn;
 use crate::captions::{self, ChunkOptions, Rasterizer, subtitles};
