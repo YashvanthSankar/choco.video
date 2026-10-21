@@ -27,6 +27,26 @@ Opus Clip, Vizard and the rest upload your footage, meter it in credits and char
 - **Pennies, paid to nobody here.** The clip picker is a language model. Use Apple Intelligence for free, or bring any OpenAI-compatible key (OpenCode Zen recommended, about 2¢ per hour of video) and pay that provider directly.
 - **Honest output.** Every clip starts and ends on a complete thought, comes with its score and the picker's reasons, and ships with a poster, SRT and VTT subtitles, and a ready-to-paste caption.
 
+## choco.video and Opus Clip
+
+[Opus Clip](https://www.opus.pro) is the best-known paid tool for this job. Here is how the two compare (Opus Clip's plans as listed on its [pricing page](https://www.opus.pro/pricing) in October 2026; check there for current terms):
+
+| | Opus Clip | choco.video |
+|---|---|---|
+| Price | Free tier, then $15/month (Starter) or $29/month (Pro); 150 and 300 monthly minutes respectively ([breakdown](https://www.castmagic.io/de/blog/opus-clip-pricing)) | Free. A hosted picker costs about 2¢ per hour of video, paid to that provider; Apple's on-device picker costs nothing |
+| Cost of a one-hour episode | About $6 of a Starter month's minutes | About 2¢, or nothing |
+| Monthly limit | Minutes per plan | None; your machine is the limit |
+| Watermark | On the free tier's caption templates | Never |
+| Where your video goes | Uploaded to Opus Clip's servers | Stays on your Mac; only transcript text reaches the picker you choose, or nothing with Apple's model |
+| How long clips last | Free exports expire after 3 days, Starter after 29 | They are files on your disk |
+| Account | Required | None |
+| Works offline | No | Yes, with Apple's on-device picker |
+| Source code | Closed | MIT, all of it |
+| Why a clip was picked | A virality score | A score and the picker's reasons for every clip |
+| Extras | AI B-roll, AI voice-over, auto-import from YouTube, team workspaces, scheduled posting | SRT and VTT subtitles, poster frame, metadata JSON and four export sizes with every clip |
+
+Opus Clip runs in a browser on any computer and does more editing for you. choco.video is for people who want the clips without the subscription, the upload or the account.
+
 ## What it does
 
 | Stage | What happens | Where |

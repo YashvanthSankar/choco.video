@@ -257,9 +257,16 @@ pub fn list_models(base_url: &str, api_key: &str) -> Result<Vec<String>> {
     let mut ids: Vec<String> = list
         .iter()
         .filter_map(|m| m["id"].as_str().map(str::to_string))
+        .filter(|id| usable_outside_opencode(base_url, id))
         .collect();
     ids.sort();
     Ok(ids)
+}
+
+/// Zen's `-free` models (and its `test` id) answer 403 FreeTierError to anything but OpenCode
+/// itself, so onboarding never offers them.
+fn usable_outside_opencode(base_url: &str, id: &str) -> bool {
+    !base_url.starts_with(OPENCODE_ZEN_BASE_URL) || !(id.ends_with("-free") || id == "test")
 }
 
 /// One tiny scoring request: proves the key, the model and structured output all work.
@@ -375,6 +382,14 @@ mod tests {
             context_tokens: 32_000,
             timeout: Duration::from_secs(5),
         })
+    }
+
+    #[test]
+    fn hides_zen_free_models_only_on_zen() {
+        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "glm-5.3-flash-free"));
+        assert!(!usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "test"));
+        assert!(usable_outside_opencode(OPENCODE_ZEN_BASE_URL, "glm-5.3-flash"));
+        assert!(usable_outside_opencode("https://openrouter.ai/api/v1", "glm-5.3-flash-free"));
     }
 
     fn ok(content: &str) -> (u16, String) {

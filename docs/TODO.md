@@ -227,6 +227,19 @@ Each row records: encoder that opened, whisper device and verdict, 72-min transc
 - [ ] Semantic prompt search as an opt-in embedding model
 - [ ] Revenue model decision (paid signed build, App Store, sponsorship), only once the app has users
 
+### Beating ViralCutter (open source, GPL-3.0, Windows + NVIDIA, alpha; read 2026-10-21, no code reused)
+
+Already ahead: 11 MB install vs Python + CUDA + build tools, native Mac, hardware encoders on every platform (theirs writes 0-byte files without an NVIDIA GPU, issue #6), four export sizes vs 9:16 only, speaker follow across camera cuts. Where they lead, in order:
+
+- [ ] Picker speed: a 72-min episode took 12 min on qwen3.8-flash, 4.9 min on glm-5.3-flash, 2.8 min on deepseek-v4.1-flash, mostly hidden reasoning → default model chosen by measured speed and quality, low reasoning effort sent where the endpoint accepts it → picks in under 90 s per hour of video
+- [ ] Offline picker on Windows (Mac has Apple on-device): optional downloaded GGUF on llama.cpp, sharing ggml with whisper.cpp → a no-key Windows user gets clips; installer grows < 2 MB
+- [ ] Caption translation through the user's picker or Apple on-device, word timing kept per segment
+- [ ] YouTube ingest (above) with a clear fix for cookie and captcha blocks, their two open issues
+- [ ] NLE export (above): Final Cut Pro XML first, then Premiere
+- [ ] Caption editing in the app (fix a word, add an emoji)
+- [ ] Active speaker from voice activity plus mouth movement for two-person podcasts (with diarization, above)
+- [ ] Head-to-head on the five golden videos once the set is human-reviewed; publish the numbers
+
 ## Needs you
 
 1. Watch the 40 golden clips (`eval/REVIEW.md`) and correct them. Every picker number depends on this.
