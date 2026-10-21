@@ -11,6 +11,10 @@ name: release
 #   APPLE_CERTIFICATE_PASSWORD  password of that .p12
 #   APPLE_SIGNING_IDENTITY      e.g. "Developer ID Application: Name (TEAMID)"
 #   APPLE_ID, APPLE_PASSWORD (app-specific password), APPLE_TEAM_ID   for notarization
+# Auto-update needs one more secret, independent of Apple:
+#   TAURI_SIGNING_PRIVATE_KEY   contents of the updater key (minisign; public half in tauri.conf.json)
+# With it the release also carries choco.video.app.tar.gz and latest.json, which the app's
+# opt-in update check reads from releases/latest/download/latest.json.
 
 on:
   push:
@@ -121,9 +125,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           # Tauri signs/notarizes when these exist; an empty value must mean "absent".
-          for v in APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do [[ -n "${!v}" ]] || unset "$v"; done
+          for v in APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID TAURI_SIGNING_PRIVATE_KEY; do [[ -n "${!v}" ]] || unset "$v"; done
           set -o pipefail
           ./scripts/build-app.sh | tee "$RUNNER_TEMP/build.log"
 
@@ -134,6 +139,25 @@ jobs:
           mkdir -p dist
           cp "$DMG" "dist/$ASSET"
           (cd dist && shasum -a 256 "$ASSET" > "$ASSET.sha256")
+          # Auto-update archive and manifest, present only when the updater key was set.
+          TGZ="app/src-tauri/target/release/bundle/macos/choco.video.app.tar.gz"
+          if [[ -f "$TGZ" && -f "$TGZ.sig" ]]; then
+            cp "$TGZ" "$TGZ.sig" dist/
+            python3 - "${{ steps.v.outputs.version }}" "${{ steps.v.outputs.tag }}" "${{ github.repository }}" <<'PY'
+          import json, sys, datetime
+          version, tag, repo = sys.argv[1:4]
+          sig = open("dist/choco.video.app.tar.gz.sig").read().strip()
+          json.dump({
+              "version": version,
+              "notes": f"https://github.com/{repo}/releases/tag/{tag}",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": {"darwin-aarch64": {
+                  "signature": sig,
+                  "url": f"https://github.com/{repo}/releases/download/{tag}/choco.video.app.tar.gz"}},
+          }, open("dist/latest.json", "w"), indent=2)
+          PY
+            echo "updater=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "size=$(du -h "dist/$ASSET" | cut -f1)" >> "$GITHUB_OUTPUT"
           echo "sha=$(cut -d' ' -f1 "dist/$ASSET.sha256")" >> "$GITHUB_OUTPUT"
           grep -E "^app:" "$RUNNER_TEMP/build.log" >> "$GITHUB_STEP_SUMMARY" || true
@@ -153,7 +177,7 @@ jobs:
               echo "> **Not notarized.** A browser download is blocked on first launch. Open **System Settings › Privacy & Security** and click **Open Anyway** next to choco.video, or run once: \`xattr -dr com.apple.quarantine /Applications/choco.video.app\`. (Right-click › Open no longer works on macOS 15 and later.)"
               echo
             fi
-            echo "Your video never leaves your Mac. The only network use is transcript text sent to the clip picker you choose."
+            echo "Your video never leaves your Mac. The only network use is transcript text sent to the clip picker you choose, plus an update check on GitHub if you turn it on in Settings."
           } > "$RUNNER_TEMP/notes.md"
 
       - uses: softprops/action-gh-release@v2
@@ -165,3 +189,7 @@ jobs:
           files: |
             dist/${{ env.ASSET }}
             dist/${{ env.ASSET }}.sha256
+            dist/choco.video.app.tar.gz
+            dist/choco.video.app.tar.gz.sig
+            dist/latest.json
+          fail_on_unmatched_files: false

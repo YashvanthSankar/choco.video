@@ -4,12 +4,18 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type ProviderKind = "opencode" | "custom" | "apple";
 
+export interface UpdateInfo {
+  version: string;
+  notes: string | null;
+}
+
 export interface Settings {
   onboarded: boolean;
   provider: { kind: ProviderKind; base_url: string; score_model: string; summary_model: string };
   defaults: { style: string; preset: string; layout: string; max_clips: number; min_score: number; output_dir: string };
   speech: string;
   language: string;
+  check_updates: boolean;
 }
 
 export interface Recommended {
@@ -38,6 +44,7 @@ export interface Status {
   whisper_installed: boolean;
   hardware: { os: string; os_version: string; arch: string; cpu_cores: number; memory_bytes: number | null; gpu: string | null };
   engine_version: string;
+  app_version: string;
   recommended: Recommended[];
   styles: string[];
   presets: string[];
@@ -94,6 +101,8 @@ export interface ProgressEvent {
 export const api = {
   status: () => invoke<Status>("status"),
   diagnostics: () => invoke<Record<string, unknown>>("diagnostics"),
+  checkUpdate: () => invoke<UpdateInfo | null>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   setApiKey: (key: string) => invoke<void>("set_api_key", { key }),
   providerModels: (baseUrl: string, key?: string) => invoke<string[]>("provider_models", { baseUrl, key: key ?? null }),

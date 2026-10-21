@@ -70,6 +70,9 @@ pub struct Settings {
     pub speech: String,
     /// BCP-47, e.g. "en-US". Empty = automatic.
     pub language: String,
+    /// Opt-in: look for a new version on GitHub when the app opens. Off unless the user turns it
+    /// on; "Check for updates" in Settings works either way because the user asked.
+    pub check_updates: bool,
 }
 
 impl Settings {

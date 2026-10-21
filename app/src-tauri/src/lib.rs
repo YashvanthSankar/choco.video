@@ -46,6 +46,7 @@ struct Status {
     whisper_installed: bool,
     hardware: backend::HardwareInfo,
     engine_version: &'static str,
+    app_version: String,
     recommended: &'static [openai_compat::Recommended],
     styles: Vec<String>,
     presets: &'static [&'static str],
@@ -71,6 +72,7 @@ fn status(app: AppHandle) -> Result<Status, String> {
         whisper_installed,
         hardware: b.info(),
         engine_version: choco_engine::VERSION,
+        app_version: app.package_info().version.to_string(),
         recommended: openai_compat::OPENCODE_RECOMMENDED,
         styles: captions::presets().into_iter().map(|s| s.name).collect(),
         presets: export::PRESETS,
@@ -110,6 +112,48 @@ fn diagnostics(app: AppHandle) -> Result<serde_json::Value, String> {
         "picker": { "kind": s.provider.kind, "host": host, "score_model": s.provider.score_model, "summary_model": s.provider.summary_model },
         "has_key": settings::key_get().is_some(),
     }))
+}
+
+#[derive(Serialize)]
+struct UpdateInfo {
+    version: String,
+    notes: Option<String>,
+}
+
+/// Ask GitHub whether a newer signed release exists. Only called when the user clicks "Check for
+/// updates" or opted in to checking at launch.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let update = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(update.map(|u| UpdateInfo {
+        version: u.version,
+        notes: u.body,
+    }))
+}
+
+/// Download the update, verify its signature against the public key in tauri.conf.json, install
+/// it over this app and restart.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let update = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(update) = update else { return Ok(()) };
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart();
 }
 
 #[tauri::command]
@@ -433,10 +477,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Arc::new(Jobs::default()))
         .invoke_handler(tauri::generate_handler![
             status,
             diagnostics,
+            check_update,
+            install_update,
             save_settings,
             set_api_key,
             provider_models,

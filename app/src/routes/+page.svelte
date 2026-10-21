@@ -1,7 +1,7 @@
 <script lang="ts">
   import { platform, words } from "$lib/platform.svelte";
   import { onMount } from "svelte";
-  import { api, onJobDone, onJobError, onJobProgress, type JobRequest, type ProgressEvent, type RunResult, type Settings, type Status } from "$lib/api";
+  import { api, onJobDone, onJobError, onJobProgress, type JobRequest, type ProgressEvent, type RunResult, type Settings, type Status, type UpdateInfo } from "$lib/api";
   import Onboarding from "$lib/components/Onboarding.svelte";
   import Home from "$lib/components/Home.svelte";
   import JobView from "$lib/components/JobView.svelte";
@@ -17,6 +17,18 @@
   let run = $state<RunResult | null>(null);
   let error = $state("");
   let fatal = $state("");
+  // Only filled when the user opted in to checking at launch (Settings › Updates).
+  let update = $state<UpdateInfo | null>(null);
+  let installing = $state(false);
+  async function installUpdate() {
+    installing = true;
+    try {
+      await api.installUpdate();
+    } catch (e) {
+      error = `Update failed: ${e}`;
+      installing = false;
+    }
+  }
 
   async function refresh() {
     status = await api.status();
@@ -42,7 +54,10 @@
       }),
     ];
     refresh()
-      .then(() => (view = status!.settings.onboarded ? "home" : "onboarding"))
+      .then(() => {
+        view = status!.settings.onboarded ? "home" : "onboarding";
+        if (status!.settings.check_updates) api.checkUpdate().then((u) => (update = u)).catch(() => {});
+      })
       .catch((e) => (fatal = String(e)));
     // A component that throws while mounting would otherwise leave the previous view on screen.
     window.addEventListener("error", (e) => (fatal = fatal || `UI error: ${e.message}`));
@@ -77,6 +92,7 @@
   <span class="brand" data-tauri-drag-region><span class="word">choco<span class="dot">.</span>video</span></span>
   {#if status && view !== "onboarding" && view !== "loading"}
     <nav class="nodrag">
+      {#if update && view !== "job"}<button class="ghost update" disabled={installing} onclick={installUpdate}>{installing ? "Updating…" : `Update to ${update.version}`}</button>{/if}
       {#if view === "results"}<button class="ghost" onclick={() => (view = "home")}>New video</button>{/if}
       {#if view !== "job"}<button class="ghost" onclick={() => (view = "settings")}>Settings</button>{/if}
     </nav>

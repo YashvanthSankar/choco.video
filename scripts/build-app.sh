@@ -29,9 +29,13 @@ done
 # An ad-hoc signature has no Team ID, so the bundled FFmpeg dylibs would be refused at launch
 # ("different Team IDs"). Enable it only for Developer ID builds, where notarization requires it.
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then HARDENED=true; else HARDENED=false; fi
+# Auto-update archive (choco.video.app.tar.gz + .sig) only when the updater signing key is present
+# (TAURI_SIGNING_PRIVATE_KEY: a release secret; locally ~/.tauri/choco.video-updater.key).
+if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then UPDATER=true; else UPDATER=false; fi
 cat > "$TAURI/tauri.release.conf.json" <<JSON
 {
   "bundle": {
+    "createUpdaterArtifacts": ${UPDATER},
     "externalBin": ["binaries/choco-apple"],
     "macOS": {
       "minimumSystemVersion": "14.0",

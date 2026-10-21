@@ -26,20 +26,43 @@
       "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data:; media-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/**", "/Volumes/**"]
+        "scope": [
+          "$HOME/**",
+          "/Volumes/**"
+        ]
       }
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Video",
     "shortDescription": "Turn long videos into vertical clips on your Mac",
     "copyright": "MIT License, choco.video contributors",
     "license": "MIT",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "macOS": {
       "minimumSystemVersion": "14.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc2N0RDQTE3MDVBMERDMDgKUldRSTNLQUZGOHA5ZGphMk42cU1YdjY0TzlnS0hINUxmTnZISi94N3ZyZjh4akdPdjZBUmJBelUK",
+      "endpoints": [
+        "https://github.com/YashvanthSankar/choco.video/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

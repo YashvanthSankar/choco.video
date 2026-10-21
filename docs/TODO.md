@@ -65,7 +65,7 @@ Legend: `[x]` works and was measured on the dev Mac (M3 Pro, 18 GB, macOS 27) ·
 - [ ] Golden set human review (you): watch each clip in `eval/REVIEW.md`, fix or replace, set `reviewed_by_human`; then rerun `choco eval` per model and freeze `OPENCODE_RECOMMENDED`
 - [x] Pushed; first CI runs found two real gaps (the bundled face model was gitignored, fixtures never generated) and an unmaintained-crate advisory → fixed
 - [ ] Developer ID signing + notarization (needs an Apple Developer account, which we do not have). Workaround shipped: `curl -fsSL https://chocovideo.vercel.app/install.sh | sh` (`scripts/install.sh`) installs with no Gatekeeper prompt; the DMG route needs Privacy & Security › Open Anyway once
-- [ ] Tauri updater with signed manifests and a release channel
+- [~] Tauri updater with signed manifests: plugin, opt-in launch check and "Check for updates" in Settings, `latest.json` + signed `.app.tar.gz` from `release.yml`; local build signs with the key (key ids match). Waits on the `TAURI_SIGNING_PRIVATE_KEY` repo secret, then the first release carrying it (0.1.4) is the first that can update itself; 0.1.3 and older have no updater
 - [x] App icon: frosted-glass clip (`brand/app-icon.svg`), shipped in 0.1.3 on the app, the DMG volume and the site
 - [x] First-launch guidance when Apple Intelligence is off and no key is set → the picker step names the exact fix (macOS 26, turn on Apple Intelligence, model still downloading, Mac not eligible), links to Apple Intelligence settings and the OpenCode key page, and "check again" re-reads Apple's status without a restart
 - [x] 40 s launch video from real choco.video output (HyperFrames project in `videos/choco-launch`), in the site hero

@@ -40,6 +40,30 @@
     }
     setTimeout(() => (copied = ""), 4000);
   }
+  let updateMsg = $state("");
+  let updateVersion = $state("");
+  let updating = $state(false);
+  async function checkForUpdate() {
+    updateMsg = "Checking…";
+    updateVersion = "";
+    try {
+      const u = await api.checkUpdate();
+      updateVersion = u?.version ?? "";
+      updateMsg = u ? `choco.video ${u.version} is available.` : `You have the latest version (${status.app_version}).`;
+    } catch (e) {
+      updateMsg = `Could not check: ${e}`;
+    }
+  }
+  async function installUpdate() {
+    updating = true;
+    updateMsg = "Downloading and installing. choco.video restarts when it is done.";
+    try {
+      await api.installUpdate();
+    } catch (e) {
+      updateMsg = `Update failed: ${e}`;
+      updating = false;
+    }
+  }
   const appleSpeech = $derived(status.speech_engines.some((e) => e.kind === "apple_speech"));
 </script>
 
@@ -80,6 +104,17 @@
     </div>
   </div>
 
+  <h2 class="sp">Updates</h2>
+  <div class="card">
+    <label class="check"><input type="checkbox" bind:checked={settings.check_updates} /> Check for a new version when choco.video opens</label>
+    <p class="small muted">Off unless you turn it on. Asks GitHub for the latest release; nothing about you or your videos is sent. Updates are signed and verified before they install.</p>
+    <div class="row diag">
+      <button class="small" onclick={checkForUpdate}>Check for updates</button>
+      {#if updateVersion}<button class="small primary" disabled={updating} onclick={installUpdate}>Install and restart</button>{/if}
+      <span class="small muted">{updateMsg}</span>
+    </div>
+  </div>
+
   <h2 class="sp">About</h2>
   <p class="small">choco.video engine {status.engine_version} · {status.hardware.gpu ?? status.hardware.arch} · {words.osName} {status.hardware.os_version}. Open source under the MIT license. Uses FFmpeg (LGPL 2.1), dav1d, whisper.cpp, YuNet, and the Inter and Montserrat fonts (SIL OFL).</p>
   <div class="row diag">
@@ -103,6 +138,7 @@
   .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 14px; }
   .wide { grid-column: 1 / -1; }
   .diag { gap: 12px; margin-top: 10px; }
+  .check { display: flex; gap: 10px; align-items: center; font-weight: 500; }
   .end { justify-content: flex-end; margin-top: 24px; gap: 12px; }
   @media (max-width: 680px) { .wrap { padding: 25px 18px; } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }
 </style>

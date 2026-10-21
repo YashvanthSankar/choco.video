@@ -22,7 +22,7 @@
 
 Opus Clip, Vizard and the rest upload your footage, meter it in credits and charge monthly. choco.video does the same job on your own machine, for free, with no account:
 
-- **Your video never leaves your Mac.** Transcription, clip picking, face tracking, captions and rendering all run locally. The only thing that can go over the network is transcript text, sent to the clip picker *you* choose. Pick Apple's on-device model and nothing leaves at all.
+- **Your video never leaves your Mac.** Transcription, clip picking, face tracking, captions and rendering all run locally. The only thing that can go over the network is transcript text, sent to the clip picker *you* choose, and an update check on GitHub if you turn it on in Settings (off by default). Pick Apple's on-device model and nothing leaves at all.
 - **Small.** About 20 MB installed, 10 MB download. No Python, no Ollama, no system FFmpeg, no bundled models. On macOS 26 the default path downloads nothing.
 - **Pennies, paid to nobody here.** The clip picker is a language model. Use Apple Intelligence for free, or bring any OpenAI-compatible key (OpenCode Zen recommended, about 2¢ per hour of video) and pay that provider directly.
 - **Honest output.** Every clip starts and ends on a complete thought, comes with its score and the picker's reasons, and ships with a poster, SRT and VTT subtitles, and a ready-to-paste caption.
