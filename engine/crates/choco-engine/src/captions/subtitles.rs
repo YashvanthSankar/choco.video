@@ -13,11 +13,7 @@ fn ts(ms: u64, sep: char) -> String {
 }
 
 fn text(c: &crate::model::CaptionChunk) -> String {
-    c.words
-        .iter()
-        .map(|w| w.text.as_str())
-        .collect::<Vec<_>>()
-        .join(" ")
+    super::join_words(c.words.iter().map(|w| w.text.as_str()))
 }
 
 pub fn srt(track: &CaptionTrack, clip_start_ms: u64) -> String {

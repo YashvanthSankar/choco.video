@@ -11,6 +11,7 @@ pub mod openai_compat;
 
 pub const SUMMARIZE_PROMPT: &str = include_str!("prompts/summarize_v1.md");
 pub const SCORE_PROMPT: &str = include_str!("prompts/score_v1.md");
+pub const TRANSLATE_PROMPT: &str = include_str!("prompts/translate_v1.md");
 
 #[derive(Debug, thiserror::Error)]
 pub enum PickerError {

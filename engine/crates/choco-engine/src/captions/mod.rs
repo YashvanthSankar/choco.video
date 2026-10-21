@@ -6,6 +6,7 @@ use crate::model::{CaptionChunk, CaptionStyle, CaptionTrack, Transcript, Word};
 pub mod edit;
 pub mod raster;
 pub mod subtitles;
+pub mod translate;
 
 pub use raster::{Rasterizer, Sprite};
 
@@ -94,11 +95,60 @@ impl Default for ChunkOptions {
 
 fn ends_clause(w: &str) -> bool {
     matches!(
-        w.trim_end_matches(['"', '\'', ')', '”', '’'])
+        w.trim_end_matches(['"', '\'', ')', '”', '’', '」', '』', '）'])
             .chars()
             .last(),
-        Some('.' | '!' | '?' | '…' | ',' | ';' | ':')
+        Some(
+            '.' | '!'
+                | '?'
+                | '…'
+                | ','
+                | ';'
+                | ':'
+                | '。'
+                | '！'
+                | '？'
+                | '、'
+                | '，'
+                | '；'
+                | '：'
+        )
     )
+}
+
+/// Han, kana and CJK punctuation: scripts written without spaces between words. Hangul is left
+/// out because Korean puts spaces between words.
+pub(crate) fn is_cjk(c: char) -> bool {
+    matches!(c,
+        '\u{3000}'..='\u{303F}'     // CJK punctuation
+        | '\u{3040}'..='\u{30FF}'   // hiragana, katakana
+        | '\u{31F0}'..='\u{31FF}'   // katakana extensions
+        | '\u{3400}'..='\u{4DBF}'   // Han extension A
+        | '\u{4E00}'..='\u{9FFF}'   // Han
+        | '\u{F900}'..='\u{FAFF}'   // Han compatibility
+        | '\u{FF00}'..='\u{FFEF}'   // full-width forms
+        | '\u{20000}'..='\u{3134F}' // Han extensions B–H
+    )
+}
+
+/// Whether a space goes between two consecutive caption words: never between two CJK words, so
+/// Japanese and Chinese captions read as unbroken text.
+pub(crate) fn needs_space(prev: &str, next: &str) -> bool {
+    !(prev.chars().next_back().is_some_and(is_cjk) && next.chars().next().is_some_and(is_cjk))
+}
+
+/// Caption words as one line of text.
+pub fn join_words<'a>(words: impl IntoIterator<Item = &'a str>) -> String {
+    let mut out = String::new();
+    let mut prev: Option<&str> = None;
+    for w in words {
+        if prev.is_some_and(|p| needs_space(p, w)) {
+            out.push(' ');
+        }
+        out.push_str(w);
+        prev = Some(w);
+    }
+    out
 }
 
 /// Words of `t` inside `[start_ms, end_ms)`, grouped into chunks that fit the frame width.
@@ -124,9 +174,9 @@ pub fn chunk(
     for w in words {
         if let Some(last) = cur.last() {
             let gap = w.start_ms.saturating_sub(last.end_ms);
-            let mut candidate: Vec<&str> = cur.iter().map(|x| x.text.as_str()).collect();
-            candidate.push(&w.text);
-            let too_wide = raster.measure(&candidate.join(" "), style, frame_h) > max_w;
+            let candidate =
+                join_words(cur.iter().map(|x| x.text.as_str()).chain([w.text.as_str()]));
+            let too_wide = raster.measure(&candidate, style, frame_h) > max_w;
             if cur.len() >= opts.max_words
                 || ends_clause(&last.text)
                 || gap >= opts.gap_ms

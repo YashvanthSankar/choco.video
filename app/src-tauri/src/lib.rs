@@ -326,6 +326,7 @@ fn start_job(app: AppHandle, jobs: State<'_, Arc<Jobs>>, req: JobRequest) -> Res
         transcript: None,
         language: (!s.language.is_empty()).then(|| s.language.clone()),
         speech,
+        translate: None,
     };
     let id = jobs.next.fetch_add(1, Ordering::Relaxed) + 1;
     let cancel = Arc::new(AtomicBool::new(false));

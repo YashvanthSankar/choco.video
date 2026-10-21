@@ -2,7 +2,7 @@
 //! features, highlights, export. Stage progress is reported as one stream.
 
 use crate::backend::{self, SpeechEngine};
-use crate::captions::Rasterizer;
+use crate::captions::{Rasterizer, translate};
 use crate::export::{self, ExportOptions, ExportedClip, Job};
 use crate::highlights::{self, HighlightOptions, HighlightReport, audio, picker::Llm};
 use crate::model::{Candidate, MediaAsset, Progress, Transcript};
@@ -22,6 +22,8 @@ pub enum PipelineError {
     Highlights(#[from] highlights::HighlightError),
     #[error(transparent)]
     Export(#[from] export::ExportError),
+    #[error(transparent)]
+    Translate(#[from] translate::TranslateError),
     #[error("pipeline: no clip scored at least {0}; lower the minimum score or try another picker")]
     NoClips(u8),
     #[error("pipeline: cancelled")]
@@ -42,6 +44,9 @@ pub struct RunOptions {
     pub language: Option<String>,
     /// Force a speech engine; None picks the best available.
     pub speech: Option<SpeechEngine>,
+    /// Translate each clip's captions into this language (BCP-47 or a name) with the picker
+    /// model before export. The transcript JSON stays in the original language.
+    pub translate: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -117,6 +122,40 @@ pub fn run(
         return Err(PipelineError::NoClips(opts.highlights.rank.min_score));
     }
     let mut raster = Rasterizer::new();
+    // Translate every clip before any rendering, so a local picker model and the renderer
+    // never overlap. A translation the bundled fonts cannot draw would burn in as boxes, so
+    // that clip keeps its translated SRT and VTT and renders without burned captions.
+    let bare = ExportOptions {
+        style: None,
+        ..opts.export.clone()
+    };
+    let mut translated = Vec::new();
+    if let Some(lang) = &opts.translate {
+        let n = cands.len();
+        for (i, c) in cands.iter().enumerate() {
+            check(cancel)?;
+            let p = |m: String| progress(Progress::new("translate", i as f32 / n as f32, m));
+            p(format!("clip {} of {n} into {lang}", i + 1));
+            let tr = translate::translate_range(&t, (c.start_ms, c.end_ms), lang, llm)?;
+            if !tr.untranslated.is_empty() {
+                p(format!(
+                    "clip {}: kept {} of {} lines untranslated (model output unusable)",
+                    i + 1,
+                    tr.untranslated.len(),
+                    tr.transcript.segments.len()
+                ));
+            }
+            let st = opts.export.style.as_ref();
+            let drawable = st.is_none_or(|st| raster.can_draw(&tr.transcript.text(), st));
+            if !drawable {
+                p(format!(
+                    "clip {}: the bundled caption fonts cannot draw {lang}; captions go to the SRT and VTT only, not burned in",
+                    i + 1
+                ));
+            }
+            translated.push((tr.transcript, drawable));
+        }
+    }
     let mut job = Job {
         raster: &mut raster,
         progress,
@@ -130,12 +169,17 @@ pub fn run(
             i as f32 / cands.len() as f32,
             format!("clip {} of {}: {}", i + 1, cands.len(), c.title),
         ));
+        let (captions, eopts) = match translated.get(i) {
+            Some((tr, true)) => (tr, &opts.export),
+            Some((tr, false)) => (tr, &bare),
+            None => (&t, &opts.export),
+        };
         clips.push(export::export_clip(
             &asset,
-            &t,
+            captions,
             c,
             i + 1,
-            &opts.export,
+            eopts,
             &mut job,
         )?);
     }

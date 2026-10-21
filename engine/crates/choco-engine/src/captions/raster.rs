@@ -108,6 +108,24 @@ impl Rasterizer {
         w * style.active_scale.max(1.0)
     }
 
+    /// Whether the bundled fonts have a glyph for every character of `text` in `style`. They
+    /// are Latin-only subsets: Cyrillic, Greek, CJK, Arabic, Hebrew, Devanagari, Thai and Hangul
+    /// would draw as empty boxes.
+    pub fn can_draw(&mut self, text: &str, style: &CaptionStyle) -> bool {
+        let mut b = Buffer::new(&mut self.fs, Metrics::new(32.0, 36.0));
+        b.set_wrap(Wrap::None);
+        b.set_size(None, None);
+        b.set_text(
+            &case(text, style),
+            &Self::attrs(style),
+            Shaping::Advanced,
+            None,
+        );
+        b.shape_until_scroll(&mut self.fs, false);
+        b.layout_runs()
+            .all(|r| r.glyphs.iter().all(|g| g.glyph_id != 0))
+    }
+
     /// Rasterize `chunk` with `active` highlighted (per the style's highlight mode).
     pub fn render(
         &mut self,
@@ -146,7 +164,7 @@ impl Rasterizer {
                 }
             }
             spans.push((w.as_str(), a));
-            if i + 1 < words.len() {
+            if words.get(i + 1).is_some_and(|n| super::needs_space(w, n)) {
                 spans.push((" ", base.clone()));
             }
         }
@@ -309,6 +327,27 @@ mod tests {
     use super::*;
     use crate::captions::preset;
     use crate::model::Word;
+
+    #[test]
+    fn bundled_fonts_draw_latin_only() {
+        let mut r = Rasterizer::new();
+        for name in ["clean", "bold"] {
+            let st = preset(name).unwrap();
+            assert!(r.can_draw("Hola, ¿qué tal? Ça coûte 5 €, Größe", &st));
+            for text in [
+                "Привет",
+                "Γειά",
+                "東京に",
+                "مرحبا",
+                "שלום",
+                "नमस्ते",
+                "สวัสดี",
+                "안녕",
+            ] {
+                assert!(!r.can_draw(text, &st), "{name}: {text}");
+            }
+        }
+    }
 
     fn chunk(words: &[&str]) -> CaptionChunk {
         CaptionChunk {

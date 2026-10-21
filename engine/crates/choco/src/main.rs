@@ -116,6 +116,14 @@ enum Cmd {
         /// Also write a poster PNG of the middle frame here.
         #[arg(long)]
         poster: Option<PathBuf>,
+        /// Translate the captions into this language ("es", "ja", "Brazilian Portuguese") with
+        /// the picker's summary model. Needs --transcript and a Latin-script language (the
+        /// bundled fonts cover no other).
+        #[arg(long, value_name = "LANG")]
+        translate: Option<String>,
+        /// Model used by --translate.
+        #[arg(long, value_enum, default_value_t = PickerArg::Auto)]
+        picker: PickerArg,
     },
     /// Whole pipeline: transcribe, pick the best clips, render and export them.
     Run {
@@ -145,6 +153,11 @@ enum Cmd {
         /// Output folder.
         #[arg(long, short, default_value = "clips")]
         out: PathBuf,
+        /// Translate each clip's captions into this language ("es", "ja", "Brazilian
+        /// Portuguese") with the picker's summary model. SRT/VTT always; burned in only for
+        /// Latin scripts, which the bundled fonts cover. The transcript JSON stays as it was.
+        #[arg(long, value_name = "LANG")]
+        translate: Option<String>,
     },
     /// Write a PNG frame from the video.
     Thumbnail {
@@ -589,10 +602,15 @@ fn main() -> Result<()> {
             layout,
             out,
             poster,
+            translate,
+            picker: pk,
         } => {
             use choco_engine::{captions, render};
             if end_ms <= start_ms {
                 bail!("--end-ms must be after --start-ms");
+            }
+            if translate.is_some() && transcript.is_none() {
+                bail!("--translate needs --transcript");
             }
             let size = match preset.as_str() {
                 "shorts" | "tiktok" | "reels" => (1080, 1920),
@@ -640,12 +658,39 @@ fn main() -> Result<()> {
                 other => bail!("unknown layout {other}"),
             }
             let mut raster = captions::Rasterizer::new();
+            // Reframe above follows the original speech; only the captions are translated.
+            let transcript_v = match (transcript_v, &translate) {
+                (Some(t), Some(lang)) => {
+                    let llm = make_picker(pk)?;
+                    let tr = captions::translate::translate_range(
+                        &t,
+                        (start_ms, end_ms),
+                        lang,
+                        llm.as_ref(),
+                    )?;
+                    eprintln!(
+                        "translate: {} lines into {lang} in {} calls, {} kept untranslated",
+                        tr.transcript.segments.len(),
+                        tr.calls,
+                        tr.untranslated.len()
+                    );
+                    Some(tr.transcript)
+                }
+                (t, _) => t,
+            };
             let track = match &transcript_v {
                 Some(t) => {
                     let mut st = captions::preset(&style)
                         .with_context(|| format!("unknown style {style}"))?;
                     if plan.layout == choco_engine::Layout::Split {
                         st.position_pct = 46.0;
+                    }
+                    if let Some(lang) = &translate
+                        && !raster.can_draw(&t.text(), &st)
+                    {
+                        bail!(
+                            "the bundled caption fonts cannot draw {lang}, so burned captions would be boxes; `choco run --translate {lang}` writes them as SRT and VTT instead"
+                        );
                     }
                     Some(captions::chunk(
                         t,
@@ -696,6 +741,7 @@ fn main() -> Result<()> {
             transcript,
             min_score,
             out,
+            translate,
         } => {
             use choco_engine::{captions, export, pipeline};
             let started = Instant::now();
@@ -739,6 +785,7 @@ fn main() -> Result<()> {
                 transcript,
                 language: None,
                 speech: None,
+                translate,
             };
             let pr = progress_printer(false);
             let cancel = std::sync::atomic::AtomicBool::new(false);
