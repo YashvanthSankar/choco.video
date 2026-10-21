@@ -52,6 +52,8 @@ pub struct RunResult {
     pub clips: Vec<ExportedClip>,
     /// Final Cut Pro XML cutting every clip from the source; None for a source without video.
     pub fcpxml_path: Option<PathBuf>,
+    /// Final Cut Pro 7 XML (xmeml) of the same cuts, for Premiere Pro; None without video.
+    pub premiere_xml_path: Option<PathBuf>,
     pub summary_path: PathBuf,
 }
 
@@ -146,6 +148,14 @@ pub fn run(
         }
         None => None,
     };
+    let premiere_xml_path = match export::xmeml::xmeml(&asset, &ranked) {
+        Some(doc) => {
+            let p = opts.export.out_dir.join(format!("{stem}.xml"));
+            std::fs::write(&p, doc)?;
+            Some(p)
+        }
+        None => None,
+    };
     let summary_path = opts.export.out_dir.join(format!("{stem}.run.json"));
     let result = RunResult {
         source: asset,
@@ -153,6 +163,7 @@ pub fn run(
         picker: report,
         clips,
         fcpxml_path,
+        premiere_xml_path,
         summary_path: summary_path.clone(),
     };
     std::fs::write(&summary_path, serde_json::to_string_pretty(&result)?)?;

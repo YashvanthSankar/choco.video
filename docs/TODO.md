@@ -220,7 +220,7 @@ Each row records: encoder that opened, whisper device and verdict, 72-min transc
 ## M7 After launch
 
 - [ ] Tighten cuts (filler words + dead air removed, captions retimed)
-- [~] NLE export: `<source>.fcpxml` (FCPXML 1.10) with every clip as a project cut on whole source frames from the original media, for Final Cut Pro and DaVinci Resolve; "Editor XML" in the results view. Left: open it in Final Cut once by hand, Premiere XML (xmeml), CapCut draft
+- [~] NLE export: `<source>.fcpxml` (FCPXML 1.10) with every clip as a project cut on whole source frames from the original media, for Final Cut Pro and DaVinci Resolve, and `<source>.xml` (Final Cut Pro 7 xmeml v5, one sequence per clip, NTSC timebases flagged) for Premiere Pro; "Editor XML" in the results view reveals both. Left: open each once by hand in Final Cut, Premiere and Resolve, CapCut draft
 - [ ] Gaming / reaction layout; profanity bleep; highlights reel
 - [ ] Audio diarization replacing the mouth heuristic
 - [ ] YouTube ingest via optional `yt-dlp` download
@@ -235,7 +235,7 @@ Already ahead: 11 MB install vs Python + CUDA + build tools, native Mac, hardwar
 - [ ] Offline picker on Windows (Mac has Apple on-device): optional downloaded GGUF on llama.cpp, sharing ggml with whisper.cpp → a no-key Windows user gets clips; installer grows < 2 MB
 - [ ] Caption translation through the user's picker or Apple on-device, word timing kept per segment
 - [ ] YouTube ingest (above) with a clear fix for cookie and captcha blocks, their two open issues
-- [~] NLE export (above): Final Cut Pro XML done, Premiere next
+- [~] NLE export (above): Final Cut Pro XML and Premiere XML done, neither yet opened in the real editor
 - [ ] Caption editing in the app (fix a word, add an emoji)
 - [ ] Active speaker from voice activity plus mouth movement for two-person podcasts (with diarization, above)
 - [ ] Head-to-head on the five golden videos once the set is human-reviewed; publish the numbers

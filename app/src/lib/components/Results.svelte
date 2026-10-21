@@ -17,7 +17,7 @@
       <p class="small">From {name}: {run.picker.windows.toLocaleString()} moments considered, {run.picker.shortlisted} read by the picker, {run.picker.model_calls} model calls</p>
     </div>
     <button onclick={() => revealItemInDir(run.summary_path)}>Open folder</button>
-    {#if run.fcpxml_path}<button onclick={() => revealItemInDir(run.fcpxml_path!)} title="Every clip as a project cut from the original video, for Final Cut Pro or DaVinci Resolve">Editor XML</button>{/if}
+    {#if run.fcpxml_path}<button onclick={() => revealItemInDir(run.fcpxml_path!)} title="Every clip as a project cut from the original video, for Final Cut Pro, Premiere Pro or DaVinci Resolve">Editor XML</button>{/if}
     <button class="primary" onclick={onNew}>New video</button>
   </div>
   {#if run.clips.length}

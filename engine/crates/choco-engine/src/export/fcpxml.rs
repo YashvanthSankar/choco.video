@@ -109,7 +109,7 @@ pub fn fcpxml(asset: &MediaAsset, clips: &[(usize, &Candidate)]) -> Option<Strin
     Some(x)
 }
 
-fn esc(s: &str) -> String {
+pub(super) fn esc(s: &str) -> String {
     let mut o = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -128,7 +128,7 @@ fn esc(s: &str) -> String {
 
 /// `file:///` URL for an absolute path, percent-encoded byte by byte; Windows drive paths become
 /// `file:///C:/…`.
-fn file_url(path: &std::path::Path) -> String {
+pub(super) fn file_url(path: &std::path::Path) -> String {
     let abs = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let p = abs.to_string_lossy().replace('\\', "/");
     let p = p.strip_prefix("//?/").unwrap_or(&p);

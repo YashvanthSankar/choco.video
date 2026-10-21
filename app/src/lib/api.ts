@@ -79,6 +79,8 @@ export interface RunResult {
   clips: ExportedClip[];
   /** Final Cut Pro / DaVinci Resolve project; absent on runs made before it existed. */
   fcpxml_path?: string | null;
+  /** Final Cut Pro 7 XML (xmeml) of the same cuts for Premiere Pro, next to the .fcpxml. */
+  premiere_xml_path?: string | null;
   summary_path: string;
 }
 

@@ -43,7 +43,7 @@ Opus Clip, Vizard and the rest upload your footage, meter it in credits and char
 | Works offline | No | Yes, with Apple's on-device picker |
 | Source code | Closed | MIT, all of it |
 | Why a clip was picked | A virality score | A score and the picker's reasons for every clip |
-| Extras | AI B-roll, AI voice-over, auto-import from YouTube, team workspaces, scheduled posting | SRT and VTT subtitles, poster frame, metadata JSON and four export sizes with every clip; a Final Cut Pro / DaVinci Resolve project cut from the original video |
+| Extras | AI B-roll, AI voice-over, auto-import from YouTube, team workspaces, scheduled posting | SRT and VTT subtitles, poster frame, metadata JSON and four export sizes with every clip; a Final Cut Pro, Premiere Pro and DaVinci Resolve project cut from the original video |
 
 Opus Clip runs in a browser on any computer and does more editing for you. choco.video is for people who want the clips without the subscription, the upload or the account.
 
