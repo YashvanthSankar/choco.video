@@ -12,7 +12,7 @@ use super::{Llm, PickerError, Result, Role, Usage};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 const TIER: &str = "local";
@@ -48,7 +48,8 @@ impl LocalConfig {
 }
 
 pub struct LocalLlm {
-    child: Child,
+    /// None once [`Llm::unload`] stopped the server.
+    child: Mutex<Option<Child>>,
     inner: OpenAiCompat,
 }
 
@@ -100,8 +101,8 @@ impl LocalLlm {
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "local".into());
-        let mut llm = Self {
-            child,
+        let llm = Self {
+            child: Mutex::new(Some(child)),
             inner: OpenAiCompat::new(OpenAiCompatConfig {
                 tier: TIER,
                 base_url,
@@ -117,7 +118,7 @@ impl LocalLlm {
         Ok(llm)
     }
 
-    fn wait_ready(&mut self, port: u16, log: &Mutex<Vec<String>>) -> Result<()> {
+    fn wait_ready(&self, port: u16, log: &Mutex<Vec<String>>) -> Result<()> {
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .http_status_as_error(false)
             .timeout_global(Some(Duration::from_secs(2)))
@@ -126,7 +127,7 @@ impl LocalLlm {
         let url = format!("http://127.0.0.1:{port}/health");
         let started = Instant::now();
         loop {
-            if let Ok(Some(status)) = self.child.try_wait() {
+            if let Some(Ok(Some(status))) = self.child().as_mut().map(Child::try_wait) {
                 return Err(unavailable(format!(
                     "llama-server exited ({status}): {}",
                     log.lock().unwrap().join(" | ")
@@ -150,12 +151,29 @@ impl LocalLlm {
             std::thread::sleep(Duration::from_millis(250));
         }
     }
+
+    fn child(&self) -> MutexGuard<'_, Option<Child>> {
+        self.child.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn stop(&self) {
+        if let Some(mut c) = self.child().take() {
+            let _ = c.kill();
+            let _ = c.wait();
+        }
+    }
+
+    fn running(&self) -> Result<()> {
+        match self.child().is_some() {
+            true => Ok(()),
+            false => Err(unavailable("the local model was unloaded".into())),
+        }
+    }
 }
 
 impl Drop for LocalLlm {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        self.stop();
     }
 }
 
@@ -173,10 +191,15 @@ impl Llm for LocalLlm {
         self.inner.usage()
     }
     fn text(&self, role: Role, system: &str, user: &str) -> Result<String> {
+        self.running()?;
         self.inner.text(role, system, user)
     }
     fn scores_json(&self, system: &str, user: &str) -> Result<String> {
+        self.running()?;
         self.inner.scores_json(system, user)
+    }
+    fn unload(&self) {
+        self.stop();
     }
 }
 

@@ -156,6 +156,8 @@ pub fn run(
             translated.push((tr.transcript, drawable));
         }
     }
+    // The model is done: a local picker's memory goes back before the renderer needs it.
+    llm.unload();
     let mut job = Job {
         raster: &mut raster,
         progress,

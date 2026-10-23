@@ -57,6 +57,9 @@ pub trait Llm: Send + Sync {
     fn concurrency(&self) -> usize {
         1
     }
+    /// Free the model's memory; called once picking (and translation) is done and before
+    /// rendering starts (AGENTS rule 6). Later calls are an error from the backend.
+    fn unload(&self) {}
     /// Tokens consumed so far, per role, when the backend reports them.
     fn usage(&self) -> Usage {
         Usage::default()
