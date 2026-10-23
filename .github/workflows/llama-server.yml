@@ -47,7 +47,8 @@ jobs:
         run: |
           EXE="out/llama-server-$LLAMA_TAG-windows-x64.exe"
           dumpbin //dependents "$EXE" | tee deps.txt
-          if grep -iE "vcruntime|msvcp|ggml|llama|libcurl|libgcc|libstdc" deps.txt; then echo "unexpected dependency"; exit 1; fi
+          # Only the DLL lines: the header names the file itself, which contains "llama".
+          if grep -iE '^\s+\S+\.dll\s*$' deps.txt | grep -iE "vcruntime|msvcp|ggml|llama|libcurl|libgcc|libstdc"; then echo "unexpected dependency"; exit 1; fi
           "$EXE" --version
       - uses: actions/upload-artifact@v4
         with:
