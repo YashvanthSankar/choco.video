@@ -19,9 +19,10 @@
   const appleSpeech = $derived(status.speech_engines[0]?.kind === "apple_speech");
   // ProviderSetup proves a new key live and reports it; a key saved in an earlier session also counts.
   let keySaved = $state(untrack(() => status.has_key));
+  let localReady = $state(untrack(() => status.local_picker.installed));
   // The Apple option can only be chosen while ProviderSetup sees it available (it re-checks live).
   const pickerReady = $derived(
-    settings.provider.kind === "apple" ? true : keySaved && !!settings.provider.score_model
+    settings.provider.kind === "apple" ? true : settings.provider.kind === "local" ? localReady : keySaved && !!settings.provider.score_model
   );
   const speechReady = $derived(appleSpeech || whisperInstalled);
 
@@ -74,7 +75,7 @@
   {:else if step === 1}
     <h1>Choose the clip picker</h1>
     <p>A language model reads the transcript and scores which moments make good clips. Pick where it runs.</p>
-    <ProviderSetup {status} bind:settings onKeySaved={() => (keySaved = true)} />
+    <ProviderSetup {status} bind:settings onKeySaved={() => (keySaved = true)} onLocalReady={() => (localReady = true)} />
     <div class="nav">
       <button class="ghost" onclick={() => (step = 0)}>Back</button>
       <button class="primary" disabled={!pickerReady} onclick={() => (step = 2)}>Continue</button>

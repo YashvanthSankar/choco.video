@@ -21,6 +21,10 @@ pub const WHISPER_TEST: &str = "whisper-tiny.en-q5_1";
 /// Pinned Hugging Face revision of ggerganov/whisper.cpp (MIT). Files at a revision are immutable.
 const WHISPER_REV: &str = "5359861c739e955e79d9a303bcbc70fb988958b1";
 
+/// Our pinned `llama-server` build for this platform (`.github/workflows/llama-server.yml`).
+pub const LLAMA_SERVER: &str = "llama-server";
+const LLAMA_TAG: &str = "b11429";
+
 /// Offline picker model, served by `llama-server` (`highlights::picker::local`).
 pub const LOCAL_PICKER_DEFAULT: &str = "qwen3.5-4b-q4_k_m";
 /// Pinned revision of unsloth/Qwen3.5-4B-GGUF (Apache-2.0, base Qwen/Qwen3.5-4B).
@@ -31,6 +35,8 @@ const QWEN35_4B_REV: &str = "e87f176479d0855a907a41277aca2f8ee7a09523";
 pub enum ModelKind {
     Whisper,
     LocalLlm,
+    /// A program the local picker runs (`llama-server`), not weights.
+    Runtime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -57,7 +63,7 @@ pub fn manifests() -> Vec<ModelManifest> {
         license: "MIT",
         min_memory_gb,
     };
-    vec![
+    let mut all = vec![
         ModelManifest {
             id: LOCAL_PICKER_DEFAULT,
             kind: ModelKind::LocalLlm,
@@ -91,7 +97,51 @@ pub fn manifests() -> Vec<ModelManifest> {
             "c77c5766f1cef09b6b7d47f21b546cbddd4157886b3b5d6d4f709e91e66c7c2b",
             2,
         ),
-    ]
+    ];
+    all.extend(llama_server());
+    all
+}
+
+/// Our `llama-server` build for this platform, from the `llama-server-<tag>` prerelease that
+/// `.github/workflows/llama-server.yml` publishes (llama.cpp, MIT). None where we build none.
+fn llama_server() -> Option<ModelManifest> {
+    let (asset, file, size, sha256) = if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        (
+            "macos-arm64",
+            "llama-server",
+            21_620_944,
+            "ded462e24711d7e1dbd738e144ed574e3a76ec0a3447f34148aea49cd1c6b9fb",
+        )
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        (
+            "windows-x64.exe",
+            "llama-server.exe",
+            13_209_600,
+            "cc1109127de306e071fffe2d8c2460f9b5e40e12f609e2448561507587845548",
+        )
+    } else {
+        return None;
+    };
+    Some(ModelManifest {
+        id: LLAMA_SERVER,
+        kind: ModelKind::Runtime,
+        file,
+        url: format!(
+            "https://github.com/YashvanthSankar/choco.video/releases/download/llama-server-{LLAMA_TAG}/llama-server-{LLAMA_TAG}-{asset}"
+        ),
+        size,
+        sha256,
+        license: "MIT",
+        min_memory_gb: 8,
+    })
+}
+
+/// The local picker's downloads in install order: this platform's `llama-server`, then the model.
+pub fn local_picker() -> Vec<ModelManifest> {
+    [LLAMA_SERVER, LOCAL_PICKER_DEFAULT]
+        .into_iter()
+        .filter_map(find)
+        .collect()
 }
 
 pub fn find(id: &str) -> Option<ModelManifest> {
@@ -201,6 +251,11 @@ pub fn pull(dir: &Path, id: &str, progress: ProgressFn) -> Result<PathBuf, Model
             actual,
         });
     }
+    #[cfg(unix)]
+    if m.kind == ModelKind::Runtime {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&part, fs::Permissions::from_mode(0o755))?;
+    }
     fs::rename(&part, &dest)?;
     progress(Progress::new(STAGE, 1.0, format!("{id} installed")));
     Ok(dest)
@@ -246,6 +301,7 @@ mod tests {
             let rev = match m.kind {
                 ModelKind::Whisper => WHISPER_REV,
                 ModelKind::LocalLlm => QWEN35_4B_REV,
+                ModelKind::Runtime => LLAMA_TAG,
             };
             assert!(m.url.contains(rev), "{}", m.id);
             assert!(m.size > 1_000_000, "{}", m.id);

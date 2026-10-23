@@ -32,6 +32,14 @@ pub struct LocalConfig {
 }
 
 impl LocalConfig {
+    /// The downloaded server and model in `dir` (`models_registry::local_picker`), whether or not
+    /// they are there yet; [`LocalLlm::start`] says which is missing.
+    pub fn installed(dir: &std::path::Path) -> Self {
+        use crate::models_registry::{self as reg, LLAMA_SERVER, LOCAL_PICKER_DEFAULT};
+        let path = |id| reg::find(id).map_or_else(|| dir.join(id), |m| reg::path_for(dir, &m));
+        Self::from_env_or(path(LLAMA_SERVER), path(LOCAL_PICKER_DEFAULT))
+    }
+
     /// `CHOCO_LLAMA_SERVER` and `CHOCO_LOCAL_MODEL` override the downloaded server and model.
     pub fn from_env_or(server: PathBuf, model: PathBuf) -> Self {
         let get = |k: &str| {

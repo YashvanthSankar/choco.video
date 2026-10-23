@@ -7,7 +7,7 @@ use choco_engine::backend::{self, SpeechEngine};
 use choco_engine::captions;
 use choco_engine::export::{self, ExportOptions, ExportedClip, Job};
 use choco_engine::highlights::HighlightOptions;
-use choco_engine::highlights::picker::{Llm, apple::AppleLlm, openai_compat};
+use choco_engine::highlights::picker::{Llm, apple::AppleLlm, local, openai_compat};
 use choco_engine::pipeline::{self, RunOptions};
 use choco_engine::{Layout, Progress, Transcript, models_registry};
 use serde::Serialize;
@@ -48,6 +48,7 @@ struct Status {
     engine_version: &'static str,
     app_version: String,
     recommended: &'static [openai_compat::Recommended],
+    local_picker: LocalPickerStatus,
     styles: Vec<String>,
     presets: &'static [&'static str],
 }
@@ -74,6 +75,7 @@ fn status(app: AppHandle) -> Result<Status, String> {
         engine_version: choco_engine::VERSION,
         app_version: app.package_info().version.to_string(),
         recommended: openai_compat::OPENCODE_RECOMMENDED,
+        local_picker: local_picker_status(),
         styles: captions::presets().into_iter().map(|s| s.name).collect(),
         presets: export::PRESETS,
     })
@@ -112,6 +114,27 @@ fn diagnostics(app: AppHandle) -> Result<serde_json::Value, String> {
         "picker": { "kind": s.provider.kind, "host": host, "score_model": s.provider.score_model, "summary_model": s.provider.summary_model },
         "has_key": settings::key_get().is_some(),
     }))
+}
+
+/// The offline picker's downloads (server + model): whether both are in place, and how much is
+/// left to fetch.
+#[derive(Serialize)]
+struct LocalPickerStatus {
+    installed: bool,
+    remaining_bytes: u64,
+}
+
+fn local_picker_status() -> LocalPickerStatus {
+    let dir = models_registry::default_dir();
+    let ms = models_registry::local_picker();
+    let missing: Vec<_> = ms
+        .iter()
+        .filter(|m| !models_registry::is_installed(&dir, m))
+        .collect();
+    LocalPickerStatus {
+        installed: ms.len() == 2 && missing.is_empty(),
+        remaining_bytes: missing.iter().map(|m| m.size).sum(),
+    }
 }
 
 #[derive(Serialize)]
@@ -215,6 +238,15 @@ async fn provider_test(
 
 fn make_llm(s: &Settings) -> Result<Box<dyn Llm>, String> {
     match s.provider.kind.as_str() {
+        "local" => {
+            if !local_picker_status().installed {
+                return Err("Download the offline picker in Settings first".into());
+            }
+            let cfg = local::LocalConfig::installed(&models_registry::default_dir());
+            Ok(Box::new(
+                local::LocalLlm::start(&cfg).map_err(|e| e.to_string())?,
+            ))
+        }
         "apple" => {
             if !choco_engine::highlights::picker::apple::available() {
                 return Err("Apple Intelligence is not available on this Mac. Choose OpenCode or another provider in Settings.".into());
@@ -597,6 +629,32 @@ async fn download_speech_model(app: AppHandle) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Fetch the offline picker (our `llama-server` build, then the model), each sha256-checked and
+/// resumable. Runs only when the user clicks the download button.
+#[tauri::command]
+async fn download_local_picker(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let progress = move |p: Progress| {
+            let _ = app.emit(
+                "model-progress",
+                ProgressEvent {
+                    job: 0,
+                    stage: p.stage,
+                    fraction: p.fraction,
+                    message: p.message,
+                },
+            );
+        };
+        let dir = models_registry::default_dir();
+        for m in models_registry::local_picker() {
+            models_registry::pull(&dir, m.id, &progress).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -620,7 +678,8 @@ pub fn run() {
             clip_words,
             update_caption_words,
             load_run,
-            download_speech_model
+            download_speech_model,
+            download_local_picker
         ])
         .run(tauri::generate_context!())
         .expect("error while running choco.video");

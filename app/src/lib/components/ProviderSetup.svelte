@@ -1,10 +1,10 @@
 <script lang="ts">
   import { words } from "$lib/platform.svelte";
-  import { api, OPENCODE_URL, OPENCODE_SIGNUP, type Status, type Settings, type ProviderKind } from "$lib/api";
+  import { api, onModelProgress, OPENCODE_URL, OPENCODE_SIGNUP, type Status, type Settings, type ProviderKind } from "$lib/api";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { untrack } from "svelte";
 
-  let { status, settings = $bindable(), onKeySaved }: { status: Status; settings: Settings; onKeySaved?: () => void } = $props();
+  let { status, settings = $bindable(), onKeySaved, onLocalReady }: { status: Status; settings: Settings; onKeySaved?: () => void; onLocalReady?: () => void } = $props();
 
   let key = $state("");
   // Local copy: a child must not mutate its parent's props.
@@ -37,6 +37,30 @@
     if (s.includes("deviceNotEligible")) return { text: "This Mac does not support Apple Intelligence. Use a key instead.", settings: false };
     return { text: "Apple's on-device model is not available on this Mac right now.", settings: false };
   });
+  // Offline picker: our llama-server build plus a 4B model, fetched only when asked.
+  let localInstalled = $state(untrack(() => status.local_picker.installed));
+  const localGb = untrack(() => (status.local_picker.remaining_bytes / 1e9).toFixed(1));
+  let localDl = $state<{ fraction: number; message: string } | null>(null);
+  async function downloadLocal() {
+    message = "";
+    ok = null;
+    localDl = { fraction: 0, message: "Starting download…" };
+    const off = await onModelProgress((e) => (localDl = { fraction: e.fraction, message: e.message }));
+    try {
+      await api.downloadLocalPicker();
+      localInstalled = true;
+      onLocalReady?.();
+      message = "Offline picker ready. Nothing leaves this computer.";
+      ok = true;
+    } catch (e) {
+      message = String(e);
+      ok = false;
+    } finally {
+      off();
+      localDl = null;
+    }
+  }
+
   const rec = $derived(status.recommended);
   const recIds = $derived(new Set(rec.map((r) => r.id)));
   const ordered = $derived([...rec.map((r) => r.id).filter((id) => models.length === 0 || models.includes(id)), ...models.filter((m) => !recIds.has(m))]);
@@ -46,7 +70,7 @@
     message = "";
     ok = null;
     if (kind === "opencode") settings.provider.base_url = OPENCODE_URL;
-    if (kind !== "apple" && !settings.provider.score_model && rec.length) {
+    if ((kind === "opencode" || kind === "custom") && !settings.provider.score_model && rec.length) {
       settings.provider.score_model = rec[0].id;
       settings.provider.summary_model = rec[0].id;
     }
@@ -118,6 +142,10 @@
     </span>
   </button>
   {/if}
+  <button class="option" aria-pressed={settings.provider.kind === "local"} class:selected={settings.provider.kind === "local"} onclick={() => choose("local")}>
+    <strong>Offline</strong> <span class="pill">no key</span>
+    <span class="small muted">Free and private, no internet needed. {localInstalled ? "Downloaded." : `One-time ${localGb} GB download.`} Slower than a hosted model.</span>
+  </button>
 </div>
 {#if words.isMac && !appleReady && appleHint.settings}
   <p class="small muted hint">
@@ -127,7 +155,19 @@
   </p>
 {/if}
 
-{#if settings.provider.kind !== "apple"}
+{#if settings.provider.kind === "local"}
+  <div class="card setup">
+    {#if localInstalled}
+      <p class="small">The offline picker is downloaded. It starts when a video needs clips and stops before rendering, so it never holds memory while you export.</p>
+    {:else if localDl}
+      <label for="local-dl">{localDl.message}</label>
+      <progress id="local-dl" max="1" value={localDl.fraction >= 0 ? localDl.fraction : undefined}></progress>
+    {:else}
+      <p class="small">Runs a 4-billion-parameter model (Qwen3.5-4B) with llama.cpp on this computer. It needs about 4 GB of free memory while picking. The download is checked against a known checksum and can resume.</p>
+      <button class="primary" onclick={downloadLocal}>Download ({localGb} GB)</button>
+    {/if}
+  </div>
+{:else if settings.provider.kind !== "apple"}
   <div class="card setup">
     {#if settings.provider.kind === "custom"}
       <label for="base">Base URL</label>
@@ -176,7 +216,8 @@
 <style>
   .hint { margin: 10px 2px 0; }
   .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
-  .options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 18px 0; }
+  .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 9px; margin: 18px 0; }
+  progress { width: 100%; margin-top: 8px; }
   .option { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-height: 132px; text-align: left; padding: 15px; border-radius: 10px; background: var(--panel);  }
   .option strong { font-size: 13px; }
   .option .pill { margin-top: -2px; }

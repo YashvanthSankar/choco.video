@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export type ProviderKind = "opencode" | "custom" | "apple";
+export type ProviderKind = "opencode" | "custom" | "apple" | "local";
 
 export interface UpdateInfo {
   version: string;
@@ -46,6 +46,7 @@ export interface Status {
   engine_version: string;
   app_version: string;
   recommended: Recommended[];
+  local_picker: { installed: boolean; remaining_bytes: number };
   styles: string[];
   presets: string[];
 }
@@ -131,6 +132,7 @@ export const api = {
     invoke<ExportedClip>("update_caption_words", { summaryPath, rank, edits, layout }),
   loadRun: (summaryPath: string) => invoke<RunResult>("load_run", { summaryPath }),
   downloadSpeechModel: () => invoke<void>("download_speech_model"),
+  downloadLocalPicker: () => invoke<void>("download_local_picker"),
 };
 
 export function onJobProgress(f: (e: ProgressEvent) => void): Promise<UnlistenFn> {

@@ -9,7 +9,7 @@ const KEYCHAIN_USER: &str = "provider-api-key";
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProviderSettings {
-    /// "opencode", "custom" or "apple".
+    /// "opencode", "custom", "apple" or "local" (the offline picker).
     pub kind: String,
     pub base_url: String,
     pub score_model: String,
