@@ -206,6 +206,8 @@ enum PickerArg {
     Provider,
     /// Apple Intelligence on-device model, macOS 26+.
     Apple,
+    /// Offline: llama.cpp's llama-server with the downloaded local model (`choco models pull qwen3.5-4b-q4_k_m`); CHOCO_LLAMA_SERVER and CHOCO_LOCAL_MODEL override the paths.
+    Local,
 }
 
 fn make_picker(p: PickerArg) -> Result<Box<dyn picker::Llm>> {
@@ -221,6 +223,22 @@ fn make_picker(p: PickerArg) -> Result<Box<dyn picker::Llm>> {
                 );
             }
             Box::new(picker::apple::AppleLlm)
+        }
+        PickerArg::Local => {
+            let dir = models_registry::default_dir();
+            let m = models_registry::find(models_registry::LOCAL_PICKER_DEFAULT)
+                .expect("built-in manifest");
+            let server = dir.join(if cfg!(windows) {
+                "llama-server.exe"
+            } else {
+                "llama-server"
+            });
+            let cfg = picker::local::LocalConfig::from_env_or(
+                server,
+                models_registry::path_for(&dir, &m),
+            );
+            eprintln!("local: starting llama-server with {}", cfg.model.display());
+            Box::new(picker::local::LocalLlm::start(&cfg)?)
         }
         PickerArg::Auto => {
             if std::env::var("CHOCO_LLM_API_KEY").is_ok_and(|k| !k.is_empty()) {

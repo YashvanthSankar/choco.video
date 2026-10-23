@@ -21,6 +21,11 @@ pub const WHISPER_TEST: &str = "whisper-tiny.en-q5_1";
 /// Pinned Hugging Face revision of ggerganov/whisper.cpp (MIT). Files at a revision are immutable.
 const WHISPER_REV: &str = "5359861c739e955e79d9a303bcbc70fb988958b1";
 
+/// Offline picker model, served by `llama-server` (`highlights::picker::local`).
+pub const LOCAL_PICKER_DEFAULT: &str = "qwen3.5-4b-q4_k_m";
+/// Pinned revision of unsloth/Qwen3.5-4B-GGUF (Apache-2.0, base Qwen/Qwen3.5-4B).
+const QWEN35_4B_REV: &str = "e87f176479d0855a907a41277aca2f8ee7a09523";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelKind {
@@ -53,6 +58,18 @@ pub fn manifests() -> Vec<ModelManifest> {
         min_memory_gb,
     };
     vec![
+        ModelManifest {
+            id: LOCAL_PICKER_DEFAULT,
+            kind: ModelKind::LocalLlm,
+            file: "Qwen3.5-4B-Q4_K_M.gguf",
+            url: format!(
+                "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/{QWEN35_4B_REV}/Qwen3.5-4B-Q4_K_M.gguf"
+            ),
+            size: 2_740_937_888,
+            sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+            license: "Apache-2.0",
+            min_memory_gb: 8,
+        },
         w(
             WHISPER_DEFAULT,
             "ggml-large-v3-turbo-q5_0.bin",
@@ -225,11 +242,20 @@ mod tests {
         assert!(ms.iter().any(|m| m.id == WHISPER_DEFAULT));
         for m in &ms {
             assert_eq!(m.sha256.len(), 64, "{}", m.id);
-            assert!(m.url.contains(WHISPER_REV), "{}", m.id);
+            // Every URL is pinned to an immutable upstream revision.
+            let rev = match m.kind {
+                ModelKind::Whisper => WHISPER_REV,
+                ModelKind::LocalLlm => QWEN35_4B_REV,
+            };
+            assert!(m.url.contains(rev), "{}", m.id);
             assert!(m.size > 1_000_000, "{}", m.id);
         }
-        // Size principle: nothing listed as a default exceeds 600 MB.
+        // Size principle: no default download exceeds 600 MB; the local picker is opt-in.
         assert!(find(WHISPER_DEFAULT).unwrap().size < 600_000_000);
+        assert_eq!(
+            find(LOCAL_PICKER_DEFAULT).unwrap().kind,
+            ModelKind::LocalLlm
+        );
     }
 
     #[test]

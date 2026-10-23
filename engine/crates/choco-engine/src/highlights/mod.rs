@@ -116,9 +116,16 @@ fn summarize(
     let joined = full.join("\n");
     if picker::estimate_tokens(&joined) <= budget {
         *calls += 1;
-        return llm.text(Role::Summarize, &system, &joined);
+        match llm.text(Role::Summarize, &system, &joined) {
+            // The estimate was low for this tokenizer: summarise in chunks instead.
+            Err(PickerError::ContextTooLong(_)) => {}
+            r => return r,
+        }
     }
-    // Map: summarise chunks that fit, then reduce the partial summaries.
+    // Map: summarise chunks that fit, then reduce the partial summaries. Chunks keep a quarter
+    // of the budget spare: timestamps and names tokenize denser than the 4-chars estimate
+    // (Qwen3.5 measured 3.4 on a podcast transcript).
+    let budget = budget * 3 / 4;
     let chunk_words = words.min(120);
     let chunk_system = picker::SUMMARIZE_PROMPT.replace("{max_words}", &chunk_words.to_string());
     let mut partials = Vec::new();

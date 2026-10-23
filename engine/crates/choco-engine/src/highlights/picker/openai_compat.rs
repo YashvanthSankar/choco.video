@@ -212,12 +212,33 @@ impl OpenAiCompat {
                 std::thread::sleep(Duration::from_millis(1000 * 2u64.pow(attempt)));
                 continue;
             }
+            if matches!(status, 400 | 413) && context_overflow(&text) {
+                return Err(PickerError::ContextTooLong(
+                    text.chars().take(300).collect(),
+                ));
+            }
             return Err(PickerError::Http {
                 status,
                 body: text.chars().take(500).collect(),
             });
         }
     }
+}
+
+/// An error body saying the prompt did not fit, so the caller splits the batch instead of
+/// failing the job. Wordings: OpenAI and most proxies, llama-server, vLLM, Anthropic-style.
+fn context_overflow(body: &str) -> bool {
+    let b = body.to_ascii_lowercase();
+    [
+        "context_length_exceeded",
+        "exceed_context_size",
+        "maximum context length",
+        "exceeds the available context",
+        "prompt is too long",
+        "too many tokens",
+    ]
+    .iter()
+    .any(|m| b.contains(m))
 }
 
 /// Model ids the endpoint offers (`GET {base_url}/models`), sorted. For onboarding pickers.
@@ -392,6 +413,19 @@ mod tests {
             context_tokens: 32_000,
             timeout: Duration::from_secs(5),
         })
+    }
+
+    #[test]
+    fn context_overflow_wordings_are_recognised() {
+        assert!(context_overflow(
+            r#"{"error":{"code":400,"message":"request (18585 tokens) exceeds the available context size (16384 tokens)","type":"exceed_context_size_error"}}"#
+        ));
+        assert!(context_overflow(
+            r#"{"error":{"code":"context_length_exceeded","message":"This model's maximum context length is 8192 tokens"}}"#
+        ));
+        assert!(!context_overflow(
+            r#"{"error":{"message":"invalid api key"}}"#
+        ));
     }
 
     #[test]

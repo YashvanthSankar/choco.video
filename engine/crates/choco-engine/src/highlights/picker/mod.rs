@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod apple;
+pub mod local;
 pub mod openai_compat;
 
 pub const SUMMARIZE_PROMPT: &str = include_str!("prompts/summarize_v1.md");
