@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install the latest choco.video on an Apple Silicon Mac.
-#   curl -fsSL https://chocovideo.vercel.app/install.sh | sh
+#   curl -fsSL https://chcvd.vercel.app/install.sh | sh
 #
 # Why a script: choco.video is open source and not notarized by Apple, so a DMG downloaded in a
 # browser is quarantined and macOS blocks its first launch. Files fetched with curl carry no

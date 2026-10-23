@@ -7,4 +7,4 @@
 - [Agent memory](AGENTS.md): non-negotiables, decisions log, benchmarks, known traps
 - [Plan](docs/PLAN.md), [stack](docs/STACK.md), [technical spec](docs/TECH.md), [TODO with measurements](docs/TODO.md), [competitors](docs/COMPETITORS.md)
 - [Engine CLI](engine/crates/choco/src/main.rs): `choco run|highlights|render|transcribe|eval|doctor|provider|models`
-- [Website](site/index.html), deployed at https://chocovideo.vercel.app
+- [Website](site/index.html), deployed at https://chcvd.vercel.app

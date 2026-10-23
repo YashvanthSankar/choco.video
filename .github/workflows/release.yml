@@ -172,7 +172,7 @@ jobs:
             echo "SHA-256: \`${{ steps.assets.outputs.sha }}\`"
             echo
             if [[ "${{ steps.sign.outputs.signed }}" != "true" ]]; then
-              echo "> **Quickest install:** \`curl -fsSL https://chocovideo.vercel.app/install.sh | sh\` downloads this release, checks its SHA-256 and installs it with no Gatekeeper prompt."
+              echo "> **Quickest install:** \`curl -fsSL https://chcvd.vercel.app/install.sh | sh\` downloads this release, checks its SHA-256 and installs it with no Gatekeeper prompt."
               echo ""
               echo "> **Not notarized.** A browser download is blocked on first launch. Open **System Settings › Privacy & Security** and click **Open Anyway** next to choco.video, or run once: \`xattr -dr com.apple.quarantine /Applications/choco.video.app\`. (Right-click › Open no longer works on macOS 15 and later.)"
               echo

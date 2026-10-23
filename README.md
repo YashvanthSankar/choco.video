@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/YashvanthSankar/choco.video/releases/latest/download/choco.video-macos-arm64.dmg"><b>Download for macOS</b></a> ·
-  <a href="https://chocovideo.vercel.app">Website</a> ·
+  <a href="https://chcvd.vercel.app">Website</a> ·
   <a href="docs/TODO.md">What works today</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
@@ -64,7 +64,7 @@ Measured on an M3 Pro: a 47:52 interview became four finished clips in 226 secon
 **App.** Requires an Apple Silicon Mac on macOS 14 or later. The quickest install is one line in Terminal; it downloads the latest release, checks its SHA-256 and copies the app to Applications, and the app then opens with no Gatekeeper prompt ([read the script](scripts/install.sh)):
 
 ```sh
-curl -fsSL https://chocovideo.vercel.app/install.sh | sh
+curl -fsSL https://chcvd.vercel.app/install.sh | sh
 ```
 
 Or download the DMG above and drag choco.video to Applications. The build is not notarized, so macOS blocks a browser download's first launch: open **System Settings › Privacy & Security** and click **Open Anyway** next to choco.video (macOS 15 and later no longer offer right-click › Open). Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/choco.video.app`.
