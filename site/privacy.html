@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy and terms · choco.video</title>
+<meta name="description" content="What choco.video sends, what it never sends, and the terms of the free open-source app.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+@font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+:root { --bg: #f4f4f2; --ink: #2a1712; --muted: #6b5a50; --rule: #d8cfc6; --link: #2a1712; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1a0f0b; --ink: #f4f4f2; --muted: #c9b9ad; --rule: #3d241c; --link: #ffd84a; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.6 "General Sans", system-ui, sans-serif; }
+main { max-width: 680px; margin: 0 auto; padding: 48px 16px 72px; }
+h1 { font-size: 34px; line-height: 1.15; margin: 0 0 6px; }
+h2 { font-size: 21px; margin: 36px 0 8px; padding-top: 20px; border-top: 1px solid var(--rule); }
+p, li { color: var(--ink); }
+.muted { color: var(--muted); }
+a { color: var(--link); text-underline-offset: 3px; }
+code { font-size: 15px; overflow-wrap: anywhere; }
+</style>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<main>
+  <p><a href="/">← choco.video</a></p>
+  <h1>Privacy and terms</h1>
+  <p class="muted">Last updated 23 October 2026</p>
+
+  <h2>The app</h2>
+  <p>choco.video has no accounts, no servers and no analytics. We never receive your videos, transcripts, clips or anything about how you use the app.</p>
+  <ul>
+    <li><b>Your video and audio never leave your Mac.</b> Transcription, face tracking, captions and rendering all run on your computer.</li>
+    <li><b>Clip picking sends transcript text only, and only where you choose.</b> With Apple's on-device model nothing leaves your Mac. With a provider such as OpenCode Zen, the transcript text goes to that provider under its own privacy policy, using your own key. The key is stored in your Mac's Keychain.</li>
+    <li><b>Downloads you start.</b> If your Mac needs a speech model, it is downloaded from Hugging Face when you ask for it.</li>
+    <li><b>Update check, off by default.</b> From version 0.1.4 you can turn on an update check, which fetches one small file from GitHub.</li>
+  </ul>
+  <p>The app is open source, so you can check all of this yourself: <a href="https://github.com/YashvanthSankar/choco.video">github.com/YashvanthSankar/choco.video</a>.</p>
+
+  <h2>This website</h2>
+  <p>This site uses <a href="https://vercel.com/docs/analytics/privacy-policy">Vercel Web Analytics</a> to count page views and see which sites send visitors. It sets no cookies and stores no personal data. Vercel hosts the site and keeps standard server logs.</p>
+
+  <h2>Terms</h2>
+  <p>choco.video is free software under the <a href="https://github.com/YashvanthSankar/choco.video/blob/main/LICENSE">MIT License</a>. It is provided as is, without warranty of any kind. You are responsible for having the rights to the videos you process and for what you publish. Clip-picking providers you connect have their own terms and prices, and you pay them directly.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or problems: <a href="https://github.com/YashvanthSankar/choco.video/issues">open an issue on GitHub</a>.</p>
+</main>
+</body>
+</html>
