@@ -1,0 +1,111 @@
+name: llama-server
+
+# Builds llama.cpp's llama-server for the offline picker tier (highlights/picker/local.rs) and
+# publishes each platform's binary as a prerelease asset. Run by hand when the pin changes; the
+# app then downloads the binary by URL + sha256 (models_registry), only when the user turns the
+# local picker on. One self-contained file per platform: no DLLs, no VC++ redistributable on
+# Windows, Metal shaders embedded and ad-hoc signed on the Mac.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Tag b11429: the build the local tier was measured with (AGENTS.md benchmarks).
+  LLAMA_TAG: b11429
+  LLAMA_SHA: d81235049384534c167caea52b85a694f6103d14
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: ${{ env.LLAMA_SHA }}
+          path: llama.cpp
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Build (static, /MT, AVX2 baseline)
+        working-directory: llama.cpp
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_OPENSSL=OFF \
+            -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON \
+            -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          cmake --build build --target llama-server -j
+          mkdir -p ../out
+          cp "$(find build -name llama-server.exe | head -1)" "../out/llama-server-$LLAMA_TAG-windows-x64.exe"
+      - name: No VC++ runtime, no DLLs beyond Windows itself
+        run: |
+          EXE="out/llama-server-$LLAMA_TAG-windows-x64.exe"
+          dumpbin //dependents "$EXE" | tee deps.txt
+          if grep -iE "vcruntime|msvcp|ggml|llama|libcurl|libgcc|libstdc" deps.txt; then echo "unexpected dependency"; exit 1; fi
+          "$EXE" --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: ${{ env.LLAMA_SHA }}
+          path: llama.cpp
+      - name: Build (static, Metal shaders embedded, macOS 14+)
+        working-directory: llama.cpp
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_OPENSSL=OFF \
+            -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON \
+            -DGGML_NATIVE=OFF -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON
+          cmake --build build --target llama-server -j
+          mkdir -p ../out
+          cp build/bin/llama-server "../out/llama-server-$LLAMA_TAG-macos-arm64"
+      - name: System libraries only, ad-hoc signed
+        run: |
+          BIN="out/llama-server-$LLAMA_TAG-macos-arm64"
+          otool -L "$BIN" | tee deps.txt
+          if tail -n +2 deps.txt | grep -vE "^\s+(/usr/lib/|/System/Library/)"; then echo "unexpected dependency"; exit 1; fi
+          codesign --force --sign - "$BIN"
+          codesign --verify "$BIN"
+          "$BIN" --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/
+
+  publish:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Checksums and license
+        id: sums
+        run: |
+          cd out
+          curl -fsSL -o LICENSE-llama.cpp "https://raw.githubusercontent.com/ggml-org/llama.cpp/$LLAMA_SHA/LICENSE"
+          sha256sum llama-server-* | tee SHA256SUMS
+          { echo "### llama-server $LLAMA_TAG"; echo '```'; ls -l llama-server-*; cat SHA256SUMS; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: llama-server-${{ env.LLAMA_TAG }}
+          name: llama-server ${{ env.LLAMA_TAG }} for the offline picker
+          prerelease: true
+          make_latest: false
+          body: "llama.cpp ${{ env.LLAMA_TAG }} (${{ env.LLAMA_SHA }}, MIT) built by .github/workflows/llama-server.yml: Windows x64 static /MT with AVX2, macOS arm64 with Metal, ad-hoc signed. Downloaded by choco.video only when the offline picker is turned on. Checksums in SHA256SUMS."
+          files: out/*
